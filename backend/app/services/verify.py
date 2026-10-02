@@ -113,8 +113,24 @@ def _check_mssql(reader: _HashingReader) -> None:
         pass
 
 
+def _check_config(reader: _HashingReader, vendor: str | None) -> int:
+    from app.services import netconfig
+
+    data = bytearray()
+    while chunk := reader.read(_CHUNK):
+        data += chunk
+        if len(data) > 128 * 1024 * 1024:
+            raise CheckFailed("configuração grande demais")
+    res = netconfig.check(bytes(data), vendor)
+    if not res.ok:
+        raise CheckFailed(res.message)
+    return res.lines
+
+
 def _content_check(reader: _HashingReader, comp: BackupComponent) -> int | None:
     name = comp.file_name or ""
+    if comp.kind == "config":
+        return _check_config(reader, comp.backup.client.vendor)
     if comp.kind == "files" or name.endswith(".tar.gz.gpg"):
         return _check_tar(reader)
     if comp.kind in ("mysql", "postgresql"):
@@ -183,7 +199,7 @@ def _deep_check(keyring: gpg.PrivateKeyring, path: Path, comp: BackupComponent) 
         return CompResult(False, f"tamanho decifrado {reader.n} ≠ {comp.plain_size_bytes}")
     msg = "decifrado e testado"
     if count is not None:
-        msg += f" ({count} entradas no tar)"
+        msg += f" ({count} linhas)" if comp.kind == "config" else f" ({count} entradas no tar)"
     return CompResult(True, msg, count)
 
 

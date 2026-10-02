@@ -36,10 +36,13 @@ def isolated_paths(tmp_path, monkeypatch):
     """Cada teste com sua própria pasta de backups e volume do sshd."""
     data = tmp_path / "data"
     ssh = tmp_path / "ssh"
+    netcfg = tmp_path / "netcfg"
     data.mkdir()
     ssh.mkdir()
+    netcfg.mkdir()
     monkeypatch.setattr(settings, "storage_path", str(data))
     monkeypatch.setattr(settings, "ssh_shared_dir", str(ssh))
+    monkeypatch.setattr(settings, "receivers_shared_dir", str(netcfg))
     monkeypatch.setattr(settings, "backup_public_key_path", str(tmp_path / "nokey.asc"))
     return tmp_path
 

@@ -10,6 +10,10 @@ class ServerInfoOut(BaseModel):
     ssh_port: int
     ssh_host_key: str | None
     ssh_host_key_fingerprint: str | None
+    net_host: str
+    ftp_port: int
+    ftp_passive_ports: str
+    tftp_port: int
     storage_path: str
     disk_total_bytes: int
     disk_used_bytes: int

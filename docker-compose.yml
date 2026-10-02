@@ -11,6 +11,7 @@ volumes:
   db_data:
   ssh_shared:
   ssh_hostkeys:
+  receivers_shared:   # receivers.json: IPs de equipamentos + contas FTP (hash)
   caddy_data:     # certificados Let's Encrypt (não apague: limite de emissão)
   caddy_config:
 
@@ -28,6 +29,13 @@ x-backend-env: &backend-env
   INCOMING_STALE_HOURS: ${INCOMING_STALE_HOURS:-12}
   REVERIFY_INTERVAL_DAYS: ${REVERIFY_INTERVAL_DAYS:-30}
   OVERDUE_GRACE_MINUTES: ${OVERDUE_GRACE_MINUTES:-120}
+  RECEIVERS_SHARED_DIR: /netcfg
+  NET_PUBLIC_HOST: ${NET_PUBLIC_HOST:-}
+  FTP_PORT: ${FTP_PORT:-21}
+  FTP_PASSIVE_PORTS: ${FTP_PASSIVE_PORTS:-30000-30049}
+  FTP_MASQUERADE_ADDRESS: ${FTP_MASQUERADE_ADDRESS:-}
+  TFTP_PORT: ${TFTP_PORT:-69}
+  NET_MAX_FILE_MB: ${NET_MAX_FILE_MB:-64}
 
 services:
   # ─────────────────────────── PostgreSQL ───────────────────────────
@@ -91,6 +99,7 @@ services:
     volumes:
       - ${BACKUP_STORAGE_PATH:?set BACKUP_STORAGE_PATH}:/data
       - ssh_shared:/ssh
+      - receivers_shared:/netcfg
       # Só a chave PÚBLICA — o backend nunca vê a privada.
       - ${SECRETS_DIR:-./secrets}/backup-key.pub.asc:/keys/backup-key.pub.asc:ro
     networks:
@@ -120,6 +129,7 @@ services:
     volumes:
       - ${BACKUP_STORAGE_PATH:?set BACKUP_STORAGE_PATH}:/data
       - ssh_shared:/ssh
+      - receivers_shared:/netcfg
       - ${SECRETS_DIR:-./secrets}/backup-key.pub.asc:/keys/backup-key.pub.asc:ro
       # Chave PRIVADA (+ senha) só aqui. Sem ela o worker verifica só a
       # integridade (hash + destinatário). Ver docs/security.md.
@@ -130,6 +140,48 @@ services:
       - no-new-privileges:true
     networks:
       - internal   # sem acesso à rede externa
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ───────────── Receptores FTP/TFTP (switches e roteadores) ─────────────
+  # Rede do host (como o sshd) para o ufw filtrar 21 + faixa passiva e 69/udp.
+  # Só gravação; só IPs de equipamentos cadastrados; sem acesso ao banco: leem
+  # o receivers.json gerado pelo painel. O worker cifra cada arquivo recebido.
+  ftp:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    network_mode: host
+    user: "0:0"   # abre a porta 21 e larga para o uid 10001
+    command: ["python", "-m", "app.receivers.ftp"]
+    environment:
+      <<: *backend-env
+      FTP_BIND: ${FTP_BIND:-0.0.0.0}
+    volumes:
+      - ${BACKUP_STORAGE_PATH:?set BACKUP_STORAGE_PATH}:/data
+      - receivers_shared:/netcfg:ro
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  tftp:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    network_mode: host
+    user: "0:0"   # abre a porta 69/udp e larga para o uid 10001
+    command: ["python", "-m", "app.receivers.tftp"]
+    environment:
+      <<: *backend-env
+      TFTP_BIND: ${TFTP_BIND:-0.0.0.0}
+    volumes:
+      - ${BACKUP_STORAGE_PATH:?set BACKUP_STORAGE_PATH}:/data
+      - receivers_shared:/netcfg:ro
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       backend:
         condition: service_healthy

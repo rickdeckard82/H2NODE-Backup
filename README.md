@@ -1,6 +1,7 @@
 # Pulse Backup
 
-Sistema para **fazer, receber, validar e acompanhar backups de servidores Linux**,
+Sistema para **fazer, receber, validar e acompanhar backups de servidores Linux e
+de configurações de switches/roteadores** (FTP/TFTP),
 com painel web protegido por login. Stack: **FastAPI + PostgreSQL** no backend,
 **React + Vite + Tailwind** no frontend, **rsync sobre SSH** no transporte e
 **GPG** na criptografia, tudo em **Docker**. Mesmos padrões visuais e de código do
@@ -9,6 +10,7 @@ Pulse RADIUS e do Projeto.io.
 | Parte | O que faz |
 |---|---|
 | **Agente** (`agent/`) | Script bash no crontab do root de cada cliente. Faz tar das pastas e dump dos bancos (MySQL/MariaDB, PostgreSQL, SQL Server), **cifra cada parte com a chave pública GPG** do servidor, envia por rsync/SSH e **apaga tudo localmente**. |
+| **ftp / tftp** | Recebem a configuração de switches e roteadores (Datacom TFTP, Huawei/Juniper FTP). Só gravação, só IPs cadastrados; o worker cifra na chegada. Ver [docs/network-devices.md](docs/network-devices.md). |
 | **sshd** | Recebe os uploads. Só chave pública; cada cliente fica preso (`rrsync -wo -no-del`) à própria pasta, **só escrita** — não lê, não lista, não apaga. |
 | **worker** | Recebe os uploads completos, confere tamanho/SHA-256, **decifra em streaming e testa o conteúdo** (tar íntegro, dump completo), aplica retenção, reverifica periodicamente e mede o disco. |
 | **backend** | API do painel: login com senha (Argon2id) + 2FA opcional, papéis, auditoria, clientes, backups, dashboard. |
@@ -77,6 +79,14 @@ Bancos suportados:
 | MySQL / MariaDB | `mysqldump`/`mariadb-dump --single-transaction`, um arquivo por banco | unix_socket do root ou `MYSQL_DEFAULTS_FILE` |
 | PostgreSQL | `pg_dump --create` por banco + `pg_dumpall --globals-only` | peer, como o usuário `postgres` |
 | SQL Server (Linux) | `BACKUP DATABASE … WITH COPY_ONLY, CHECKSUM` + `RESTORE VERIFYONLY` | `sqlcmd`, senha em arquivo 600 |
+
+## Switches e roteadores
+
+Cadastre em **Equipamentos de rede** (fabricante, protocolo, IP de origem) e, para
+FTP, as contas em **Configuração → Contas FTP**. O painel mostra os comandos de cada
+fabricante (Datacom DmOS via TFTP, Huawei VRP e Juniper Junos via FTP). Cada
+configuração recebida é validada, cifrada com a chave GPG e guardada como uma versão.
+Detalhes em [docs/network-devices.md](docs/network-devices.md).
 
 ## Validação dos backups
 

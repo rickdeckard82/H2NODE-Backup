@@ -54,6 +54,8 @@ class DashboardOut(BaseModel):
     days: int
     clients_total: int
     clients_active: int
+    servers_active: int = 0
+    devices_active: int = 0
     clients_health: dict[str, int]
     last24h: dict[str, int]
     window: dict[str, int]

@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.1.1";
+export const APP_VERSION = "0.2.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.2.0",
+    date: "2026-10-01",
+    changes: [
+      "Backup de switches e roteadores: receptores FTP e TFTP (Datacom DmOS via TFTP, Huawei VRP e Juniper Junos via FTP), aceitando só os IPs cadastrados e só gravação.",
+      "Tela Equipamentos de rede com fabricante, protocolo e IP de origem, e os comandos prontos para colar em cada equipamento.",
+      "Configuração → Contas FTP para as contas usadas pelos equipamentos (senha em hash Argon2id).",
+      "Cada configuração recebida é validada (Huawei \"return\", Junos .gz íntegro, DmOS), cifrada com a chave GPG na chegada e verificada de novo após decifrar; versões idênticas são sinalizadas.",
+      "Intervalo esperado 0 = sob demanda (envio a cada alteração), sem alerta de atraso.",
+      "Clientes passam a se chamar Servidores; painel e filtros mostram servidores e equipamentos.",
+    ],
+  },
   {
     version: "0.1.1",
     date: "2026-10-01",

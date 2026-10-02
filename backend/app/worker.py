@@ -1,7 +1,8 @@
 """Worker de background (container próprio, mesma imagem do backend).
 
 Ciclo a cada WORKER_POLL_SECONDS:
-  1. recebe os uploads completos de incoming/ (ingest);
+  1. recebe os uploads completos de incoming/ (agente Linux) e de netin/
+     (configurações de switches/roteadores via FTP/TFTP, cifradas aqui);
   2. verifica os backups pendentes (um por vez, FOR UPDATE SKIP LOCKED);
   3. de hora em hora: retenção, limpeza da quarentena, reverificação periódica;
   4. foto do disco a cada STORAGE_SNAPSHOT_MINUTES.
@@ -20,7 +21,7 @@ from app.core.db import SessionLocal
 from app.core.logging import configure_logging, logger
 from app.core.security import utcnow
 from app.models import Backup, BackupStatus, Client, StorageSnapshot, VerifyStatus, WorkerStatus
-from app.services import gpg, ingest, retention, sshkeys, storage, verify
+from app.services import gpg, ingest, netingest, receivers, retention, sshkeys, storage, verify
 
 _HOUSEKEEPING_EVERY = 3600
 _VERIFY_BUDGET_SECONDS = 600  # devolve o controle ao ciclo (ingest) após isso
@@ -53,6 +54,8 @@ def prepare(db) -> None:
     for c in db.execute(select(Client)).scalars():
         storage.ensure_client_dirs(c.slug)
     sshkeys.sync_authorized_keys(db)
+    netingest.ensure_layout()
+    receivers.sync(db)
     db.execute(
         update(Backup).where(Backup.verify_status == VerifyStatus.running)
         .values(verify_status=VerifyStatus.pending)
@@ -159,11 +162,13 @@ def main() -> None:
                 for c in db.execute(select(Client)).scalars():
                     storage.ensure_client_dirs(c.slug)
                 ingest.scan(db)
+                netingest.scan(db)
                 run_verifications(db, keyring)
                 now = time.monotonic()
                 if now - last_housekeeping >= _HOUSEKEEPING_EVERY:
                     retention.apply_all(db)
                     retention.purge_quarantine()
+                    netingest.cleanup()
                     queued = schedule_reverify(db)
                     if queued:
                         logger.info("reverify_scheduled", count=queued)

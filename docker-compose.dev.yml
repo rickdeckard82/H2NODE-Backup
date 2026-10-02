@@ -31,3 +31,11 @@ services:
     environment:
       PUBLIC_DOMAIN: localhost
       ACME_EMAIL: dev@localhost
+
+  # Portas sem privilégio em dev (21/69 exigem root e podem já estar em uso).
+  ftp:
+    environment:
+      FTP_PORT: "2121"
+  tftp:
+    environment:
+      TFTP_PORT: "6969"

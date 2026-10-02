@@ -1,0 +1,170 @@
+"""Ponte entre o painel e os receptores FTP/TFTP (containers na rede do host,
+sem acesso ao banco).
+
+O painel/worker grava `receivers.json` no volume compartilhado com:
+  - equipamentos ATIVOS (slug, IP de origem, protocolo);
+  - contas FTP ATIVAS (usuário + hash Argon2id da senha).
+Os receptores recarregam o arquivo quando ele muda.
+
+Layout da recepção, dentro de STORAGE_PATH:
+    netin/.sessions/<slug>/<sessão>/   área de escrita de uma sessão FTP
+    netin/.tmp/                        transferências TFTP em andamento
+    netin/<slug>/<carimbo>__<nome>     arquivo completo, pronto para o worker
+    netin/<slug>/<carimbo>__<nome>.meta.json   (gravado por ÚLTIMO)
+"""
+
+import json
+import os
+import re
+import secrets
+import tempfile
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.core.logging import logger
+
+ALLOWLIST_FILE = "receivers.json"
+META_SUFFIX = ".meta.json"
+
+
+def shared_dir() -> Path:
+    return Path(settings.receivers_shared_dir)
+
+
+def netin() -> Path:
+    return Path(settings.storage_path) / "netin"
+
+
+def render(db: Session) -> dict:
+    from app.models import Client, FtpAccount
+
+    devices = [
+        {"slug": c.slug, "ip": c.mgmt_ip, "protocol": c.protocol, "vendor": c.vendor}
+        for c in db.execute(
+            select(Client).where(Client.kind == "network", Client.is_active.is_(True))
+        ).scalars()
+        if c.mgmt_ip and c.protocol
+    ]
+    accounts = [
+        {"username": a.username, "password_hash": a.password_hash}
+        for a in db.execute(select(FtpAccount).where(FtpAccount.is_active.is_(True))).scalars()
+    ]
+    return {"version": 1, "devices": devices, "ftp_accounts": accounts}
+
+
+def sync(db: Session) -> bool:
+    """Reescreve receivers.json de forma atômica (modo 600: tem hashes de senha)."""
+    d = shared_dir()
+    if not d.is_dir():
+        logger.warning("receivers_shared_dir_missing", path=str(d))
+        return False
+    data = json.dumps(render(db), indent=1)
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".receivers.")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(data)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, d / ALLOWLIST_FILE)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+    return True
+
+
+# ---------------------------------------------------------------- receptores --
+
+
+@dataclass(frozen=True)
+class Device:
+    slug: str
+    ip: str
+    protocol: str
+    vendor: str | None
+
+
+class Allowlist:
+    """Leitura do receivers.json com recarga automática quando o arquivo muda."""
+
+    def __init__(self, path: Path | None = None) -> None:
+        self.path = path or (shared_dir() / ALLOWLIST_FILE)
+        self._mtime: float | None = None
+        self.by_ip: dict[str, Device] = {}
+        self.accounts: dict[str, str] = {}
+
+    def refresh(self) -> None:
+        try:
+            mtime = self.path.stat().st_mtime
+        except OSError:
+            self.by_ip, self.accounts, self._mtime = {}, {}, None
+            return
+        if mtime == self._mtime:
+            return
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            logger.error("receivers_allowlist_unreadable", error=str(exc))
+            return
+        self.by_ip = {
+            d["ip"]: Device(d["slug"], d["ip"], d["protocol"], d.get("vendor"))
+            for d in data.get("devices", [])
+        }
+        self.accounts = {a["username"]: a["password_hash"] for a in data.get("ftp_accounts", [])}
+        self._mtime = mtime
+        logger.info("receivers_allowlist_loaded", devices=len(self.by_ip), accounts=len(self.accounts))
+
+    def device(self, ip: str, protocol: str) -> Device | None:
+        self.refresh()
+        # IPv4 mapeado em IPv6 (::ffff:10.0.0.1) quando o socket é dual-stack
+        if ip.startswith("::ffff:"):
+            ip = ip[7:]
+        d = self.by_ip.get(ip)
+        return d if d and d.protocol == protocol else None
+
+
+_UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def safe_filename(remote_path: str) -> str:
+    """'DM4380MP/config.txt' -> 'DM4380MP_config.txt' (sem barras, sem ponto inicial)."""
+    name = _UNSAFE.sub("_", remote_path.replace("\\", "/").strip("/")).strip("._-")
+    return (name or "config")[:120]
+
+
+def finalize(src: Path, device: Device, *, protocol: str, remote_path: str, size: int) -> Path:
+    """Move um upload completo para netin/<slug>/ e grava o .meta.json por último
+    (é ele que sinaliza ao worker que o arquivo está pronto)."""
+    now = datetime.now(UTC)
+    dest_dir = netin() / device.slug
+    dest_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    base = f"{now.strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(3)}__{safe_filename(remote_path)}"
+    dest = dest_dir / base
+    os.replace(src, dest)
+    meta = {
+        "device": device.slug,
+        "source_ip": device.ip,
+        "protocol": protocol,
+        "remote_path": remote_path[:500],
+        "size": size,
+        "received_at": now.isoformat(),
+    }
+    fd, tmp = tempfile.mkstemp(dir=dest_dir, prefix=".meta.")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(meta, f)
+    os.replace(tmp, dest_dir / (base + META_SUFFIX))
+    logger.info("net_upload_received", device=device.slug, protocol=protocol, file=remote_path, size=size)
+    return dest
+
+
+def drop_privileges(uid: int = 10001, gid: int = 10001) -> None:
+    """Depois de abrir as portas < 1024, roda como o usuário sem privilégio."""
+    if os.getuid() != 0:
+        return
+    os.setgroups([])
+    os.setgid(gid)
+    os.setuid(uid)
+    os.umask(0o077)

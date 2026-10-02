@@ -135,6 +135,8 @@ def dashboard(
         days=days,
         clients_total=len(clients),
         clients_active=sum(1 for c in clients if c.is_active),
+        servers_active=sum(1 for c in clients if c.is_active and c.kind == "server"),
+        devices_active=sum(1 for c in clients if c.is_active and c.kind == "network"),
         clients_health=dict(health),
         last24h={k: last24[k] for k in ("ok", "warning", "failed")},
         window={k: window[k] for k in ("ok", "warning", "failed")},

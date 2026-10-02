@@ -13,9 +13,11 @@ def client_health(c: Client) -> str:
         return "inactive"
     if c.last_backup_at is None:
         return "never"
-    limit = timedelta(hours=c.expected_interval_hours, minutes=settings.overdue_grace_minutes)
-    if utcnow() - c.last_backup_at > limit:
-        return "overdue"
+    # intervalo 0 = sob demanda (ex.: envio a cada commit): nunca "atrasado"
+    if c.expected_interval_hours > 0:
+        limit = timedelta(hours=c.expected_interval_hours, minutes=settings.overdue_grace_minutes)
+        if utcnow() - c.last_backup_at > limit:
+            return "overdue"
     if c.last_status in ("failed", "corrupted"):
         return "failed"
     if c.last_status == "warning":

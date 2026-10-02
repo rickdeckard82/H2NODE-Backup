@@ -101,6 +101,27 @@ export default function ServerPage() {
           </Card>
 
           <Card>
+            <h3 className="mb-1 font-semibold">Recepção de switches e roteadores (FTP/TFTP)</h3>
+            <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
+              Só gravação e só a partir dos IPs dos equipamentos cadastrados. A configuração chega em claro (limite
+              dos protocolos), é cifrada com a chave GPG na hora e o original é apagado.
+            </p>
+            <dl className="divide-y divide-slate-100 dark:divide-slate-800">
+              <Row label="Endereço para os equipamentos">
+                <span className="font-mono">{s.net_host}</span>
+              </Row>
+              <Row label="FTP">
+                <span className="font-mono">
+                  porta {s.ftp_port} · passivo {s.ftp_passive_ports}
+                </span>
+              </Row>
+              <Row label="TFTP">
+                <span className="font-mono">porta {s.tftp_port}/udp</span>
+              </Row>
+            </dl>
+          </Card>
+
+          <Card>
             <h3 className="mb-3 font-semibold">Armazenamento</h3>
             <dl className="divide-y divide-slate-100 dark:divide-slate-800">
               <Row label="Pasta no container">

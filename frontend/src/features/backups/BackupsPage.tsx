@@ -268,12 +268,19 @@ export default function BackupsPage() {
 
       <Card className="mb-3 flex flex-wrap items-center gap-2">
         <select className="input max-w-[14rem]" value={clientId} onChange={(e) => setParam("client", e.target.value)}>
-          <option value="">Todos os clientes</option>
-          {clients.data?.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
+          <option value="">Todas as origens</option>
+          {(["server", "network"] as const).map((k) => {
+            const items = clients.data?.filter((c) => c.kind === k) ?? [];
+            return items.length ? (
+              <optgroup key={k} label={k === "server" ? "Servidores" : "Equipamentos de rede"}>
+                {items.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null;
+          })}
         </select>
         <select className="input max-w-[12rem]" value={status} onChange={(e) => setParam("status", e.target.value)}>
           <option value="">Qualquer resultado</option>
@@ -299,7 +306,7 @@ export default function BackupsPage() {
         <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
           <thead className="bg-slate-50 dark:bg-slate-800/50">
             <tr>
-              <th className="th">Cliente</th>
+              <th className="th">Origem</th>
               <th className="th">Data</th>
               <th className="th">Resultado</th>
               <th className="th">Verificação</th>

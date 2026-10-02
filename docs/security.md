@@ -12,6 +12,13 @@
 | Backup "verde" que não restaura | Verificação profunda: tar lido até o fim, dump com marcador final, destinatário GPG correto. |
 | Acesso indevido ao painel | Login com Argon2id, bloqueio progressivo após 5 erros, rate-limit, 2FA TOTP com códigos de recuperação, cookies `HttpOnly`/`SameSite=Strict`/`Secure`, CSRF double-submit, refresh token com rotação e detecção de reuso, papéis, trilha de auditoria (inclusive downloads). |
 
+## Equipamentos de rede (FTP/TFTP)
+
+FTP e TFTP não têm criptografia: a configuração e a senha FTP trafegam em claro. O
+sistema compensa no que controla — só IPs cadastrados, receptores só de gravação,
+sessões isoladas, cifragem GPG imediata na chegada e remoção do original —, mas o
+trecho de rede entre equipamento e servidor deve ser a rede de gerência ou uma VPN.
+
 ## Dados em claro no cliente
 
 Pastas e dumps saem do `tar`/`mysqldump`/`pg_dump` direto para o `gpg` por pipe —
@@ -37,10 +44,12 @@ seguida, em `MSSQL_BACKUP_DIR` (modo 700).
 |---|---|---|
 | 443 / 80 | proxy Caddy (rede do host) | pública — HTTPS com Let's Encrypt; 80 só redireciona |
 | 2222 | sshd (rede do host) | **só os IPs dos clientes** (ufw) |
+| 21 + 30000-30049 | receptor FTP (rede do host) | **só os IPs dos equipamentos FTP** (ufw) |
+| 69/udp | receptor TFTP (rede do host) | **só os IPs dos equipamentos TFTP** (ufw) |
 | 8080 | frontend | `127.0.0.1` apenas |
 | 8000 / 5432 | backend / PostgreSQL | sem porta no host (redes internas do Compose) |
 
-Proxy e sshd usam `network_mode: host` de propósito: portas publicadas com `ports:`
+Proxy, sshd e os receptores FTP/TFTP usam `network_mode: host` de propósito: portas publicadas com `ports:`
 entram por regras de iptables do Docker avaliadas antes do ufw. Não troque isso por
 `ports:` sem também filtrar a chain `DOCKER-USER`.
 

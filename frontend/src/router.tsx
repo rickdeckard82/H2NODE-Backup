@@ -7,6 +7,8 @@ import { useAuth, type Role } from "./lib/auth";
 const LoginPage = lazy(() => import("./features/auth/LoginPage"));
 const DashboardPage = lazy(() => import("./features/dashboard/DashboardPage"));
 const ClientsPage = lazy(() => import("./features/clients/ClientsPage"));
+const DevicesPage = lazy(() => import("./features/devices/DevicesPage"));
+const FtpAccountsPage = lazy(() => import("./features/settings/FtpAccountsPage"));
 const BackupsPage = lazy(() => import("./features/backups/BackupsPage"));
 const ServerPage = lazy(() => import("./features/settings/ServerPage"));
 const SystemUsersPage = lazy(() => import("./features/system-users/SystemUsersPage"));
@@ -57,7 +59,16 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <DashboardPage /> },
       { path: "clients", element: <ClientsPage /> },
+      { path: "devices", element: <DevicesPage /> },
       { path: "backups", element: <BackupsPage /> },
+      {
+        path: "settings/ftp-accounts",
+        element: (
+          <Protected roles={["admin"]}>
+            <FtpAccountsPage />
+          </Protected>
+        ),
+      },
       { path: "settings/server", element: <ServerPage /> },
       {
         path: "system-users",

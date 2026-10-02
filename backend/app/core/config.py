@@ -69,6 +69,22 @@ class Settings(BaseSettings):
     # uid do usuário "backup" no container sshd (dono dos arquivos enviados).
     ssh_user: str = "backup"
 
+    # ---- Receptores FTP/TFTP (equipamentos de rede) ----
+    # Volume compartilhado com os containers ftp/tftp: lista de IPs autorizados e
+    # contas FTP (hash), gerada pelo painel. Eles não acessam o banco.
+    receivers_shared_dir: str = Field(default="/netcfg", alias="RECEIVERS_SHARED_DIR")
+    # Endereço que os EQUIPAMENTOS usam para chegar aqui (vai nos comandos de
+    # exemplo). Vazio = SSH_PUBLIC_HOST.
+    net_public_host: str = Field(default="", alias="NET_PUBLIC_HOST")
+    ftp_port: int = Field(default=21, alias="FTP_PORT")
+    # Faixa de portas do modo passivo (libere no ufw para os IPs dos equipamentos).
+    ftp_passive_ports: str = Field(default="30000-30049", alias="FTP_PASSIVE_PORTS")
+    # IP anunciado no PASV quando o servidor está atrás de NAT. Vazio = o da interface.
+    ftp_masquerade_address: str | None = Field(default=None, alias="FTP_MASQUERADE_ADDRESS")
+    tftp_port: int = Field(default=69, alias="TFTP_PORT")
+    # Tamanho máximo de um arquivo de configuração recebido.
+    net_max_file_mb: int = Field(default=64, alias="NET_MAX_FILE_MB")
+
     # ---- Chave GPG dos backups ----
     # Pública: distribuída aos clientes (cifram para ela). Privada: só no worker,
     # para a verificação profunda (decifrar e testar o conteúdo). Sem a privada o
@@ -89,6 +105,15 @@ class Settings(BaseSettings):
     storage_snapshot_minutes: int = Field(default=60, alias="STORAGE_SNAPSHOT_MINUTES")
     # Margem além do intervalo esperado antes de marcar o cliente como atrasado.
     overdue_grace_minutes: int = Field(default=120, alias="OVERDUE_GRACE_MINUTES")
+
+    @property
+    def net_host(self) -> str:
+        return self.net_public_host or self.ssh_public_host
+
+    @property
+    def passive_port_range(self) -> tuple[int, int]:
+        a, _, b = self.ftp_passive_ports.partition("-")
+        return int(a), int(b or a)
 
     @field_validator("jwt_secret")
     @classmethod

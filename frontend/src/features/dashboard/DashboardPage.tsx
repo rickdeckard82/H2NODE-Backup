@@ -23,6 +23,8 @@ interface Dashboard {
   days: number;
   clients_total: number;
   clients_active: number;
+  servers_active: number;
+  devices_active: number;
   clients_health: Partial<Record<Health, number>>;
   last24h: { ok: number; warning: number; failed: number };
   window: { ok: number; warning: number; failed: number };
@@ -147,10 +149,10 @@ export default function DashboardPage() {
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             <Stat
-              label="Clientes ativos"
+              label="Origens ativas"
               value={d.clients_active}
               accent="bg-brand-500"
-              hint={d.clients_total !== d.clients_active ? `de ${d.clients_total}` : undefined}
+              hint={`${d.servers_active} servidor(es) · ${d.devices_active} equipamento(s)`}
             />
             <Stat
               label="Atrasados / falhando"
@@ -218,7 +220,7 @@ export default function DashboardPage() {
               <StorageTrendChart data={d.storage_history} />
             </Card>
             <Card>
-              <h3 className="mb-4 font-semibold">Clientes que mais ocupam espaço</h3>
+              <h3 className="mb-4 font-semibold">Origens que mais ocupam espaço</h3>
               <HBarList
                 items={d.top_clients.map((c) => ({ label: c.name, sub: c.slug, value: c.stored_bytes }))}
                 empty="Nenhum backup guardado ainda"
@@ -242,7 +244,7 @@ export default function DashboardPage() {
                 ]}
               />
               <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
-                <h3 className="mb-3 font-semibold">Clientes atrasados ou sem backup</h3>
+                <h3 className="mb-3 font-semibold">Origens atrasadas ou sem backup</h3>
                 <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
                   {d.overdue_clients.length ? (
                     d.overdue_clients.map((c) => (
@@ -252,12 +254,13 @@ export default function DashboardPage() {
                           <span className="truncate font-medium text-slate-700 dark:text-slate-200">{c.name}</span>
                         </span>
                         <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500">
-                          último: {fmtAgo(c.last_backup_at)} · esperado a cada {c.expected_interval_hours}h
+                          último: {fmtAgo(c.last_backup_at)}
+                          {c.expected_interval_hours ? ` · esperado a cada ${c.expected_interval_hours}h` : ""}
                         </span>
                       </li>
                     ))
                   ) : (
-                    <li className="py-2 text-slate-400 dark:text-slate-500">Todos os clientes em dia</li>
+                    <li className="py-2 text-slate-400 dark:text-slate-500">Tudo em dia</li>
                   )}
                 </ul>
               </div>

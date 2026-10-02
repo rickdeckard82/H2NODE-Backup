@@ -11,6 +11,8 @@ for f in backup-key.sec.asc backup-key.pass; do
     fi
 done
 chown -R 10001:10001 /tmp/keys
+# volume compartilhado com os receptores FTP/TFTP (painel e worker gravam nele)
+[ -d /netcfg ] && chown 10001:10001 /netcfg && chmod 700 /netcfg
 [ -f /tmp/keys/backup-key.pass ] && export BACKUP_KEY_PASSPHRASE_FILE=/tmp/keys/backup-key.pass
 [ -f /tmp/keys/backup-key.sec.asc ] && export BACKUP_PRIVATE_KEY_PATH=/tmp/keys/backup-key.sec.asc
 exec setpriv --reuid=10001 --regid=10001 --init-groups --no-new-privs python -m app.worker

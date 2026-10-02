@@ -11,7 +11,17 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.api.routes import audit, auth, backups, clients, dashboard, health, server, system_users
+from app.api.routes import (
+    audit,
+    auth,
+    backups,
+    clients,
+    dashboard,
+    ftp_accounts,
+    health,
+    server,
+    system_users,
+)
 from app.core.config import settings
 from app.core.logging import configure_logging, logger
 from app.core.ratelimit import limiter
@@ -99,6 +109,7 @@ for r in (
     auth.router,
     dashboard.router,
     clients.router,
+    ftp_accounts.router,
     backups.router,
     server.router,
     audit.router,

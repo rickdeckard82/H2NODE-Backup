@@ -35,6 +35,8 @@ export SSH_PUBLIC_PORT=$SSH_PORT
 export WEB_PORT PUBLIC_DOMAIN=localhost ACME_EMAIL=e2e@localhost
 export COOKIE_SECURE=false FRONTEND_ORIGIN="http://127.0.0.1:$WEB_PORT"
 export WORKER_POLL_SECONDS=3
+# receptores de rede em portas altas (rede do host) para não colidir com nada
+export FTP_PORT=12121 TFTP_PORT=16969 FTP_PASSIVE_PORTS=31000-31009 NET_PUBLIC_HOST=host.docker.internal
 COMPOSE=(docker compose -f docker-compose.yml)
 
 step() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
@@ -42,7 +44,8 @@ fail() { printf '\n\033[1;31mFALHOU: %s\033[0m\n' "$*"; "${COMPOSE[@]}" logs --t
 
 teardown() {
     [ "$KEEP" -eq 1 ] && { echo "stack mantida (projeto $P, pasta $WORK)"; return; }
-    docker rm -f "$CLIENT_CT" >/dev/null 2>&1 || true
+    docker rm -f "$CLIENT_CT" "$P-juniper" "$P-huawei" "$P-datacom" >/dev/null 2>&1 || true
+    docker rmi -f "$P-netdev" >/dev/null 2>&1 || true
     "${COMPOSE[@]}" down -v >/dev/null 2>&1 || true
     # os arquivos recebidos são do uid 10001: apaga com um container
     docker run --rm -v "$WORK:/w" debian:bookworm-slim rm -rf /w/data >/dev/null 2>&1 || true
@@ -64,7 +67,7 @@ FPR="$(gpg --with-colons --show-keys "$SECRETS_DIR/backup-key.pub.asc" | awk -F:
 echo "fingerprint: $FPR"
 
 step "Subindo a stack ($P)"
-"${COMPOSE[@]}" up -d --build --wait db sshd backend worker frontend >/dev/null
+"${COMPOSE[@]}" up -d --build --wait db sshd backend worker frontend ftp tftp >/dev/null
 
 step "Login na API"
 for _ in $(seq 1 30); do curl -sf "$API/health" >/dev/null && break; sleep 2; done
@@ -176,12 +179,69 @@ if docker exec "$CLIENT_CT" bash -c "ssh -i /etc/pulse-backup/id_ed25519 -p $SSH
 fi
 echo "leitura e shell negados: ok"
 
+step "Equipamentos de rede: Juniper (FTP passivo), Huawei (FTP ativo + pasta), Datacom (TFTP)"
+docker run --name "$P-netdev-build" debian:bookworm-slim sh -c \
+    'apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends curl tftp-hpa >/dev/null 2>&1' \
+    || fail "imagem dos equipamentos simulados"
+docker commit "$P-netdev-build" "$P-netdev" >/dev/null && docker rm "$P-netdev-build" >/dev/null
+for d in juniper huawei datacom; do
+    docker run -d --name "$P-$d" --add-host=host.docker.internal:host-gateway "$P-netdev" sleep infinity >/dev/null
+done
+ipof() { docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$P-$1"; }
+JIP="$(ipof juniper)"; HIP="$(ipof huawei)"; DIP="$(ipof datacom)"
+echo "IPs: juniper=$JIP huawei=$HIP datacom=$DIP"
+
+api POST /ftp-accounts '{"username":"juniper","password":"Senha-teste-01"}' >/dev/null || fail "conta ftp juniper"
+api POST /ftp-accounts '{"username":"huawei","password":"Hw-backup-01"}' >/dev/null || fail "conta ftp huawei"
+newdev() { api POST /clients "$(printf '{"slug":"%s","name":"%s","kind":"network","vendor":"%s","protocol":"%s","mgmt_ip":"%s","expected_interval_hours":0}' "$1" "$2" "$3" "$4" "$5")" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])'; }
+J_ID="$(newdev mx-core 'MX core' juniper ftp "$JIP")" || fail "cadastro juniper"
+H_ID="$(newdev sw-huawei 'SW Huawei' huawei ftp "$HIP")" || fail "cadastro huawei"
+D_ID="$(newdev dm4380 'DM4380MP' datacom tftp "$DIP")" || fail "cadastro datacom"
+api GET "/clients/$H_ID/device-config?ftp_user=huawei" | python3 -c 'import json,sys; print(json.load(sys.stdin)["commands"])'
+sleep 2  # receptores recarregam o receivers.json
+
+docker exec "$P-juniper" sh -c 'printf "## Last commit: 2026-10-01\nversion 23.4R1;\nsystem {\n    host-name mx-core;\n    root-authentication { encrypted-password \"x\"; }\n}\ninterfaces {\n}\n" | gzip > /tmp/c.gz &&
+  curl -sS -T /tmp/c.gz "ftp://juniper:Senha-teste-01@host.docker.internal:12121/mx-core_juniper.conf.gz_20261001_120000"' \
+    || fail "upload FTP juniper"
+docker exec "$P-huawei" sh -c 'printf "#\n sysname SW-HUAWEI-SEGREDO\n#\ninterface Vlanif10\n ip address 192.0.2.15 255.255.255.0\n#\nreturn\n" > /tmp/vrpcfg.cfg &&
+  curl -sS -P - --ftp-create-dirs -T /tmp/vrpcfg.cfg "ftp://huawei:Hw-backup-01@host.docker.internal:12121/192.0.2.15/vrpcfg.cfg"' \
+    || fail "upload FTP huawei (modo ativo)"
+docker exec "$P-datacom" sh -c 'printf "hostname DM4380MP\naaa user admin\ndot1q\n vlan 10\n!\ninterface l3 mgmt\n" > /tmp/config.txt &&
+  tftp -m binary host.docker.internal 16969 -c put /tmp/config.txt DM4380MP/config.txt' \
+    || fail "upload TFTP datacom"
+
+# IP não cadastrado (o container do servidor Linux) não consegue enviar por TFTP nem FTP
+docker exec "$CLIENT_CT" bash -c 'apt-get install -y -qq curl >/dev/null 2>&1; echo x > /tmp/x &&
+  ! curl -sS -m 10 -T /tmp/x "ftp://juniper:Senha-teste-01@host.docker.internal:12121/x" 2>/dev/null' \
+    || fail "FTP deveria recusar IP não cadastrado"
+echo "IP não cadastrado recusado: ok"
+
+for id in "$J_ID" "$H_ID" "$D_ID"; do
+    ST=""
+    for _ in $(seq 1 40); do
+        ST="$(api GET "/backups?client_id=$id" | python3 -c 'import json,sys; d=json.load(sys.stdin)["items"]; print("/".join(str(d[0][k]) for k in ("status","verify_status","verify_mode")) if d else "")')"
+        case "$ST" in */ok/*|*/failed/*) break ;; esac
+        sleep 2
+    done
+    api GET "/backups?client_id=$id" | python3 -c '
+import json, sys
+b = json.load(sys.stdin)["items"][0]
+print("  %-10s %-14s %s/%s" % (b["client_slug"], b["run_name"], b["status"], b["verify_status"]))'
+    [ "$ST" = "ok/ok/full" ] || fail "equipamento $id: esperado ok/ok/full, veio $ST"
+done
+if docker run --rm -v "$BACKUP_STORAGE_PATH:/d:ro" debian:bookworm-slim grep -rl "SW-HUAWEI-SEGREDO" /d; then
+    fail "configuração em claro encontrada no armazenamento"
+fi
+echo "nenhuma configuração em claro no disco: ok"
+
 step "Dashboard"
 api GET "/dashboard?days=7" | python3 -c '
 import json, sys
 d = json.load(sys.stdin)
-print("  clientes:", d["clients_total"], "| ok 24h:", d["last24h"]["ok"], "| backups:", d["backups_bytes"], "bytes | worker online:", d["worker"]["online"], "| verificação profunda:", d["worker"]["deep_verify"])
-assert d["last24h"]["ok"] == 1 and d["worker"]["online"] and d["worker"]["deep_verify"]
+print("  origens:", d["clients_total"], "| ok 24h:", d["last24h"]["ok"], "| backups:", d["backups_bytes"], "bytes | worker online:", d["worker"]["online"], "| verificação profunda:", d["worker"]["deep_verify"])
+assert d["last24h"]["ok"] == 4 and d["worker"]["online"] and d["worker"]["deep_verify"]
+assert d["devices_active"] == 3 and d["servers_active"] == 1
 '
 
 printf '\n\033[1;32mE2E OK\033[0m\n'

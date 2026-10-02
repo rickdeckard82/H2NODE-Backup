@@ -29,6 +29,7 @@ No `.env`:
 | `BACKUP_STORAGE_PATH` | `/srv/pulse-backup/data` |
 | `SSH_PUBLIC_PORT` | `2222` (porta que os clientes usam) |
 | `COOKIE_SECURE` | `true` |
+| `NET_PUBLIC_HOST` | IP público que os switches/roteadores usam |
 
 `FRONTEND_ORIGIN` e `SSH_PUBLIC_HOST` podem ficar vazios — viram `https://PUBLIC_DOMAIN` e `PUBLIC_DOMAIN`.
 
@@ -43,13 +44,15 @@ O ufw libera só o necessário: **443** (e 80) para todos, e a porta de backup
 sudo ./scripts/ufw-setup.sh web                    # 443 + 80
 sudo ./scripts/ufw-setup.sh client 203.0.113.10    # um por servidor cliente
 sudo ./scripts/ufw-setup.sh client 198.51.100.0/28 # aceita faixa também
+sudo ./scripts/ufw-setup.sh device 192.0.2.15 ftp    # Huawei/Juniper
+sudo ./scripts/ufw-setup.sh device 192.0.2.17 tftp   # Datacom
 sudo ./scripts/ufw-setup.sh status
 ```
 
 O script não habilita o ufw nem mexe na porta 22 de administração (garanta a sua
 regra de acesso antes de `ufw enable`).
 
-> **Por que `network_mode: host` no proxy e no sshd?** Porta publicada com
+> **Por que `network_mode: host` no proxy, no sshd e nos receptores FTP/TFTP?** Porta publicada com
 > `ports:` no Docker é aberta por regras próprias de iptables (chain `DOCKER`),
 > avaliadas **antes** do ufw — o ufw não a bloquearia. Na rede do host, as portas
 > 80/443/2222 passam pelo INPUT normal e obedecem ao ufw. Os demais serviços

@@ -186,8 +186,8 @@ export default function ClientsPage() {
   const [agentFor, setAgentFor] = useState<Client | null>(null);
 
   const list = useQuery({
-    queryKey: ["clients", q],
-    queryFn: () => api.get<Client[]>("/clients", { q }),
+    queryKey: ["clients", "server", q],
+    queryFn: () => api.get<Client[]>("/clients", { q, kind: "server" }),
   });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["clients"] });
 
@@ -229,12 +229,12 @@ export default function ClientsPage() {
   return (
     <div>
       <PageHeader
-        title="Clientes"
+        title="Servidores"
         subtitle="Servidores Linux que enviam backups (agente no crontab do root)"
         actions={
           <>
             <RefreshButton keys={["clients"]} />
-            {canEdit && <Button onClick={() => setForm({ ...empty })}>Novo cliente</Button>}
+            {canEdit && <Button onClick={() => setForm({ ...empty })}>Novo servidor</Button>}
           </>
         }
       />
@@ -252,7 +252,7 @@ export default function ClientsPage() {
         <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
           <thead className="bg-slate-50 dark:bg-slate-800/50">
             <tr>
-              <th className="th">Cliente</th>
+              <th className="th">Servidor</th>
               <th className="th">Situação</th>
               <th className="th">Último backup</th>
               <th className="th">Guardado</th>
@@ -272,7 +272,7 @@ export default function ClientsPage() {
             {list.data?.length === 0 && (
               <tr>
                 <td className="td text-slate-400 dark:text-slate-500" colSpan={7}>
-                  Nenhum cliente cadastrado.
+                  Nenhum servidor cadastrado.
                 </td>
               </tr>
             )}
@@ -361,7 +361,7 @@ export default function ClientsPage() {
         </table>
       </Card>
 
-      <Modal open={!!form} onClose={() => setForm(null)} title={form?.id ? "Editar cliente" : "Novo cliente"} wide>
+      <Modal open={!!form} onClose={() => setForm(null)} title={form?.id ? "Editar servidor" : "Novo servidor"} wide>
         {form && (
           <form
             className="space-y-3"

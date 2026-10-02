@@ -28,13 +28,15 @@ const isGroup = (e: NavEntry): e is NavGroup => "children" in e;
 
 const NAV: NavEntry[] = [
   { to: "/", label: "Painel", icon: "home" },
-  { to: "/clients", label: "Clientes", icon: "server" },
+  { to: "/clients", label: "Servidores", icon: "server" },
+  { to: "/devices", label: "Equipamentos de rede", icon: "router" },
   { to: "/backups", label: "Backups", icon: "archive" },
   {
     label: "Configuração",
     icon: "settings",
     children: [
       { to: "/settings/server", label: "Chaves e servidor", icon: "key" },
+      { to: "/settings/ftp-accounts", label: "Contas FTP", icon: "lock", roles: ["admin"] },
       { to: "/system-users", label: "Usuários do painel", icon: "userCog", roles: ["admin"] },
       { to: "/audit", label: "Auditoria", icon: "clipboard", roles: ["admin"] },
     ],

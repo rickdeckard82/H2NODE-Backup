@@ -1,3 +1,20 @@
+export type Vendor = "datacom" | "huawei" | "juniper" | "generic";
+
+export const VENDOR_LABEL: Record<Vendor, string> = {
+  datacom: "Datacom (DmOS)",
+  huawei: "Huawei (VRP)",
+  juniper: "Juniper (Junos)",
+  generic: "Genérico",
+};
+
+/** Protocolo usual de cada fabricante (sugestão no cadastro). */
+export const VENDOR_PROTOCOL: Record<Vendor, "ftp" | "tftp"> = {
+  datacom: "tftp",
+  huawei: "ftp",
+  juniper: "ftp",
+  generic: "ftp",
+};
+
 export type Health = "ok" | "warning" | "failed" | "overdue" | "never" | "inactive";
 export type BackupStatus = "ok" | "warning" | "failed" | "corrupted";
 export type VerifyStatus = "pending" | "running" | "ok" | "failed" | "skipped";
@@ -8,6 +25,10 @@ export interface Client {
   name: string;
   description: string | null;
   is_active: boolean;
+  kind: "server" | "network";
+  vendor: Vendor | null;
+  mgmt_ip: string | null;
+  protocol: "ftp" | "tftp" | null;
   ssh_public_key: string | null;
   ssh_key_fingerprint: string | null;
   expected_interval_hours: number;
@@ -51,7 +72,7 @@ export interface Backup {
 export interface BackupComponent {
   id: number;
   position: number;
-  kind: "files" | "mysql" | "postgresql" | "mssql";
+  kind: "files" | "mysql" | "postgresql" | "mssql" | "config";
   name: string;
   file_name: string | null;
   size_bytes: number;
@@ -107,6 +128,10 @@ export interface ServerInfo {
   ssh_port: number;
   ssh_host_key: string | null;
   ssh_host_key_fingerprint: string | null;
+  net_host: string;
+  ftp_port: number;
+  ftp_passive_ports: string;
+  tftp_port: number;
   storage_path: string;
   disk_total_bytes: number;
   disk_used_bytes: number;
@@ -118,4 +143,14 @@ export const KIND_LABEL: Record<BackupComponent["kind"], string> = {
   mysql: "MySQL/MariaDB",
   postgresql: "PostgreSQL",
   mssql: "SQL Server",
+  config: "Configuração",
 };
+
+export interface FtpAccount {
+  id: number;
+  username: string;
+  description: string | null;
+  is_active: boolean;
+  last_used_at: string | null;
+  created_at: string;
+}

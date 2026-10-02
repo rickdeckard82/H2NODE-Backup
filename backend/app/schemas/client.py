@@ -1,4 +1,7 @@
-from pydantic import BaseModel, ConfigDict, Field
+import ipaddress
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.common import UtcDatetime
 
@@ -6,12 +9,36 @@ from app.schemas.common import UtcDatetime
 SLUG_PATTERN = r"^[a-z0-9][a-z0-9-]{1,46}[a-z0-9]$"
 
 
+Kind = Literal["server", "network"]
+Vendor = Literal["datacom", "huawei", "juniper", "generic"]
+Protocol = Literal["ftp", "tftp"]
+
+
+def _norm_ip(v: str | None) -> str | None:
+    if v is None or v == "":
+        return None
+    try:
+        return str(ipaddress.ip_address(v.strip()))
+    except ValueError as exc:
+        raise ValueError("IP inválido") from exc
+
+
 class ClientBase(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     description: str | None = Field(default=None, max_length=2000)
     is_active: bool = True
+    kind: Kind = "server"
+    vendor: Vendor | None = None
+    mgmt_ip: str | None = Field(default=None, max_length=45)
+    protocol: Protocol | None = None
     ssh_public_key: str | None = Field(default=None, max_length=16384)
-    expected_interval_hours: int = Field(default=24, ge=1, le=24 * 31)
+    # 0 = sob demanda (sem alerta de atraso)
+    expected_interval_hours: int = Field(default=24, ge=0, le=24 * 31)
+
+    @field_validator("mgmt_ip")
+    @classmethod
+    def _ip(cls, v: str | None) -> str | None:
+        return _norm_ip(v)
     retention_days: int = Field(default=30, ge=1, le=3650)
     retention_min_keep: int = Field(default=7, ge=1, le=1000)
 
@@ -24,9 +51,17 @@ class ClientUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     description: str | None = Field(default=None, max_length=2000)
     is_active: bool | None = None
+    vendor: Vendor | None = None
+    mgmt_ip: str | None = Field(default=None, max_length=45)
+    protocol: Protocol | None = None
     # "" remove a chave (o cliente deixa de conseguir enviar).
     ssh_public_key: str | None = Field(default=None, max_length=16384)
-    expected_interval_hours: int | None = Field(default=None, ge=1, le=24 * 31)
+    expected_interval_hours: int | None = Field(default=None, ge=0, le=24 * 31)
+
+    @field_validator("mgmt_ip")
+    @classmethod
+    def _ip(cls, v: str | None) -> str | None:
+        return _norm_ip(v)
     retention_days: int | None = Field(default=None, ge=1, le=3650)
     retention_min_keep: int | None = Field(default=None, ge=1, le=1000)
 
@@ -39,6 +74,10 @@ class ClientOut(BaseModel):
     name: str
     description: str | None
     is_active: bool
+    kind: str
+    vendor: str | None
+    mgmt_ip: str | None
+    protocol: str | None
     ssh_public_key: str | None
     ssh_key_fingerprint: str | None
     expected_interval_hours: int
@@ -62,3 +101,13 @@ class AgentConfigOut(BaseModel):
     content: str
     known_hosts: str | None
     public_key_available: bool
+
+
+class DeviceConfigOut(BaseModel):
+    vendor: str
+    protocol: str
+    server_host: str
+    ftp_user: str | None
+    ftp_accounts: list[str]
+    commands: str
+    notes: list[str]

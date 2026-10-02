@@ -27,7 +27,8 @@ COPY worker-entrypoint.sh /usr/local/bin/worker-entrypoint.sh
 
 # uid 10001 = o mesmo do usuário "backup" do container sshd: os arquivos que
 # chegam por rsync ficam com esse dono e o worker consegue movê-los/apagá-los.
-RUN useradd -m -u 10001 appuser && chown -R appuser:appuser /app
+RUN useradd -m -u 10001 appuser && chown -R appuser:appuser /app \
+ && mkdir -p /netcfg /ssh && chown appuser:appuser /netcfg
 USER appuser
 ENV HOME=/home/appuser
 
