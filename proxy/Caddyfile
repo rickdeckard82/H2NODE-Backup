@@ -1,0 +1,35 @@
+# Pulse Backup — proxy HTTPS. Certificado Let's Encrypt automático para
+# PUBLIC_DOMAIN (emitido e renovado pelo Caddy; guardado no volume caddy_data).
+{
+	email {$ACME_EMAIL}
+	# Painel administrativo: sem página/metrics do Caddy expostas.
+	admin off
+}
+
+{$PUBLIC_DOMAIN} {
+	# Endpoint de métricas/OpenAPI nunca pela borda.
+	@internal path /api/metrics /api/openapi.json /api/docs*
+	respond @internal 404
+
+	reverse_proxy 127.0.0.1:{$WEB_PORT} {
+		# Downloads de backups (.gpg grandes) em streaming, sem timeout curto.
+		flush_interval -1
+		transport http {
+			read_timeout 1h
+			write_timeout 1h
+		}
+		# O Caddy NÃO confia em X-Forwarded-For vindo da internet (sem
+		# trusted_proxies): ele grava o IP real do cliente — a auditoria do
+		# painel usa esse valor.
+	}
+
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

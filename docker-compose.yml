@@ -1,0 +1,168 @@
+name: pulse-backup
+
+networks:
+  edge:
+    driver: bridge
+  internal:
+    driver: bridge
+    internal: true
+
+volumes:
+  db_data:
+  ssh_shared:
+  ssh_hostkeys:
+  caddy_data:     # certificados Let's Encrypt (não apague: limite de emissão)
+  caddy_config:
+
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pulse}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pulse_backup}
+  JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+  FERNET_KEY: ${FERNET_KEY:?set FERNET_KEY}
+  STORAGE_PATH: /data
+  SSH_SHARED_DIR: /ssh
+  SSH_PUBLIC_HOST: ${SSH_PUBLIC_HOST:-${PUBLIC_DOMAIN:-backup.example.com}}
+  SSH_PUBLIC_PORT: ${SSH_PUBLIC_PORT:-2222}
+  BACKUP_PUBLIC_KEY_PATH: /keys/backup-key.pub.asc
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  WORKER_POLL_SECONDS: ${WORKER_POLL_SECONDS:-30}
+  INCOMING_STALE_HOURS: ${INCOMING_STALE_HOURS:-12}
+  REVERIFY_INTERVAL_DAYS: ${REVERIFY_INTERVAL_DAYS:-30}
+  OVERDUE_GRACE_MINUTES: ${OVERDUE_GRACE_MINUTES:-120}
+
+services:
+  # ─────────────────────────── PostgreSQL ───────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-pulse_backup}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pulse} -d ${POSTGRES_DB:-pulse_backup}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  # ─────────────── SSH/rsync: recebe os backups dos clientes ───────────────
+  # Só chave pública; cada chave fica presa a `rrsync -wo -no-del` na pasta do
+  # próprio cliente (escrita apenas).
+  # network_mode: host DE PROPÓSITO — porta publicada com `ports:` passa por
+  # regras de iptables do Docker que IGNORAM o ufw. Na rede do host, a porta
+  # SSH_PUBLIC_PORT obedece ao ufw (libere só os IPs dos clientes de backup).
+  sshd:
+    build:
+      context: ./sshd
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      SSH_PORT: ${SSH_PUBLIC_PORT:-2222}
+      # Fixe no IP público do servidor se houver mais de uma interface.
+      SSH_BIND: ${SSH_BIND:-0.0.0.0}
+    volumes:
+      - ${BACKUP_STORAGE_PATH:?set BACKUP_STORAGE_PATH}:/data
+      - ssh_shared:/ssh
+      - ssh_hostkeys:/etc/ssh/keys
+
+  # ─────────────────────────── Backend (API) ─────────────────────────
+  backend:
+    build:
+      context: ./backend
+      args:
+        INSTALL_DEV: ${INSTALL_DEV:-false}
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-https://${PUBLIC_DOMAIN:-localhost}}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      # IPs de reverse proxies confiáveis (X-Forwarded-*). Em produção prefira o
+      # IP do proxy (ex.: do Nginx Proxy Manager) em vez de "*".
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
+      ENABLE_DOCS: ${ENABLE_DOCS:-false}
+      ACCESS_TOKEN_TTL_MINUTES: ${ACCESS_TOKEN_TTL_MINUTES:-15}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-7}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?set BOOTSTRAP_ADMIN_PASSWORD}
+    volumes:
+      - ${BACKUP_STORAGE_PATH:?set BACKUP_STORAGE_PATH}:/data
+      - ssh_shared:/ssh
+      # Só a chave PÚBLICA — o backend nunca vê a privada.
+      - ${SECRETS_DIR:-./secrets}/backup-key.pub.asc:/keys/backup-key.pub.asc:ro
+    networks:
+      - edge
+      - internal
+    depends_on:
+      db:
+        condition: service_healthy
+      sshd:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health').status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ───────────── Worker: recepção, verificação, retenção, snapshots ─────────────
+  worker:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    user: "0:0"   # o entrypoint copia a chave privada e larga para o uid 10001
+    entrypoint: ["/usr/local/bin/worker-entrypoint.sh"]
+    environment:
+      <<: *backend-env
+    volumes:
+      - ${BACKUP_STORAGE_PATH:?set BACKUP_STORAGE_PATH}:/data
+      - ssh_shared:/ssh
+      - ${SECRETS_DIR:-./secrets}/backup-key.pub.asc:/keys/backup-key.pub.asc:ro
+      # Chave PRIVADA (+ senha) só aqui. Sem ela o worker verifica só a
+      # integridade (hash + destinatário). Ver docs/security.md.
+      - ${SECRETS_DIR:-./secrets}/private:/run/backup-keys:ro
+    tmpfs:
+      - /tmp:mode=1777
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - internal   # sem acesso à rede externa
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ─────────────────────────── Frontend ────────────────────────
+  # Serve a SPA e encaminha /api -> backend. Escuta SÓ no loopback do host: o
+  # acesso público é pelo proxy (HTTPS) abaixo.
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
+    networks:
+      - edge
+    depends_on:
+      - backend
+
+  # ───────────── Proxy HTTPS com certificado automático (Let's Encrypt) ─────────────
+  # Caddy emite e renova o certificado de PUBLIC_DOMAIN sozinho. Rede do host
+  # pelo mesmo motivo do sshd: as portas 80/443 obedecem ao ufw.
+  # Emissão: TLS-ALPN-01 pela 443 (basta ela liberada) ou HTTP-01 pela 80.
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?set PUBLIC_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+      WEB_PORT: ${WEB_PORT:-8080}
+    volumes:
+      - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend

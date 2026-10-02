@@ -1,0 +1,64 @@
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.common import UtcDatetime
+
+# Mesmo formato aceito pelo agente (CLIENT_ID) — vira nome de pasta.
+SLUG_PATTERN = r"^[a-z0-9][a-z0-9-]{1,46}[a-z0-9]$"
+
+
+class ClientBase(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+    is_active: bool = True
+    ssh_public_key: str | None = Field(default=None, max_length=16384)
+    expected_interval_hours: int = Field(default=24, ge=1, le=24 * 31)
+    retention_days: int = Field(default=30, ge=1, le=3650)
+    retention_min_keep: int = Field(default=7, ge=1, le=1000)
+
+
+class ClientCreate(ClientBase):
+    slug: str = Field(pattern=SLUG_PATTERN)
+
+
+class ClientUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+    is_active: bool | None = None
+    # "" remove a chave (o cliente deixa de conseguir enviar).
+    ssh_public_key: str | None = Field(default=None, max_length=16384)
+    expected_interval_hours: int | None = Field(default=None, ge=1, le=24 * 31)
+    retention_days: int | None = Field(default=None, ge=1, le=3650)
+    retention_min_keep: int | None = Field(default=None, ge=1, le=1000)
+
+
+class ClientOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    slug: str
+    name: str
+    description: str | None
+    is_active: bool
+    ssh_public_key: str | None
+    ssh_key_fingerprint: str | None
+    expected_interval_hours: int
+    retention_days: int
+    retention_min_keep: int
+    hostname: str | None
+    os_info: str | None
+    agent_version: str | None
+    last_backup_at: UtcDatetime | None
+    last_status: str | None
+    stored_bytes: int
+    backup_count: int = 0
+    # ok | warning | failed | overdue | never | inactive — calculado na leitura.
+    health: str = "never"
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
+
+
+class AgentConfigOut(BaseModel):
+    filename: str
+    content: str
+    known_hosts: str | None
+    public_key_available: bool

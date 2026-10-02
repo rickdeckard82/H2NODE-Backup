@@ -1,0 +1,33 @@
+# Overrides para teste local (HTTP, sem o proxy HTTPS — ele nem sobe):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+# Painel em http://localhost:8080 — API direto em :8000 com /api/docs.
+services:
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks:
+      - internal
+      - edge
+
+  backend:
+    build:
+      args:
+        INSTALL_DEV: "true"
+    environment:
+      COOKIE_SECURE: "false"
+      LOG_LEVEL: DEBUG
+      ENABLE_DOCS: "true"
+      FRONTEND_ORIGIN: http://localhost:8080
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  worker:
+    environment:
+      WORKER_POLL_SECONDS: "5"
+
+  # Sem domínio público em dev: o proxy Let's Encrypt fica desligado.
+  proxy:
+    profiles: ["tls"]
+    environment:
+      PUBLIC_DOMAIN: localhost
+      ACME_EMAIL: dev@localhost

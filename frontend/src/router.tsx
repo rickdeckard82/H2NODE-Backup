@@ -1,0 +1,81 @@
+import { lazy, Suspense, type ReactNode } from "react";
+import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
+import { Spinner, ToastProvider } from "./components/ui";
+import { AppShell } from "./layouts/AppShell";
+import { useAuth, type Role } from "./lib/auth";
+
+const LoginPage = lazy(() => import("./features/auth/LoginPage"));
+const DashboardPage = lazy(() => import("./features/dashboard/DashboardPage"));
+const ClientsPage = lazy(() => import("./features/clients/ClientsPage"));
+const BackupsPage = lazy(() => import("./features/backups/BackupsPage"));
+const ServerPage = lazy(() => import("./features/settings/ServerPage"));
+const SystemUsersPage = lazy(() => import("./features/system-users/SystemUsersPage"));
+const AuditPage = lazy(() => import("./features/audit/AuditPage"));
+
+function Loader() {
+  return (
+    <div className="flex h-screen items-center justify-center text-brand-600">
+      <Spinner className="h-8 w-8" />
+    </div>
+  );
+}
+
+function Protected({ roles, children }: { roles?: Role[]; children: ReactNode }) {
+  const { user, loading, can } = useAuth();
+  if (loading) return <Loader />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (roles && !can(...roles)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+function Shell() {
+  return (
+    <ToastProvider>
+      <Protected>
+        <AppShell>
+          <Suspense fallback={<Loader />}>
+            <Outlet />
+          </Suspense>
+        </AppShell>
+      </Protected>
+    </ToastProvider>
+  );
+}
+
+export const router = createBrowserRouter([
+  {
+    path: "/login",
+    element: (
+      <Suspense fallback={<Loader />}>
+        <LoginPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/",
+    element: <Shell />,
+    children: [
+      { index: true, element: <DashboardPage /> },
+      { path: "clients", element: <ClientsPage /> },
+      { path: "backups", element: <BackupsPage /> },
+      { path: "settings/server", element: <ServerPage /> },
+      {
+        path: "system-users",
+        element: (
+          <Protected roles={["admin"]}>
+            <SystemUsersPage />
+          </Protected>
+        ),
+      },
+      {
+        path: "audit",
+        element: (
+          <Protected roles={["admin"]}>
+            <AuditPage />
+          </Protected>
+        ),
+      },
+      { path: "*", element: <Navigate to="/" replace /> },
+    ],
+  },
+]);

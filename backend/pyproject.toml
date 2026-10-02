@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = { find = { include = ["app*"] } }
+
+[project]
+name = "pulse-backup-backend"
+version = "0.1.1"
+description = "API e worker do Pulse Backup (gestão de backups cifrados de servidores Linux)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.34.0",
+    "gunicorn==23.0.0",
+    "sqlalchemy==2.0.36",
+    "psycopg[binary]==3.2.3",
+    "alembic==1.14.0",
+    "pydantic==2.10.4",
+    "pydantic-settings==2.7.0",
+    "pyjwt==2.13.0",
+    "argon2-cffi==23.1.0",
+    "cryptography==50.0.1",
+    "pyotp==2.10.0",
+    "segno==1.6.6",
+    "structlog==24.4.0",
+    "slowapi==0.1.9",
+    "email-validator==2.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+    "httpx==0.28.1",
+    "ruff==0.8.4",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "SIM"]
+# B008: `Depends(...)` em defaults é o idioma padrão do FastAPI.
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
