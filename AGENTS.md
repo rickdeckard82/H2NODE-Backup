@@ -6,6 +6,8 @@ Guia para agentes de IA (Claude Code, Codex etc.) neste repositório.
 
 **Idioma:** responda sempre em português. Textos da interface, mensagens de erro da API e comentários em pt-BR.
 
+**Mensagens de commit:** em português, conventional commits (`feat:`, `fix(escopo):`), **sem** linha de coautoria (`Co-Authored-By: …`).
+
 **Versionamento e changelog:** a cada mudança perceptível para quem usa o painel, suba `APP_VERSION` em
 `frontend/src/lib/changelog.ts` e a `version` em `frontend/package.json`/`backend/pyproject.toml` (os três iguais) e
 adicione a entrada em `CHANGELOG` (é o que o rodapé "v…" mostra). Mudança no agente: suba `AGENT_VERSION` em
