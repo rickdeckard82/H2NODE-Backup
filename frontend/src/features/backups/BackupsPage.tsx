@@ -64,6 +64,10 @@ function BackupDetailModal({ id, onClose }: { id: number | null; onClose: () => 
   }
 
   const stored = b && !b.deleted_at;
+  // Com um único arquivo (equipamentos de rede), Baixar/.gpg ficam no rodapé,
+  // ao lado de Excluir; com vários, cada linha da tabela tem os seus links.
+  const files = b?.components.filter((c) => c.file_name) ?? [];
+  const single = files.length === 1 ? files[0] : null;
 
   return (
     <Modal open={id !== null} onClose={onClose} title={b ? `${b.client_name} — ${b.run_name}` : "Backup"} wide>
@@ -181,7 +185,7 @@ function BackupDetailModal({ id, onClose }: { id: number | null; onClose: () => 
                       )}
                     </td>
                     <td className="td text-right">
-                      {stored && c.file_name && can("admin") && (
+                      {stored && !single && c.file_name && can("admin") && (
                         <span className="space-x-3 whitespace-nowrap">
                           <button
                             className="text-brand-600 hover:underline dark:text-brand-400"
@@ -207,6 +211,16 @@ function BackupDetailModal({ id, onClose }: { id: number | null; onClose: () => 
           </div>
 
           <div className="flex flex-wrap justify-end gap-2 pt-1">
+            {stored && single && can("admin") && (
+              <>
+                <Button title="Pede a chave privada e baixa o arquivo já decifrado" onClick={() => setDecrypting(single)}>
+                  Baixar
+                </Button>
+                <Button variant="ghost" title="Baixa o arquivo ainda cifrado (.gpg)" onClick={() => download(single.id)}>
+                  .gpg
+                </Button>
+              </>
+            )}
             {stored && can("admin") && (
               <Button
                 variant="danger"

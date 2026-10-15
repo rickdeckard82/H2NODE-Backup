@@ -41,6 +41,14 @@ const NAV: NavEntry[] = [
       { to: "/audit", label: "Auditoria", icon: "clipboard", roles: ["admin"] },
     ],
   },
+  {
+    label: "Ajuda",
+    icon: "help",
+    children: [
+      { to: "/help/decrypt", label: "Baixar e decifrar", icon: "lock" },
+      { to: "/help/juniper", label: "Juniper (Junos)", icon: "router" },
+    ],
+  },
 ];
 
 const leafClass = (isActive: boolean, extra = "") =>

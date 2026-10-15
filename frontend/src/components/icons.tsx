@@ -167,6 +167,14 @@ export const RouterIcon = (p: IconProps) => (
   </S>
 );
 
+export const HelpIcon = (p: IconProps) => (
+  <S {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7" />
+    <path d="M12 17h.01" />
+  </S>
+);
+
 export const ICONS = {
   home: HomeIcon,
   database: DatabaseIcon,
@@ -187,6 +195,7 @@ export const ICONS = {
   archive: ArchiveIcon,
   lock: LockIcon,
   router: RouterIcon,
+  help: HelpIcon,
 } as const;
 
 export type IconName = keyof typeof ICONS;

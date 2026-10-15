@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.3.0";
+export const APP_VERSION = "0.4.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.4.0",
+    date: "2026-10-15",
+    changes: [
+      "Novo menu Ajuda, abaixo de Configuração: \"Baixar e decifrar\" (pelo painel e pelo gpg) e \"Juniper (Junos)\" (criar o backup por FTP e restaurar a configuração).",
+      "Detalhe do backup de equipamento de rede: Baixar e .gpg passam a ser botões no rodapé, ao lado de Excluir backup.",
+    ],
+  },
   {
     version: "0.3.0",
     date: "2026-10-15",

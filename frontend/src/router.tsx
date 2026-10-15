@@ -13,6 +13,8 @@ const BackupsPage = lazy(() => import("./features/backups/BackupsPage"));
 const ServerPage = lazy(() => import("./features/settings/ServerPage"));
 const SystemUsersPage = lazy(() => import("./features/system-users/SystemUsersPage"));
 const AuditPage = lazy(() => import("./features/audit/AuditPage"));
+const DecryptHelpPage = lazy(() => import("./features/help/DecryptHelpPage"));
+const JuniperHelpPage = lazy(() => import("./features/help/JuniperHelpPage"));
 
 function Loader() {
   return (
@@ -86,6 +88,8 @@ export const router = createBrowserRouter([
           </Protected>
         ),
       },
+      { path: "help/decrypt", element: <DecryptHelpPage /> },
+      { path: "help/juniper", element: <JuniperHelpPage /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },
