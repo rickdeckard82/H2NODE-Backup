@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { DecryptDownloadModal } from "./DecryptDownloadModal";
 import { RefreshButton } from "../../components/RefreshButton";
 import { BackupStatusBadge, ComponentStatusBadge, VerifyBadge } from "../../components/status";
 import { Badge, Button, Card, Modal, PageHeader, Pagination, Spinner, useToast } from "../../components/ui";
@@ -49,6 +50,8 @@ function BackupDetailModal({ id, onClose }: { id: number | null; onClose: () => 
     },
     onError: (e) => toast("err", e instanceof ApiError ? e.detail : "Erro ao excluir"),
   });
+
+  const [decrypting, setDecrypting] = useState<BackupDetail["components"][number] | null>(null);
 
   async function download(componentId: number) {
     // Garante um access token válido (o download é um GET direto do navegador,
@@ -179,13 +182,22 @@ function BackupDetailModal({ id, onClose }: { id: number | null; onClose: () => 
                     </td>
                     <td className="td text-right">
                       {stored && c.file_name && can("admin") && (
-                        <button
-                          className="text-brand-600 hover:underline dark:text-brand-400"
-                          title="Baixa o arquivo ainda cifrado (.gpg)"
-                          onClick={() => download(c.id)}
-                        >
-                          Baixar .gpg
-                        </button>
+                        <span className="space-x-3 whitespace-nowrap">
+                          <button
+                            className="text-brand-600 hover:underline dark:text-brand-400"
+                            title="Pede a chave privada e baixa o arquivo já decifrado"
+                            onClick={() => setDecrypting(c)}
+                          >
+                            Baixar
+                          </button>
+                          <button
+                            className="text-xs text-slate-500 hover:underline dark:text-slate-400"
+                            title="Baixa o arquivo ainda cifrado (.gpg)"
+                            onClick={() => download(c.id)}
+                          >
+                            .gpg
+                          </button>
+                        </span>
                       )}
                     </td>
                   </tr>
@@ -220,6 +232,16 @@ function BackupDetailModal({ id, onClose }: { id: number | null; onClose: () => 
             <Button onClick={onClose}>Fechar</Button>
           </div>
         </div>
+      )}
+      {decrypting && id !== null && decrypting.file_name && (
+        <DecryptDownloadModal
+          open
+          onClose={() => setDecrypting(null)}
+          backupId={id}
+          componentId={decrypting.id}
+          fileName={decrypting.file_name}
+          sizeBytes={decrypting.size_bytes}
+        />
       )}
     </Modal>
   );

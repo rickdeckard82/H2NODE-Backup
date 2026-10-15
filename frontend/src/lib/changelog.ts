@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.2.0";
+export const APP_VERSION = "0.3.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.3.0",
+    date: "2026-10-15",
+    changes: [
+      "Backups → detalhe → Baixar: pede a chave privada e a senha, decifra o arquivo no próprio navegador e baixa já decifrado (com opção de descompactar o .gz, útil nas configurações Junos). A chave e a senha não saem do navegador nem chegam ao servidor.",
+      "O arquivo ainda cifrado continua disponível pelo link .gpg.",
+      "Novo script scripts/ufw-docker.sh: faz o ufw valer também para portas publicadas pelo Docker.",
+    ],
+  },
   {
     version: "0.2.0",
     date: "2026-10-01",

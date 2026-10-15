@@ -2,7 +2,12 @@
 
 Os backups ficam em `BACKUP_STORAGE_PATH/store/<cliente>/<execução>/`, um arquivo `.gpg`
 por pasta/banco, mais o `manifest.json` (lista as partes, tamanhos e SHA-256). Também dá
-para baixar cada parte pelo painel (**Backups → detalhe → Baixar .gpg**, só admin).
+para baixar cada parte pelo painel (**Backups → detalhe**, só admin):
+
+- **Baixar** pede o `.asc` da chave privada e a senha, **decifra no navegador** (a chave não é enviada
+  ao servidor) e baixa o arquivo já decifrado; em `.gz` há a opção de descompactar. Serve para arquivos
+  pequenos/médios (a configuração de um switch/roteador); para dumps grandes use o `gpg` abaixo.
+- **.gpg** baixa o arquivo ainda cifrado.
 
 ## 1. Importar a chave privada (numa máquina segura)
 
