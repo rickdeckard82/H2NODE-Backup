@@ -52,6 +52,15 @@ sudo ./scripts/ufw-setup.sh status
 O script não habilita o ufw nem mexe na porta 22 de administração (garanta a sua
 regra de acesso antes de `ufw enable`).
 
+Como segunda camada, faça o ufw valer também para portas publicadas com `ports:`
+(o Docker as abre por cima dele). Ajuste uma vez por servidor:
+
+```bash
+sudo ./scripts/ufw-docker.sh install   # insere o bloco em /etc/ufw/after.rules e recarrega
+sudo ./scripts/ufw-docker.sh status
+sudo ./scripts/ufw-docker.sh remove    # desfaz
+```
+
 > **Por que `network_mode: host` no proxy, no sshd e nos receptores FTP/TFTP?** Porta publicada com
 > `ports:` no Docker é aberta por regras próprias de iptables (chain `DOCKER`),
 > avaliadas **antes** do ufw — o ufw não a bloquearia. Na rede do host, as portas
