@@ -47,6 +47,7 @@ const NAV: NavEntry[] = [
     children: [
       { to: "/help/decrypt", label: "Baixar e decifrar", icon: "lock" },
       { to: "/help/juniper", label: "Juniper (Junos)", icon: "router" },
+      { to: "/help/datacom", label: "Datacom (DmOS)", icon: "router" },
     ],
   },
 ];

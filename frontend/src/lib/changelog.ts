@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.4.0";
+export const APP_VERSION = "0.4.1";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,13 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.4.1",
+    date: "2026-10-15",
+    changes: [
+      "Ajuda → Datacom (DmOS): como criar o backup por TFTP (script no equipamento e assistant-task agendada) e como restaurar a configuração.",
+    ],
+  },
   {
     version: "0.4.0",
     date: "2026-10-15",
