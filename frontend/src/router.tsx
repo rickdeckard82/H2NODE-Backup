@@ -14,6 +14,7 @@ const ServerPage = lazy(() => import("./features/settings/ServerPage"));
 const SystemUsersPage = lazy(() => import("./features/system-users/SystemUsersPage"));
 const AuditPage = lazy(() => import("./features/audit/AuditPage"));
 const DecryptHelpPage = lazy(() => import("./features/help/DecryptHelpPage"));
+const LinuxHelpPage = lazy(() => import("./features/help/LinuxHelpPage"));
 const DatacomHelpPage = lazy(() => import("./features/help/DatacomHelpPage"));
 const JuniperHelpPage = lazy(() => import("./features/help/JuniperHelpPage"));
 
@@ -90,6 +91,7 @@ export const router = createBrowserRouter([
         ),
       },
       { path: "help/decrypt", element: <DecryptHelpPage /> },
+      { path: "help/linux", element: <LinuxHelpPage /> },
       { path: "help/juniper", element: <JuniperHelpPage /> },
       { path: "help/datacom", element: <DatacomHelpPage /> },
       { path: "*", element: <Navigate to="/" replace /> },

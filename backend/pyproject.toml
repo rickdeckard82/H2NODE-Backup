@@ -7,7 +7,7 @@ packages = { find = { include = ["app*"] } }
 
 [project]
 name = "pulse-backup-backend"
-version = "0.4.1"
+version = "0.4.2"
 description = "API e worker do Pulse Backup (gestão de backups cifrados de servidores Linux)"
 requires-python = ">=3.12"
 dependencies = [

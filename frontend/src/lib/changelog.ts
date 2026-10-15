@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.4.1";
+export const APP_VERSION = "0.4.2";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,13 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.4.2",
+    date: "2026-10-15",
+    changes: [
+      "Ajuda → Servidor Linux: como o backup funciona, instalação do agente, cadastro, liberação no firewall, teste, solução de problemas e restauração de pastas e bancos.",
+    ],
+  },
   {
     version: "0.4.1",
     date: "2026-10-15",
