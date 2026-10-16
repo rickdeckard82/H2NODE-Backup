@@ -3,7 +3,7 @@
 Usada duas vezes: na recepção (conteúdo ainda em claro, antes de cifrar) e na
 verificação profunda (depois de decifrar). Formatos aceitos:
 
-- texto puro (Datacom DmOS `show running-config`, Huawei .cfg);
+- texto puro (Datacom DmOS `show running-config`, Huawei .cfg, Fiberhome `config_<IP>_<data>`);
 - gzip (Juniper archival: `<host>_juniper.conf.gz_AAAAMMDD_HHMMSS`);
 - zip (Huawei pode enviar o `vrpcfg.zip`).
 """
@@ -14,11 +14,12 @@ import zipfile
 import zlib
 from dataclasses import dataclass
 
-VENDORS = ("datacom", "huawei", "juniper", "generic")
+VENDORS = ("datacom", "huawei", "juniper", "fiberhome", "generic")
 VENDOR_LABEL = {
     "datacom": "Datacom (DmOS)",
     "huawei": "Huawei (VRP)",
     "juniper": "Juniper (Junos)",
+    "fiberhome": "Fiberhome (UNM2000)",
     "generic": "Genérico",
 }
 
@@ -100,6 +101,13 @@ def check(data: bytes, vendor: str | None) -> ConfigCheck:
             return ConfigCheck(False, "configuração Junos sem o bloco \"system\"", lines, fmt)
         if text.count("{") != text.count("}"):
             return ConfigCheck(False, "chaves { } desbalanceadas (configuração truncada?)", lines, fmt)
+    elif vendor == "fiberhome" and not (
+        text.lstrip().startswith("!WOS system config") or any(ln.startswith("hostname ") for ln in stripped)
+    ):
+        return ConfigCheck(
+            False, "não parece uma configuração de OLT Fiberhome (cabeçalho \"!WOS\" ou hostname ausente)",
+            lines, fmt,
+        )
     elif vendor == "datacom" and not any(ln.startswith(_DMOS_TOP_LEVEL) for ln in stripped):
         return ConfigCheck(False, "não parece um running-config DmOS", lines, fmt)
 

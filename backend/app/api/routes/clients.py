@@ -214,6 +214,13 @@ EXCLUDES=(
 )
 ONE_FILE_SYSTEM="no"
 
+# ---- Arquivos como estão (ex.: backups de conta do cPanel) ----
+# Cada arquivo é cifrado como está e enviado um a um (cifra, envia, apaga): a pasta
+# WORK_DIR só precisa caber o MAIOR arquivo. "@latest" = a pasta datada mais recente.
+BACKUP_FILES=(
+  # "/backup/cpanel/@latest/accounts/*.tar.gz"
+)
+
 # ---- MySQL / MariaDB ----  (autenticação: unix_socket do root ou MYSQL_DEFAULTS_FILE)
 MYSQL_ENABLED="no"
 MYSQL_DATABASES=( "all" )
@@ -287,6 +294,18 @@ def render_device_commands(c: Client, host: str, ftp_user: str) -> tuple[str, li
             "commit"
         )
         notes.append("O Junos envia um .conf.gz a cada commit (sob demanda: use intervalo 0).")
+    elif c.vendor == "fiberhome" and c.protocol == "ftp":
+        cmds = (
+            "# Na UNM2000: tarefa de exportação de configuração das OLTs com destino FTP\n"
+            f"servidor FTP : {host}   (porta 21, modo passivo)\n"
+            f"usuário      : {ftp_user}\n"
+            "senha        : <SENHA-FTP>"
+        )
+        notes.append("A UNM2000 envia um arquivo config_<IP-da-OLT>_<data> por OLT (sob demanda: use "
+                     "intervalo 0, ou o intervalo da tarefa agendada).")
+        notes.append("Uma única UNM2000 envia a configuração de várias OLTs: cadastre a UNM2000 como UM "
+                     "equipamento (IP de origem = IP da UNM2000); cada arquivo vira uma versão, comparada "
+                     "só com o anterior da mesma OLT.")
     elif c.protocol == "tftp":
         cmds = f"# envie o arquivo de configuração por TFTP (modo octet) para\ntftp://{host}/{c.slug}/config.txt"
     else:

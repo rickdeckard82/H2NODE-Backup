@@ -113,6 +113,16 @@ def _check_mssql(reader: _HashingReader) -> None:
         pass
 
 
+def _check_gzip(reader: _HashingReader, name: str) -> None:
+    """Arquivo enviado como está (ex.: backup de conta do cPanel): se for .gz, lê até o fim
+    para validar o CRC; o SHA-256 do conteúdo decifrado é conferido depois, contra o do cliente."""
+    if not name.endswith((".gz.gpg", ".tgz.gpg")):
+        return
+    gz = gzip.GzipFile(fileobj=reader, mode="rb")
+    while gz.read(_CHUNK):
+        pass
+
+
 def _check_config(reader: _HashingReader, vendor: str | None) -> int:
     from app.services import netconfig
 
@@ -131,6 +141,9 @@ def _content_check(reader: _HashingReader, comp: BackupComponent) -> int | None:
     name = comp.file_name or ""
     if comp.kind == "config":
         return _check_config(reader, comp.backup.client.vendor)
+    if comp.kind == "file":
+        _check_gzip(reader, name)
+        return None
     if comp.kind == "files" or name.endswith(".tar.gz.gpg"):
         return _check_tar(reader)
     if comp.kind in ("mysql", "postgresql"):

@@ -25,6 +25,9 @@ HUAWEI_CFG = b"#\n sysname SW-CORE\n#\ninterface Vlanif10\n ip address 192.0.2.1
 JUNOS_CFG = b"## Last commit: 2026-10-01\nversion 23.4R1;\nsystem {\n    host-name mx1;\n}\ninterfaces {\n}\n"
 DMOS_CFG = b"hostname DM4380MP\naaa user admin\ndot1q\n vlan 10\n!\ninterface l3 mgmt\n"
 
+FIBERHOME_CFG = (b"!WOS system config file----------------------------------------\r\n"
+                 b"!system name:ngpon olt\r\ncli debug off\r\nhostname OLT-Centro\r\nidle-timeout 0\r\n")
+
 FTP_USER, FTP_PASS = "juniper", "Senha-teste-01"
 
 
@@ -39,6 +42,9 @@ def test_netconfig_vendor_checks():
     assert not netconfig.check(gzip.compress(JUNOS_CFG)[:-10], "juniper").ok  # gzip truncado
     assert not netconfig.check(JUNOS_CFG.replace(b"}\ninterfaces", b"\ninterfaces"), "juniper").ok
     assert netconfig.check(DMOS_CFG, "datacom").ok
+    assert netconfig.check(FIBERHOME_CFG, "fiberhome").ok
+    assert not netconfig.check(JUNOS_CFG, "fiberhome").ok  # outro fabricante
+    assert not netconfig.check(b"\x00\x01\x02" * 100, "fiberhome").ok
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("vrpcfg.cfg", HUAWEI_CFG)
@@ -299,3 +305,12 @@ def test_api_network_device_and_ftp_accounts(auth_client, isolated_paths):
 
     servers = auth_client.get("/api/clients", params={"kind": "server"}).json()
     assert servers == []
+
+
+def test_name_key_groups_files_of_the_same_olt():
+    from app.services.netingest import name_key
+
+    assert name_key("config_198.51.100.126_20260901") == name_key("config_198.51.100.126_20260902")
+    assert name_key("config_198.51.100.126_20260901") != name_key("config_198.51.100.164_20260901")
+    assert name_key("mx1_juniper.conf.gz_20261001_120000") == name_key("mx1_juniper.conf.gz_20261002_130500")
+    assert name_key("config.txt") == "config.txt"

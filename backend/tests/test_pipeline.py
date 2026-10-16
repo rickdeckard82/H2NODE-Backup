@@ -297,3 +297,37 @@ def test_worker_queue_verifies_pending(db, web01, keyring, keys, tmp_path):
     assert worker.next_pending(db) is None
     worker.heartbeat(db, keyring)
     worker.snapshot(db)
+
+
+def test_file_kind_as_is_is_verified(db, web01, keyring, keys, tmp_path):
+    """Backup de conta do cPanel: .tar.gz cifrado como está (kind "file")."""
+    pub = keys["server"][0]
+    acct = _tar_gz({"homedir/public_html/index.php": b"<?php echo 1;"})
+    upload("web01", "run-file", [("file", "alfa.tar.gz", "01-file-alfa.tar.gz.gpg", acct)], pub, tmp_path)
+    assert ingest.scan(db) == 1
+    b = db.query(Backup).one()
+    assert b.components[0].kind == "file"
+    verify.verify_backup(db, b, keyring)
+    assert b.verify_status == VerifyStatus.ok, b.verify_message
+    assert b.verify_mode == "full"
+
+
+def test_file_kind_truncated_gzip_is_detected(db, web01, keyring, keys, tmp_path):
+    pub = keys["server"][0]
+    acct = _tar_gz({"homedir/a": b"x" * 5000})
+    upload("web01", "run-file-trunc", [("file", "beta.tar.gz", "01-file-beta.tar.gz.gpg", acct[:-20])],
+           pub, tmp_path)
+    ingest.scan(db)
+    b = db.query(Backup).one()
+    verify.verify_backup(db, b, keyring)
+    assert b.verify_status == VerifyStatus.failed
+
+
+def test_file_kind_non_gzip_checks_hash_only(db, web01, keyring, keys, tmp_path):
+    pub = keys["server"][0]
+    upload("web01", "run-file-bin", [("file", "dump.bin", "01-file-dump.bin.gpg", b"\x00binary" * 100)],
+           pub, tmp_path)
+    ingest.scan(db)
+    b = db.query(Backup).one()
+    verify.verify_backup(db, b, keyring)
+    assert b.verify_status == VerifyStatus.ok, b.verify_message

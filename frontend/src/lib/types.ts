@@ -1,9 +1,10 @@
-export type Vendor = "datacom" | "huawei" | "juniper" | "generic";
+export type Vendor = "datacom" | "huawei" | "juniper" | "fiberhome" | "generic";
 
 export const VENDOR_LABEL: Record<Vendor, string> = {
   datacom: "Datacom (DmOS)",
   huawei: "Huawei (VRP)",
   juniper: "Juniper (Junos)",
+  fiberhome: "Fiberhome (UNM2000)",
   generic: "Genérico",
 };
 
@@ -12,6 +13,7 @@ export const VENDOR_PROTOCOL: Record<Vendor, "ftp" | "tftp"> = {
   datacom: "tftp",
   huawei: "ftp",
   juniper: "ftp",
+  fiberhome: "ftp",
   generic: "ftp",
 };
 
@@ -72,7 +74,7 @@ export interface Backup {
 export interface BackupComponent {
   id: number;
   position: number;
-  kind: "files" | "mysql" | "postgresql" | "mssql" | "config";
+  kind: "files" | "file" | "mysql" | "postgresql" | "mssql" | "config";
   name: string;
   file_name: string | null;
   size_bytes: number;
@@ -140,6 +142,7 @@ export interface ServerInfo {
 
 export const KIND_LABEL: Record<BackupComponent["kind"], string> = {
   files: "Pasta",
+  file: "Arquivo",
   mysql: "MySQL/MariaDB",
   postgresql: "PostgreSQL",
   mssql: "SQL Server",

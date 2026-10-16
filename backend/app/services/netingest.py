@@ -11,6 +11,7 @@ Para cada arquivo pronto (`<nome>` + `<nome>.meta.json`):
 import hashlib
 import json
 import os
+import re
 import secrets
 import shutil
 import subprocess
@@ -53,21 +54,36 @@ def _encrypt(src: Path, dest: Path) -> None:
         raise RuntimeError("gpg falhou: " + r.stderr.decode(errors="replace")[-300:])
 
 
-def _previous_plain_sha(db: Session, client: Client) -> str | None:
-    return db.execute(
-        select(BackupComponent.plain_sha256)
+_DATE_SUFFIX = re.compile(r"[_.-]?\d{8}(?:[_.-]?\d{6})?$")
+
+
+def name_key(name: str) -> str:
+    """Nome sem a data final: `config_10.0.0.1_20261015` e `..._20261016` são o mesmo arquivo.
+    Uma UNM2000 envia uma configuração por OLT; só se compara com a anterior da MESMA OLT."""
+    return _DATE_SUFFIX.sub("", name)
+
+
+def _previous_plain_sha(db: Session, client: Client, name: str) -> str | None:
+    key = name_key(name)
+    rows = db.execute(
+        select(BackupComponent.name, BackupComponent.plain_sha256)
         .join(Backup, Backup.id == BackupComponent.backup_id)
         .where(Backup.client_id == client.id, BackupComponent.kind == "config")
         .order_by(Backup.received_at.desc())
-        .limit(1)
-    ).scalar_one_or_none()
+        .limit(500)
+    ).all()
+    for n, sha in rows:
+        if name_key(n) == key:
+            return sha
+    return None
 
 
 def ingest_file(db: Session, client: Client, data_path: Path, meta: dict) -> Backup:
     raw = data_path.read_bytes()
     plain_sha = hashlib.sha256(raw).hexdigest()
     res = netconfig.check(raw, client.vendor)
-    same = res.ok and _previous_plain_sha(db, client) == plain_sha
+    original = data_path.name.split("__", 1)[-1]
+    same = res.ok and _previous_plain_sha(db, client, original) == plain_sha
 
     received = meta.get("received_at")
     try:
@@ -77,7 +93,6 @@ def ingest_file(db: Session, client: Client, data_path: Path, meta: dict) -> Bac
     run_name = f"{when.strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(3)}"
     dest_dir = storage.safe_child(storage.store(), client.slug, run_name)
     dest_dir.mkdir(parents=True, mode=0o700)
-    original = data_path.name.split("__", 1)[-1]
     enc_name = f"01-config-{receivers.safe_filename(original)}.gpg"
     enc_path = dest_dir / enc_name
     try:

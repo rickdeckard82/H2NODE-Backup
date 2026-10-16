@@ -16,6 +16,10 @@
 #    direto para o gpg por pipe. Só arquivos JÁ cifrados ficam no WORK_DIR, e são
 #    apagados ao final (com ou sem sucesso). Exceção: SQL Server, que só sabe
 #    gravar o .bak em disco — ele é cifrado e apagado logo em seguida.
+#  - BACKUP_FILES: arquivos que já existem (ex.: backups de conta do cPanel) são
+#    cifrados como estão e enviados UM A UM — cifra, envia, apaga — para o disco
+#    só precisar do espaço do maior arquivo. Os arquivos de origem só são LIDOS:
+#    o agente apaga apenas as cópias cifradas que ele mesmo criou no WORK_DIR.
 #  - Cifra assimétrica: o cliente só tem a chave PÚBLICA; um servidor cliente
 #    invadido não consegue decifrar backups (nem os próprios).
 #  - A chave SSH do agente só consegue ESCREVER na própria pasta do servidor
@@ -28,7 +32,7 @@ umask 077
 # devolver variáveis). Funciona porque o script não tem controle de jobs.
 shopt -s lastpipe
 
-AGENT_VERSION="1.0.0"
+AGENT_VERSION="1.1.0"
 CONF_DIR="/etc/pulse-backup"
 CONF_FILE="${PULSE_BACKUP_CONF:-$CONF_DIR/agent.conf}"
 LOCK_FILE="/run/pulse-backup-agent.lock"
@@ -100,7 +104,7 @@ load_config() {
     SSH_KEY="$CONF_DIR/id_ed25519"; KNOWN_HOSTS="$CONF_DIR/known_hosts"
     GPG_PUBLIC_KEY="$CONF_DIR/backup-key.pub.asc"; GPG_FINGERPRINT=""
     WORK_DIR="/var/tmp/pulse-backup"
-    BACKUP_PATHS=(); EXCLUDES=(); ONE_FILE_SYSTEM="no"
+    BACKUP_PATHS=(); EXCLUDES=(); ONE_FILE_SYSTEM="no"; BACKUP_FILES=()
     MYSQL_ENABLED="no"; MYSQL_DATABASES=("all"); MYSQL_DEFAULTS_FILE=""; MYSQL_DUMP_OPTS=""
     POSTGRES_ENABLED="no"; POSTGRES_DATABASES=("all"); POSTGRES_OS_USER="postgres"; POSTGRES_GLOBALS="yes"
     MSSQL_ENABLED="no"; MSSQL_DATABASES=("all"); MSSQL_SERVER="localhost"; MSSQL_USER="sa"
@@ -207,7 +211,8 @@ add_component() {
     esac
 }
 
-next_prefix() { COMP_INDEX=$((COMP_INDEX + 1)); printf '%02d' "$COMP_INDEX"; }
+# Define PREFIX (e não imprime): dentro de $(...) o contador se perderia no subshell.
+next_prefix() { COMP_INDEX=$((COMP_INDEX + 1)); printf -v PREFIX '%02d' "$COMP_INDEX"; }
 
 errtail() { [ -s "$1" ] && tail -c 1500 "$1" | tr '\n' ' '; }
 
@@ -217,7 +222,7 @@ backup_paths() {
         [ -n "$p" ] || continue
         local name prefix file t0 err
         name="$(safe_name "$p")"
-        prefix="$(next_prefix)"
+        next_prefix; prefix="$PREFIX"
         file="$prefix-files-$name.tar.gz.gpg"
         t0=$SECONDS
         if [ ! -e "$p" ]; then
@@ -251,6 +256,74 @@ backup_paths() {
         else
             add_component files "$p" "$file" ok "" "$dur"
         fi
+        rm -f "$err"
+    done
+}
+
+# ---- Arquivos como estão (BACKUP_FILES)
+
+# resolve_file_pattern <padrão>  — imprime os arquivos que casam, um por linha.
+# "@latest" no caminho vira a pasta mais recente (nome começando com dígito, como
+# 2026-10-16 do cPanel): /backup/cpanel/@latest/accounts/*.tar.gz
+resolve_file_pattern() {
+    local pat="$1" pre post newest="" d
+    if [[ "$pat" == *"@latest"* ]]; then
+        pre="${pat%%@latest*}"
+        post="${pat#*@latest}"
+        [[ "$pre" == */ ]] || return 0
+        for d in "$pre"[0-9]*/; do [ -d "$d" ] && newest="$d"; done   # o glob já vem em ordem
+        [ -n "$newest" ] || return 0
+        pat="$newest${post#/}"
+    fi
+    compgen -G "$pat" | sort
+}
+
+# upload_one <arquivo.gpg> — envia agora e apaga o local (só o necessário em disco).
+upload_one() {
+    rsync_send "$RUN_DIR/$1" "$UPLOAD_DEST" || return 1
+    rm -f "$RUN_DIR/$1"
+}
+
+backup_files() {
+    local pat f
+    for pat in "${BACKUP_FILES[@]}"; do
+        [ -n "$pat" ] || continue
+        local list=()
+        mapfile -t list < <(resolve_file_pattern "$pat")
+        if [ "${#list[@]}" -eq 0 ]; then
+            add_component file "$pat" "" failed "nenhum arquivo encontrado para o padrão" 0
+            continue
+        fi
+        for f in "${list[@]}"; do
+            [ -f "$f" ] && [ ! -L "$f" ] || continue
+            # nunca processa o que está na pasta de trabalho do próprio agente
+            case "$f" in "${WORK_DIR%/}"/*) continue ;; esac
+            local base prefix file t0 err dur
+            base="$(basename "$f")"
+            next_prefix; prefix="$PREFIX"
+            file="$prefix-file-$(safe_name "$base").gpg"
+            t0=$SECONDS
+            err="$RUN_DIR/.err"
+            encrypt_stream "$RUN_DIR/$file" < "$f" 2>"$err"
+            dur=$((SECONDS - t0))
+            if [ "$GPG_RC" -ne 0 ] || [ ! -s "$RUN_DIR/$file" ]; then
+                rm -f "$RUN_DIR/$file"
+                add_component file "$base" "" failed "falha ao cifrar $f (gpg=$GPG_RC) $(errtail "$err")" "$dur"
+                continue
+            fi
+            local prev_ok=$ANY_OK
+            add_component file "$base" "$file" ok "" "$dur"
+            if ! upload_one "$file"; then
+                # tira o componente que acabou de entrar (o arquivo não chegou) e para:
+                # sem rede, continuar só encheria o disco.
+                unset 'COMPONENTS_JSON[${#COMPONENTS_JSON[@]}-1]'
+                ANY_OK=$prev_ok
+                rm -f "$RUN_DIR/$file"
+                add_component file "$base" "" failed "envio falhou; demais arquivos não foram processados" 0
+                rm -f "$err"
+                return 0
+            fi
+        done
         rm -f "$err"
     done
 }
@@ -296,7 +369,7 @@ backup_mysql() {
     for db in "${dbs[@]}"; do
         [ -n "$db" ] || continue
         local prefix file t0 err opts
-        prefix="$(next_prefix)"
+        next_prefix; prefix="$PREFIX"
         file="$prefix-mysql-$(safe_name "$db").sql.gz.gpg"
         err="$RUN_DIR/.err"; t0=$SECONDS
         # shellcheck disable=SC2206
@@ -344,7 +417,7 @@ backup_postgres() {
     local err="$RUN_DIR/.err"
     if [ "$POSTGRES_GLOBALS" = "yes" ] && command -v pg_dumpall >/dev/null 2>&1; then
         local prefix file t0
-        prefix="$(next_prefix)"; file="$prefix-postgresql-globals.sql.gz.gpg"; t0=$SECONDS
+        next_prefix; prefix="$PREFIX"; file="$prefix-postgresql-globals.sql.gz.gpg"; t0=$SECONDS
         pg_run pg_dumpall --globals-only 2>"$err" | $GZIP_CMD | encrypt_stream "$RUN_DIR/$file"
         local rcs=("${PIPESTATUS[@]}") dur=$((SECONDS - t0))
         if [ "${rcs[0]}" -ne 0 ] || [ "$GPG_RC" -ne 0 ]; then
@@ -369,7 +442,7 @@ backup_postgres() {
     for db in "${dbs[@]}"; do
         [ -n "$db" ] || continue
         local prefix file t0
-        prefix="$(next_prefix)"
+        next_prefix; prefix="$PREFIX"
         file="$prefix-postgresql-$(safe_name "$db").sql.gz.gpg"; t0=$SECONDS
         # --create: o dump recria o banco na restauração (psql -f arquivo.sql postgres).
         pg_run pg_dump --create --format=plain --dbname="$db" 2>"$err" \
@@ -428,7 +501,7 @@ backup_mssql() {
             continue
         fi
         local prefix file t0 bak
-        prefix="$(next_prefix)"
+        next_prefix; prefix="$PREFIX"
         file="$prefix-mssql-$(safe_name "$db").bak.gz.gpg"
         bak="$MSSQL_BACKUP_DIR/pulse-$(safe_name "$db").bak"; t0=$SECONDS
         rm -f "$bak"
@@ -531,11 +604,13 @@ cmd_run() {
     mkdir -p "$WORK_DIR" && chmod 700 "$WORK_DIR" || die "não foi possível criar $WORK_DIR"
     RUN_DIR="$WORK_DIR/$RUN_NAME"
     mkdir -m 700 "$RUN_DIR" || die "não foi possível criar $RUN_DIR"
+    UPLOAD_DEST="$SERVER_USER@$SERVER_HOST:$RUN_NAME/"
     log INFO "início do backup $RUN_NAME (cliente $CLIENT_ID, agente $AGENT_VERSION)"
 
     gpg_prepare
     detect_gzip
     backup_paths
+    backup_files
     backup_mysql
     backup_postgres
     backup_mssql
@@ -552,7 +627,7 @@ cmd_run() {
 
     # 1) arquivos cifrados; 2) manifest.json por último — é ele que sinaliza ao
     # servidor que o upload terminou.
-    local dest="$SERVER_USER@$SERVER_HOST:$RUN_NAME/"
+    local dest="$UPLOAD_DEST"
     local files=()
     mapfile -t files < <(find "$RUN_DIR" -maxdepth 1 -type f -name '*.gpg' -printf '%f\n' | sort)
     local up_ok=0
@@ -624,6 +699,32 @@ cmd_test() {
     for p in "${BACKUP_PATHS[@]}"; do
         [ -e "$p" ] && echo "• Pasta $p: ok" || { echo "✗ Pasta $p não existe"; ok=0; }
     done
+    local pat f biggest=0 nfiles=0 size
+    for pat in "${BACKUP_FILES[@]}"; do
+        [ -n "$pat" ] || continue
+        local list=()
+        mapfile -t list < <(resolve_file_pattern "$pat")
+        if [ "${#list[@]}" -eq 0 ]; then
+            echo "✗ Arquivos $pat: nenhum encontrado"; ok=0; continue
+        fi
+        for f in "${list[@]}"; do
+            [ -f "$f" ] || continue
+            nfiles=$((nfiles + 1))
+            size="$(stat -c %s "$f")"
+            [ "$size" -gt "$biggest" ] && biggest="$size"
+        done
+        echo "• Arquivos $pat: $nfiles encontrado(s)"
+    done
+    if [ "$nfiles" -gt 0 ]; then
+        mkdir -p "$WORK_DIR" 2>/dev/null
+        local avail
+        avail="$(df -P -B1 "$WORK_DIR" 2>/dev/null | awk 'NR==2 {print $4}')"
+        if [ -n "$avail" ] && [ "$avail" -lt $((biggest + 1073741824)) ]; then
+            echo "✗ $WORK_DIR tem $((avail / 1073741824)) GB livres; o maior arquivo ($((biggest / 1073741824)) GB) precisa caber cifrado + 1 GB"; ok=0
+        else
+            echo "• Espaço em $WORK_DIR: ok (maior arquivo: $((biggest / 1048576)) MB)"
+        fi
+    fi
     if [ "$MYSQL_ENABLED" = "yes" ]; then
         mysql_bins; mysql_auth_args
         if [ -n "$MYSQL_BIN" ] && "$MYSQL_BIN" "${MYSQL_AUTH[@]}" -N -B -e 'SELECT 1' >/dev/null 2>&1; then

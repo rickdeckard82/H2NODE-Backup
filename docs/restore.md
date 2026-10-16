@@ -24,6 +24,11 @@ sha256sum *.gpg   # compare com "sha256" de cada componente no manifest.json
 
 ## 2. Restaurar
 
+**Arquivos como estão** (`BACKUP_FILES`, ex. backups de conta do cPanel — o `.gpg` é o `.tar.gz` cifrado):
+```bash
+dec 05-file-conta.tar.gz.gpg > conta.tar.gz     # cPanel: /scripts/restorepkg /home/conta.tar.gz
+```
+
 **Pastas** (os caminhos são relativos à raiz, ex. `etc/nginx/...`):
 ```bash
 mkdir -p /restore && dec 01-files-etc.tar.gz.gpg | tar -xzp --numeric-owner -C /restore

@@ -27,7 +27,7 @@ def _naive_utc(v: datetime | None) -> datetime | None:
 class ManifestComponent(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    kind: Literal["files", "mysql", "postgresql", "mssql"]
+    kind: Literal["files", "file", "mysql", "postgresql", "mssql"]
     name: str = Field(max_length=255)
     file: str | None = Field(default=None, max_length=200, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*\.gpg$")
     size: int = Field(default=0, ge=0)

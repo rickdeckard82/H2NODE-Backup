@@ -58,6 +58,7 @@ commit
 | Huawei | texto (ou `.zip` com o `.cfg`) terminando em `return` |
 | Juniper | `.gz` íntegro, bloco `system`, chaves `{ }` balanceadas |
 | Datacom | texto com comandos de primeiro nível do DmOS (`hostname`, `dot1q`, `interface`…) |
+| Fiberhome (UNM2000) | texto da OLT com `!WOS system config file` ou `hostname`; um arquivo `config_<IP-da-OLT>_<data>` por OLT, comparado só com o anterior da mesma OLT |
 | Genérico | texto não vazio com 3+ linhas |
 
 Arquivo vazio, truncado ou binário vira backup **com falha** (aparece no painel).

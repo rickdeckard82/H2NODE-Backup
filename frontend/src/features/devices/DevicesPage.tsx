@@ -35,7 +35,7 @@ const empty: FormState = {
   vendor: "huawei",
   mgmt_ip: "",
   protocol: "ftp",
-  // Huawei/Juniper enviam a cada alteração: sob demanda (sem alerta de atraso)
+  // Huawei/Juniper/UNM2000 enviam a cada alteração: sob demanda (sem alerta de atraso)
   expected_interval_hours: 0,
   retention_days: 90,
   retention_min_keep: 10,

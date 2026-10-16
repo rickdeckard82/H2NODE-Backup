@@ -29,6 +29,13 @@ EXCLUDES=(
 )
 ONE_FILE_SYSTEM="no"
 
+# ---- Arquivos como estão (ex.: backups de conta do cPanel) ----
+# Cada arquivo é cifrado como está e enviado um a um (cifra, envia, apaga): a pasta
+# WORK_DIR só precisa caber o MAIOR arquivo. "@latest" = a pasta datada mais recente.
+BACKUP_FILES=(
+  # "/backup/cpanel/@latest/accounts/*.tar.gz"
+)
+
 # ---- MySQL / MariaDB ----  (autenticação: unix_socket do root ou MYSQL_DEFAULTS_FILE)
 MYSQL_ENABLED="no"
 MYSQL_DATABASES=( "all" )

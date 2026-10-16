@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.4.2";
+export const APP_VERSION = "0.5.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.5.0",
+    date: "2026-10-16",
+    changes: [
+      "Backup de cPanel/WHM e outros arquivos grandes: o agente (1.1.0) ganhou BACKUP_FILES — cifra cada arquivo como está (ex.: .tar.gz de conta) e o envia um a um, só precisando de disco para o maior. A verificação confere o gzip e o hash do conteúdo. Novo tipo de componente \"Arquivo\".",
+      "Backup das OLTs Fiberhome pela UNM2000 (FTP): novo fabricante, com validação do config da OLT e comparação \"idêntica ao anterior\" por OLT.",
+      "Ajuda: novas páginas cPanel / WHM e UNM2000 (Fiberhome).",
+      "Agente: corrigido o prefixo numérico dos arquivos (todos saíam 01).",
+    ],
+  },
   {
     version: "0.4.2",
     date: "2026-10-15",

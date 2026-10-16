@@ -94,7 +94,7 @@ class BackupComponent(Base):
         ForeignKey("backup.id", ondelete="CASCADE"), index=True
     )
     position: Mapped[int] = mapped_column(Integer, default=0)
-    kind: Mapped[str] = mapped_column(String(16))  # files | mysql | postgresql | mssql
+    kind: Mapped[str] = mapped_column(String(16))  # files | file | mysql | postgresql | mssql | config
     name: Mapped[str] = mapped_column(String(255))
     file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
