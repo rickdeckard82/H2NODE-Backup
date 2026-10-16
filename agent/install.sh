@@ -32,6 +32,8 @@ if [ "${#missing[@]}" -gt 0 ]; then
 fi
 
 install -m 700 -o root -g root "$HERE/pulse-backup-agent.sh" "$BIN"
+# /usr/local/sbin não está no PATH do root/sudo em vários CentOS/Alma/cPanel: atalho em /usr/bin.
+ln -sf "$BIN" /usr/bin/pulse-backup-agent 2>/dev/null || echo "aviso: use o caminho completo: $BIN"
 mkdir -p /etc/pulse-backup && chmod 700 /etc/pulse-backup
 if [ ! -f /etc/pulse-backup/agent.conf ]; then
     install -m 600 -o root -g root "$HERE/agent.conf.example" /etc/pulse-backup/agent.conf
