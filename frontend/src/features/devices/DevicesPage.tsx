@@ -379,7 +379,7 @@ export default function DevicesPage() {
                 <input
                   className="input font-mono"
                   value={form.manager_ip}
-                  placeholder="203.0.113.26"
+                  placeholder="IP da UNM2000 (deixe vazio se não houver)"
                   onChange={(e) => setForm({ ...form, manager_ip: e.target.value })}
                 />
               </Field>

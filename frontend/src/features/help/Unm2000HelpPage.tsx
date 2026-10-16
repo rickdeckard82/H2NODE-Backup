@@ -78,8 +78,8 @@ export default function Unm2000HelpPage() {
         <Step n={3} title="Libere os IPs no firewall do servidor">
           <CopyBlock
             label="Comando (um por equipamento, ou a faixa)"
-            text={`sudo ./scripts/ufw-setup.sh device 198.51.100.126 ftp
-sudo ./scripts/ufw-setup.sh device 198.51.100.0/24 ftp   # a faixa das OLTs
+            text={`sudo ./scripts/ufw-setup.sh device <IP-da-OLT> ftp
+sudo ./scripts/ufw-setup.sh device <faixa-das-OLTs, ex.: 10.0.0.0/24> ftp   # ou a faixa inteira
 sudo ./scripts/ufw-setup.sh device <IP-da-UNM2000> ftp`}
           />
           <p>
