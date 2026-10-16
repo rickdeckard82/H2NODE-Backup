@@ -58,7 +58,7 @@ commit
 | Huawei | texto (ou `.zip` com o `.cfg`) terminando em `return` |
 | Juniper | `.gz` íntegro, bloco `system`, chaves `{ }` balanceadas |
 | Datacom | texto com comandos de primeiro nível do DmOS (`hostname`, `dot1q`, `interface`…) |
-| Fiberhome (UNM2000) | texto da OLT com `!WOS system config file` ou `hostname`; um arquivo `config_<IP-da-OLT>_<data>` por OLT, comparado só com o anterior da mesma OLT |
+| Fiberhome (UNM2000) | texto da OLT com `!WOS system config file` ou `hostname`; cada OLT envia o próprio arquivo (`<ID>_<MMDD>`) e é um equipamento (IP de origem = IP da OLT); o **IP da UNM2000** é informado em cada OLT (campo "IP da UNM2000") |
 | Genérico | texto não vazio com 3+ linhas |
 
 Arquivo vazio, truncado ou binário vira backup **com falha** (aparece no painel).
@@ -69,6 +69,9 @@ Configuração idêntica à anterior é marcada como "idêntica ao backup anteri
 - **FTP e TFTP trafegam em claro**, inclusive a senha FTP. Use a rede de gerência
   ou VPN entre equipamentos e servidor, e libere as portas no ufw **só** para os
   IPs dos equipamentos.
+- Exceção controlada: para o **IP da UNM2000** informado nas OLTs Fiberhome, os comandos FTP `DELE`, `RNFR` e `RNTO`
+  respondem sucesso **sem fazer nada** (a UNM2000 apaga/renomeia o arquivo que a OLT enviou e o servidor já o guardou).
+  Para qualquer outro equipamento continuam recusados, e nenhum backup guardado pode ser lido, alterado ou apagado.
 - Os receptores só aceitam **gravação**: TFTP recusa leitura (RRQ); a conta FTP não
   tem RETR, DELE nem APPE, e cada sessão grava numa pasta própria, vazia.
 - Conexões de IPs não cadastrados são recusadas antes do login.

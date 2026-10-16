@@ -4,7 +4,7 @@ export const VENDOR_LABEL: Record<Vendor, string> = {
   datacom: "Datacom (DmOS)",
   huawei: "Huawei (VRP)",
   juniper: "Juniper (Junos)",
-  fiberhome: "Fiberhome (UNM2000)",
+  fiberhome: "Fiberhome (OLT / UNM2000)",
   generic: "Genérico",
 };
 
@@ -30,6 +30,7 @@ export interface Client {
   kind: "server" | "network";
   vendor: Vendor | null;
   mgmt_ip: string | null;
+  manager_ip: string | null;
   protocol: "ftp" | "tftp" | null;
   ssh_public_key: string | null;
   ssh_key_fingerprint: string | null;

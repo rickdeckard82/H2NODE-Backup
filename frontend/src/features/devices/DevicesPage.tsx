@@ -21,6 +21,7 @@ interface FormState {
   is_active: boolean;
   vendor: Vendor;
   mgmt_ip: string;
+  manager_ip: string;
   protocol: Protocol;
   expected_interval_hours: number;
   retention_days: number;
@@ -34,6 +35,7 @@ const empty: FormState = {
   is_active: true,
   vendor: "huawei",
   mgmt_ip: "",
+  manager_ip: "",
   protocol: "ftp",
   // Huawei/Juniper/UNM2000 enviam a cada alteração: sob demanda (sem alerta de atraso)
   expected_interval_hours: 0,
@@ -138,6 +140,8 @@ export default function DevicesPage() {
         is_active: f.is_active,
         vendor: f.vendor,
         mgmt_ip: f.mgmt_ip.trim(),
+        // só OLT Fiberhome por FTP tem UNM2000; "" remove (o servidor também limpa nos outros casos)
+        manager_ip: f.vendor === "fiberhome" && f.protocol === "ftp" ? f.manager_ip.trim() : "",
         protocol: f.protocol,
         expected_interval_hours: f.expected_interval_hours,
         retention_days: f.retention_days,
@@ -227,6 +231,9 @@ export default function DevicesPage() {
                 <td className="td">
                   <Badge tone="blue">{c.protocol?.toUpperCase()}</Badge>
                   <div className="mt-0.5 font-mono text-xs text-slate-400 dark:text-slate-500">de {c.mgmt_ip}</div>
+                  {c.manager_ip && (
+                    <div className="font-mono text-xs text-slate-400 dark:text-slate-500">UNM2000 {c.manager_ip}</div>
+                  )}
                 </td>
                 <td className="td">
                   <HealthBadge health={c.health} />
@@ -262,6 +269,7 @@ export default function DevicesPage() {
                               is_active: c.is_active,
                               vendor: c.vendor ?? "generic",
                               mgmt_ip: c.mgmt_ip ?? "",
+                              manager_ip: c.manager_ip ?? "",
                               protocol: c.protocol ?? "ftp",
                               expected_interval_hours: c.expected_interval_hours,
                               retention_days: c.retention_days,
@@ -363,6 +371,19 @@ export default function DevicesPage() {
                 />
               </Field>
             </div>
+            {form.vendor === "fiberhome" && form.protocol === "ftp" && (
+              <Field
+                label="IP da UNM2000 (gerenciador)"
+                hint="Depois que a OLT envia, a UNM2000 entra no FTP para apagar/renomear o arquivo. Este IP passa a poder usar o FTP (sem cadastro próprio) — libere-o também no ufw."
+              >
+                <input
+                  className="input font-mono"
+                  value={form.manager_ip}
+                  placeholder="203.0.113.26"
+                  onChange={(e) => setForm({ ...form, manager_ip: e.target.value })}
+                />
+              </Field>
+            )}
             <Field label="Descrição">
               <input
                 className="input"

@@ -19,7 +19,7 @@ VENDOR_LABEL = {
     "datacom": "Datacom (DmOS)",
     "huawei": "Huawei (VRP)",
     "juniper": "Juniper (Junos)",
-    "fiberhome": "Fiberhome (UNM2000)",
+    "fiberhome": "Fiberhome (OLT / UNM2000)",
     "generic": "Genérico",
 }
 

@@ -28,8 +28,15 @@ from app.core.logging import configure_logging, logger
 from app.core.security import verify_password
 from app.services import receivers
 
-# e=CWD  l=LIST  m=MKD  w=STOR  f=RENAME — sem r (RETR), d (DELE), a (APPE), M (chmod)
-PERMS = "elmwf"
+# e=CWD  l=LIST  m=MKD  w=STOR  f=RENAME  d=DELE/RMD — sem r (RETR), a (APPE), M (chmod).
+# O "d" só deixa o comando CHEGAR ao handler: DELE/RMD continuam recusados (ver DeviceHandler),
+# exceto como no-op para o gerenciador UNM2000.
+PERMS = "elmwfd"
+
+# IP de UNM2000 (campo "IP da UNM2000" das OLTs Fiberhome): depois que cada OLT envia o arquivo,
+# a UNM2000 entra no FTP para apagar o antigo e RENOMEAR o novo. Aqui cada sessão é isolada e o
+# arquivo já foi para a fila, então esses comandos respondem sucesso SEM fazer nada.
+MANAGER_VENDOR = receivers.MANAGER_VENDOR
 
 
 class AllowlistAuthorizer(DummyAuthorizer):
@@ -126,6 +133,36 @@ class DeviceHandler(FTPHandler):
             logger.warning("ftp_unknown_ip", ip=self.remote_ip)
             self.respond("421 IP nao autorizado.")
             self.close_when_done()
+
+    def _is_manager(self) -> bool:
+        return getattr(getattr(self, "device", None), "vendor", None) == MANAGER_VENDOR
+
+    def ftp_DELE(self, path):  # noqa: ANN001
+        if not self._is_manager():
+            self.respond("550 Not enough privileges.")
+            return None
+        logger.info("ftp_manager_noop", cmd="DELE", device=self.device.slug)
+        self.respond("250 File removed.")
+        return None
+
+    def ftp_RMD(self, path):  # noqa: ANN001
+        self.respond("550 Not enough privileges.")
+        return None
+
+    def ftp_RNFR(self, path):  # noqa: ANN001
+        if not self._is_manager():
+            return super().ftp_RNFR(path)
+        self._rnfr = path
+        self.respond("350 Ready for destination name.")
+        return None
+
+    def ftp_RNTO(self, path):  # noqa: ANN001
+        if not self._is_manager():
+            return super().ftp_RNTO(path)
+        self._rnfr = None
+        logger.info("ftp_manager_noop", cmd="RNTO", device=self.device.slug)
+        self.respond("250 Renaming ok.")
+        return None
 
     def on_file_received(self, file):  # noqa: ANN001
         path = Path(file)

@@ -22,12 +22,15 @@ class Client(Base, TimestampMixin):
     kind: Mapped[str] = mapped_column(String(16), default="server", server_default="server", index=True)
 
     # ---- Só para equipamentos de rede ----
-    # datacom | huawei | juniper | generic — define as instruções e a validação.
+    # datacom | huawei | juniper | fiberhome | generic — define as instruções e a validação.
     vendor: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # IP de origem com que o equipamento chega ao servidor (identifica o upload).
     mgmt_ip: Mapped[str | None] = mapped_column(String(45), nullable=True, unique=True)
     # ftp | tftp
     protocol: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    # Só OLT Fiberhome: IP da UNM2000 que gerencia o FTP (apaga/renomeia o arquivo que a OLT
+    # enviou). Esse IP também pode usar o FTP, em modo de compatibilidade (ver receivers/ftp.py).
+    manager_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
 
     # Chave pública SSH do agente. Vira uma linha do authorized_keys do container
     # sshd, presa (rrsync -wo) à pasta incoming/<slug>/.

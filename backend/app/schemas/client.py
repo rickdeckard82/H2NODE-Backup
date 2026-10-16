@@ -30,12 +30,13 @@ class ClientBase(BaseModel):
     kind: Kind = "server"
     vendor: Vendor | None = None
     mgmt_ip: str | None = Field(default=None, max_length=45)
+    manager_ip: str | None = Field(default=None, max_length=45)
     protocol: Protocol | None = None
     ssh_public_key: str | None = Field(default=None, max_length=16384)
     # 0 = sob demanda (sem alerta de atraso)
     expected_interval_hours: int = Field(default=24, ge=0, le=24 * 31)
 
-    @field_validator("mgmt_ip")
+    @field_validator("mgmt_ip", "manager_ip")
     @classmethod
     def _ip(cls, v: str | None) -> str | None:
         return _norm_ip(v)
@@ -53,12 +54,14 @@ class ClientUpdate(BaseModel):
     is_active: bool | None = None
     vendor: Vendor | None = None
     mgmt_ip: str | None = Field(default=None, max_length=45)
+    # enviado (inclusive vazio) = grava; ausente = mantém (por isso usa model_fields_set)
+    manager_ip: str | None = Field(default=None, max_length=45)
     protocol: Protocol | None = None
     # "" remove a chave (o cliente deixa de conseguir enviar).
     ssh_public_key: str | None = Field(default=None, max_length=16384)
     expected_interval_hours: int | None = Field(default=None, ge=0, le=24 * 31)
 
-    @field_validator("mgmt_ip")
+    @field_validator("mgmt_ip", "manager_ip")
     @classmethod
     def _ip(cls, v: str | None) -> str | None:
         return _norm_ip(v)
@@ -77,6 +80,7 @@ class ClientOut(BaseModel):
     kind: str
     vendor: str | None
     mgmt_ip: str | None
+    manager_ip: str | None
     protocol: str | None
     ssh_public_key: str | None
     ssh_key_fingerprint: str | None

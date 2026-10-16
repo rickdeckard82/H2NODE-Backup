@@ -61,8 +61,27 @@ def _apply_network(db: Session, c: Client) -> None:
         if db.execute(select(Client.id).where(Client.mgmt_ip == c.mgmt_ip, Client.id != (c.id or 0))).first():
             # o upload é atribuído pelo IP de origem: precisa ser único
             raise HTTPException(status.HTTP_409_CONFLICT, f"o IP {c.mgmt_ip} já pertence a outro equipamento")
+        if c.vendor != "fiberhome" or c.protocol != "ftp":
+            c.manager_ip = None  # só OLT Fiberhome por FTP tem UNM2000
+        if c.manager_ip:
+            if c.manager_ip == c.mgmt_ip:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                                    "o IP da UNM2000 não pode ser o da própria OLT")
+            owner = db.execute(select(Client.name).where(Client.mgmt_ip == c.manager_ip)).scalar_one_or_none()
+            if owner:
+                # um IP não pode ser equipamento e gerenciador ao mesmo tempo
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT,
+                    f"o IP {c.manager_ip} já está cadastrado como equipamento ('{owner}'): exclua esse "
+                    "cadastro — o IP da UNM2000 é informado em cada OLT",
+                )
+        elif c.mgmt_ip and db.execute(
+            select(Client.name).where(Client.manager_ip == c.mgmt_ip, Client.id != (c.id or 0))
+        ).first():
+            raise HTTPException(status.HTTP_409_CONFLICT,
+                                f"o IP {c.mgmt_ip} já é usado como IP da UNM2000 em outra OLT")
     else:
-        c.vendor = c.mgmt_ip = c.protocol = None
+        c.vendor = c.mgmt_ip = c.manager_ip = c.protocol = None
 
 
 def _sync_all(db: Session) -> None:
@@ -106,7 +125,8 @@ def create_client(
         raise HTTPException(status.HTTP_409_CONFLICT, "já existe um cliente com este identificador")
     c = Client(
         slug=body.slug, name=body.name, description=body.description, is_active=body.is_active,
-        kind=body.kind, vendor=body.vendor, mgmt_ip=body.mgmt_ip, protocol=body.protocol,
+        kind=body.kind, vendor=body.vendor, mgmt_ip=body.mgmt_ip, manager_ip=body.manager_ip,
+        protocol=body.protocol,
         expected_interval_hours=body.expected_interval_hours,
         retention_days=body.retention_days, retention_min_keep=body.retention_min_keep,
     )
@@ -119,7 +139,7 @@ def create_client(
     audit.record(db, action="create", entity_type="client", entity_id=c.id,
                  actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request),
                  after={"slug": c.slug, "name": c.name, "kind": c.kind, "ssh_key": c.ssh_key_fingerprint,
-                        "mgmt_ip": c.mgmt_ip, "protocol": c.protocol})
+                        "mgmt_ip": c.mgmt_ip, "manager_ip": c.manager_ip, "protocol": c.protocol})
     db.commit()
     storage.ensure_client_dirs(c.slug)
     _sync_all(db)
@@ -136,11 +156,15 @@ def update_client(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "não encontrado")
     fields = ("name", "description", "is_active", "expected_interval_hours", "retention_days",
               "retention_min_keep", "vendor", "mgmt_ip", "protocol")
-    before = {f: getattr(c, f) for f in fields if f != "description"} | {"ssh_key": c.ssh_key_fingerprint}
+    before = {f: getattr(c, f) for f in (*fields, "manager_ip") if f != "description"} | {
+        "ssh_key": c.ssh_key_fingerprint
+    }
     for field in fields:
         v = getattr(body, field)
         if v is not None:
             setattr(c, field, v)
+    if "manager_ip" in body.model_fields_set:
+        c.manager_ip = body.manager_ip  # None/"" remove
     if c.kind == "server":
         _apply_key(c, body.ssh_public_key)
         _check_key_unique(db, c)
@@ -296,16 +320,21 @@ def render_device_commands(c: Client, host: str, ftp_user: str) -> tuple[str, li
         notes.append("O Junos envia um .conf.gz a cada commit (sob demanda: use intervalo 0).")
     elif c.vendor == "fiberhome" and c.protocol == "ftp":
         cmds = (
-            "# Na UNM2000: tarefa de exportação de configuração das OLTs com destino FTP\n"
+            "# Na UNM2000: tarefa de exportação de configuração com destino FTP (cada OLT envia direto)\n"
             f"servidor FTP : {host}   (porta 21, modo passivo)\n"
             f"usuário      : {ftp_user}\n"
             "senha        : <SENHA-FTP>"
         )
-        notes.append("A UNM2000 envia um arquivo config_<IP-da-OLT>_<data> por OLT (sob demanda: use "
-                     "intervalo 0, ou o intervalo da tarefa agendada).")
-        notes.append("Uma única UNM2000 envia a configuração de várias OLTs: cadastre a UNM2000 como UM "
-                     "equipamento (IP de origem = IP da UNM2000); cada arquivo vira uma versão, comparada "
-                     "só com o anterior da mesma OLT.")
+        notes.append("Cada OLT envia o próprio arquivo direto ao servidor, a partir do IP dela: cadastre UM "
+                     "equipamento por OLT (IP de origem = IP da OLT).")
+        if c.manager_ip:
+            notes.append(f"A UNM2000 ({c.manager_ip}) também pode usar o FTP: ela apaga/renomeia o arquivo "
+                         "que a OLT enviou e o servidor responde sucesso sem alterar nada. Libere esse IP "
+                         "no ufw (scripts/ufw-setup.sh device <IP> ftp).")
+        else:
+            notes.append("Informe o IP da UNM2000 no cadastro: sem ele a UNM2000 é recusada ao tentar "
+                         "apagar/renomear o arquivo e acusa falha de conexão.")
+        notes.append("O intervalo esperado segue a tarefa de exportação da UNM2000 (ex.: 24 h).")
     elif c.protocol == "tftp":
         cmds = f"# envie o arquivo de configuração por TFTP (modo octet) para\ntftp://{host}/{c.slug}/config.txt"
     else:

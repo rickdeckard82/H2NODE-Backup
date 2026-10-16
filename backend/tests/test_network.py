@@ -56,11 +56,13 @@ def test_netconfig_vendor_checks():
 # --------------------------------------------------------------- receptores --
 
 
-def write_allowlist(devices: list[dict], accounts: dict[str, str] | None = None) -> receivers.Allowlist:
+def write_allowlist(devices: list[dict], accounts: dict[str, str] | None = None,
+                    managers: list[str] | None = None) -> receivers.Allowlist:
     path = Path(settings.receivers_shared_dir) / receivers.ALLOWLIST_FILE
     path.write_text(json.dumps({
         "devices": devices,
         "ftp_accounts": [{"username": u, "password_hash": h} for u, h in (accounts or {}).items()],
+        "managers": managers or [],
     }))
     return receivers.Allowlist(path)
 
@@ -179,6 +181,41 @@ def test_ftp_upload_juniper_root_and_huawei_path(ftp_server):
     names = sorted(p.name.split("__", 1)[1] for p in files)
     assert names == ["192.0.2.15_vrpcfg.cfg", "mx1_juniper.conf.gz_20261001_120000"]
     assert any(p.read_bytes() == gz for p in files)
+
+
+def test_ftp_unm2000_manager_noop_but_others_denied():
+    # o IP da UNM2000 (campo das OLTs) entra no FTP sem ser equipamento: DELE/RNFR/RNTO viram no-op
+    allow = write_allowlist([{"slug": "olt1", "ip": "10.0.0.9", "protocol": "ftp", "vendor": "fiberhome"}],
+                            {FTP_USER: hash_password(FTP_PASS)}, managers=["127.0.0.1"])
+    srv = ftp_recv.build_server("127.0.0.1", 0, allow)
+    t = threading.Thread(target=srv.serve_forever, kwargs={"timeout": 0.2, "handle_exit": False}, daemon=True)
+    t.start()
+    try:
+        f = ftp_connect(srv)
+        f.login(FTP_USER, FTP_PASS)
+        assert f.delete("Policy_Task/Config_Export/config_10.0.0.1_20261016").startswith("250")
+        assert f.sendcmd("RNFR 10000001_1016").startswith("350")
+        assert f.sendcmd("RNTO Policy_Task/Config_Export/config_10.0.0.1_20261016").startswith("250")
+        with pytest.raises(ftplib.error_perm):
+            f.retrbinary("RETR qualquer", lambda b: None)  # leitura continua proibida
+        with pytest.raises(ftplib.error_perm):
+            f.rmd("pasta")
+        f.quit()
+        assert not (receivers.netin() / "unm2000").exists()  # nada foi para a fila de backups
+    finally:
+        srv.close_all()
+
+
+def test_ftp_non_manager_cannot_delete_or_rename_missing(ftp_server):
+    f = ftp_connect(ftp_server)
+    f.login(FTP_USER, FTP_PASS)
+    with pytest.raises(ftplib.error_perm):
+        f.delete("x")
+    with pytest.raises(ftplib.error_perm):
+        f.rmd("pasta")
+    with pytest.raises(ftplib.error_perm):
+        f.sendcmd("RNFR arquivo-inexistente")
+    f.quit()
 
 
 def test_ftp_wrong_password(ftp_server):
@@ -314,3 +351,54 @@ def test_name_key_groups_files_of_the_same_olt():
     assert name_key("config_198.51.100.126_20260901") != name_key("config_198.51.100.164_20260901")
     assert name_key("mx1_juniper.conf.gz_20261001_120000") == name_key("mx1_juniper.conf.gz_20261002_130500")
     assert name_key("config.txt") == "config.txt"
+    # OLT Fiberhome: <ID>_<MMDD> — o mesmo arquivo em dias diferentes
+    assert name_key("10000001_1016") == name_key("10000001_1017")
+    assert name_key("10000001_1016") != name_key("10000002_1016")
+
+
+def test_allowlist_manager_ip_only_for_ftp(tmp_path):
+    allow = write_allowlist([], managers=["203.0.113.26"])
+    d = allow.device("203.0.113.26", "ftp")
+    assert d is not None and d.vendor == receivers.MANAGER_VENDOR
+    assert allow.device("203.0.113.26", "tftp") is None
+    assert allow.device("203.0.113.27", "ftp") is None
+
+
+def test_api_manager_ip_on_fiberhome_olt(auth_client, isolated_paths):
+    base = {"kind": "network", "vendor": "fiberhome", "protocol": "ftp", "expected_interval_hours": 24}
+    r = auth_client.post("/api/clients", json={**base, "slug": "olt-a", "name": "OLT A",
+                                               "mgmt_ip": "198.51.100.126", "manager_ip": "203.0.113.26"})
+    assert r.status_code == 201, r.text
+    assert r.json()["manager_ip"] == "203.0.113.26"
+    r = auth_client.post("/api/clients", json={**base, "slug": "olt-b", "name": "OLT B",
+                                               "mgmt_ip": "198.51.100.163", "manager_ip": "203.0.113.26"})
+    assert r.status_code == 201
+    allow = json.loads((isolated_paths / "netcfg" / receivers.ALLOWLIST_FILE).read_text())
+    assert allow["managers"] == ["203.0.113.26"]  # único, mesmo informado em duas OLTs
+
+    # a nota dos comandos cita a UNM2000
+    cfg = auth_client.get(f"/api/clients/{r.json()['id']}/device-config").json()
+    assert any("203.0.113.26" in n for n in cfg["notes"])
+
+    # o IP da UNM2000 não pode ser outro equipamento, nem a própria OLT
+    r2 = auth_client.post("/api/clients", json={**base, "slug": "olt-c", "name": "OLT C",
+                                                "mgmt_ip": "198.51.100.164", "manager_ip": "198.51.100.126"})
+    assert r2.status_code == 409
+    r3 = auth_client.post("/api/clients", json={**base, "slug": "olt-d", "name": "OLT D",
+                                                "mgmt_ip": "198.51.100.165", "manager_ip": "198.51.100.165"})
+    assert r3.status_code == 422
+    # e um equipamento novo não pode usar o IP já dado a uma UNM2000
+    r4 = auth_client.post("/api/clients", json={**base, "slug": "olt-e", "name": "OLT E",
+                                                "mgmt_ip": "203.0.113.26"})
+    assert r4.status_code == 409
+
+    # remover: manager_ip vazio limpa; outro fabricante também limpa
+    cid = auth_client.get("/api/clients", params={"kind": "network"}).json()
+    olt_a = next(c for c in cid if c["slug"] == "olt-a")
+    cleared = auth_client.patch(f"/api/clients/{olt_a['id']}", json={"manager_ip": ""}).json()
+    assert cleared["manager_ip"] is None
+    olt_b = next(c for c in cid if c["slug"] == "olt-b")
+    out = auth_client.patch(f"/api/clients/{olt_b['id']}", json={"vendor": "huawei"}).json()
+    assert out["manager_ip"] is None
+    allow = json.loads((isolated_paths / "netcfg" / receivers.ALLOWLIST_FILE).read_text())
+    assert allow["managers"] == []

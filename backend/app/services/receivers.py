@@ -54,7 +54,16 @@ def render(db: Session) -> dict:
         {"username": a.username, "password_hash": a.password_hash}
         for a in db.execute(select(FtpAccount).where(FtpAccount.is_active.is_(True))).scalars()
     ]
-    return {"version": 1, "devices": devices, "ftp_accounts": accounts}
+    # IPs de UNM2000 (gerenciador) informados nas OLTs Fiberhome: entram no FTP sem ser equipamento
+    managers = sorted({
+        c.manager_ip
+        for c in db.execute(
+            select(Client).where(Client.kind == "network", Client.is_active.is_(True),
+                                 Client.manager_ip.is_not(None))
+        ).scalars()
+        if c.manager_ip and c.protocol == "ftp"
+    })
+    return {"version": 1, "devices": devices, "ftp_accounts": accounts, "managers": managers}
 
 
 def sync(db: Session) -> bool:
@@ -79,6 +88,11 @@ def sync(db: Session) -> bool:
 # ---------------------------------------------------------------- receptores --
 
 
+# Fabricante interno dado ao IP da UNM2000 (não é selecionável no cadastro).
+MANAGER_VENDOR = "unm2000"
+MANAGER_SLUG = "unm2000"
+
+
 @dataclass(frozen=True)
 class Device:
     slug: str
@@ -94,13 +108,14 @@ class Allowlist:
         self.path = path or (shared_dir() / ALLOWLIST_FILE)
         self._mtime: float | None = None
         self.by_ip: dict[str, Device] = {}
+        self.managers: set[str] = set()
         self.accounts: dict[str, str] = {}
 
     def refresh(self) -> None:
         try:
             mtime = self.path.stat().st_mtime
         except OSError:
-            self.by_ip, self.accounts, self._mtime = {}, {}, None
+            self.by_ip, self.accounts, self.managers, self._mtime = {}, {}, set(), None
             return
         if mtime == self._mtime:
             return
@@ -114,8 +129,10 @@ class Allowlist:
             for d in data.get("devices", [])
         }
         self.accounts = {a["username"]: a["password_hash"] for a in data.get("ftp_accounts", [])}
+        self.managers = {m for m in data.get("managers", []) if isinstance(m, str)}
         self._mtime = mtime
-        logger.info("receivers_allowlist_loaded", devices=len(self.by_ip), accounts=len(self.accounts))
+        logger.info("receivers_allowlist_loaded", devices=len(self.by_ip), accounts=len(self.accounts),
+                    managers=len(self.managers))
 
     def device(self, ip: str, protocol: str) -> Device | None:
         self.refresh()
@@ -123,6 +140,8 @@ class Allowlist:
         if ip.startswith("::ffff:"):
             ip = ip[7:]
         d = self.by_ip.get(ip)
+        if d is None and protocol == "ftp" and ip in self.managers:
+            return Device(MANAGER_SLUG, ip, "ftp", MANAGER_VENDOR)
         return d if d and d.protocol == protocol else None
 
 

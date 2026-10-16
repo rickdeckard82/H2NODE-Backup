@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.5.0";
+export const APP_VERSION = "0.5.2";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,21 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.5.2",
+    date: "2026-10-16",
+    changes: [
+      "OLT Fiberhome (FTP): novo campo \"IP da UNM2000 (gerenciador)\" no cadastro. Depois que cada OLT envia o backup, a UNM2000 entra no FTP para apagar/renomear o arquivo; esse IP passa a poder usar o FTP (sem cadastro próprio) e o servidor responde sucesso a esses comandos sem alterar nada — o resto continua só de gravação. A UNM2000 deixa de acusar falha e de repetir a tarefa.",
+      "Arquivos <ID>_<MMDD> das OLTs são comparados com o do dia anterior da mesma OLT (\"idêntica ao backup anterior\").",
+    ],
+  },
+  {
+    version: "0.5.1",
+    date: "2026-10-16",
+    changes: [
+      "Ajuda → UNM2000: corrigido — cada OLT envia a própria configuração a partir do IP dela, então cada OLT é um equipamento (e não a UNM2000 inteira).",
+    ],
+  },
   {
     version: "0.5.0",
     date: "2026-10-16",

@@ -54,12 +54,16 @@ def _encrypt(src: Path, dest: Path) -> None:
         raise RuntimeError("gpg falhou: " + r.stderr.decode(errors="replace")[-300:])
 
 
+_OLT_ID_MMDD = re.compile(r"^(\d{5,})_\d{4}$")
 _DATE_SUFFIX = re.compile(r"[_.-]?\d{8}(?:[_.-]?\d{6})?$")
 
 
 def name_key(name: str) -> str:
     """Nome sem a data final: `config_10.0.0.1_20261015` e `..._20261016` são o mesmo arquivo.
     Uma UNM2000 envia uma configuração por OLT; só se compara com a anterior da MESMA OLT."""
+    m = _OLT_ID_MMDD.match(name)  # Fiberhome: <ID-da-OLT>_<MMDD>
+    if m:
+        return m.group(1)
     return _DATE_SUFFIX.sub("", name)
 
 
