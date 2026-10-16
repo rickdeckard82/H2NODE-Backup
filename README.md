@@ -1,7 +1,7 @@
 # Pulse Backup
 
-Sistema para **fazer, receber, validar e acompanhar backups de servidores Linux e
-de configurações de switches/roteadores** (FTP/TFTP),
+Sistema para **fazer, receber, validar e acompanhar backups de servidores Linux
+(inclusive cPanel/WHM) e de configurações de switches, roteadores e OLTs** (FTP/TFTP),
 com painel web protegido por login. Stack: **FastAPI + PostgreSQL** no backend,
 **React + Vite + Tailwind** no frontend, **rsync sobre SSH** no transporte e
 **GPG** na criptografia, tudo em **Docker**. Mesmos padrões visuais e de código do
@@ -9,8 +9,8 @@ Pulse RADIUS e do Projeto.io.
 
 | Parte | O que faz |
 |---|---|
-| **Agente** (`agent/`) | Script bash no crontab do root de cada cliente. Faz tar das pastas e dump dos bancos (MySQL/MariaDB, PostgreSQL, SQL Server), **cifra cada parte com a chave pública GPG** do servidor, envia por rsync/SSH e **apaga tudo localmente**. |
-| **ftp / tftp** | Recebem a configuração de switches e roteadores (Datacom TFTP, Huawei/Juniper FTP). Só gravação, só IPs cadastrados; o worker cifra na chegada. Ver [docs/network-devices.md](docs/network-devices.md). |
+| **Agente** (`agent/`) | Script bash no crontab do root de cada cliente. Faz tar das pastas e dump dos bancos (MySQL/MariaDB, PostgreSQL, SQL Server), ou cifra **arquivos que já existem** (ex.: backups de conta do cPanel), **cifra cada parte com a chave pública GPG** do servidor, envia por rsync/SSH e **apaga tudo localmente**. |
+| **ftp / tftp** | Recebem a configuração de switches, roteadores e OLTs (Datacom TFTP; Huawei, Juniper e Fiberhome/UNM2000 FTP). Só gravação, só IPs cadastrados; o worker cifra na chegada. Ver [docs/network-devices.md](docs/network-devices.md). |
 | **sshd** | Recebe os uploads. Só chave pública; cada cliente fica preso (`rrsync -wo -no-del`) à própria pasta, **só escrita** — não lê, não lista, não apaga. |
 | **worker** | Recebe os uploads completos, confere tamanho/SHA-256, **decifra em streaming e testa o conteúdo** (tar íntegro, dump completo), aplica retenção, reverifica periodicamente e mede o disco. |
 | **backend** | API do painel: login com senha (Argon2id) + 2FA opcional, papéis, auditoria, clientes, backups, dashboard. |
@@ -44,6 +44,7 @@ make init        # cria .env com segredos aleatórios + gera a chave GPG em secr
 vim .env         # PUBLIC_DOMAIN, ACME_EMAIL, BACKUP_STORAGE_PATH
 sudo ./scripts/ufw-setup.sh web                  # 443/80 para todos
 sudo ./scripts/ufw-setup.sh client <IP-cliente>  # porta de backup só para os clientes
+sudo ./scripts/ufw-docker.sh install            # opcional: o ufw também vale para portas publicadas pelo Docker
 make build && make up
 ```
 
@@ -63,8 +64,10 @@ Teste local em HTTP: `make dev` → http://localhost:8080 (login `admin` + senha
    ```bash
    cd agent && ./install.sh --cron "30 2 * * *"
    ```
-   O instalador coloca o agente em `/usr/local/sbin/pulse-backup-agent`, agenda no
-   crontab do root e imprime a **chave pública SSH** do agente.
+   O instalador coloca o agente em `/usr/local/sbin/pulse-backup-agent` (com atalho em
+   `/usr/bin`, porque o `PATH` do root/sudo nem sempre inclui `/usr/local/sbin`), agenda no
+   crontab do root e imprime a **chave pública SSH** do agente. Só a pasta `agent/`
+   precisa ir para o cliente — não é preciso clonar o repositório.
 2. No painel: **Clientes → Novo cliente**, cole a chave SSH.
 3. Em **Agente** (no cliente cadastrado) o painel mostra, prontos para copiar:
    o `agent.conf`, a linha do `known_hosts` e o download da chave pública GPG.
@@ -80,12 +83,35 @@ Bancos suportados:
 | PostgreSQL | `pg_dump --create` por banco + `pg_dumpall --globals-only` | peer, como o usuário `postgres` |
 | SQL Server (Linux) | `BACKUP DATABASE … WITH COPY_ONLY, CHECKSUM` + `RESTORE VERIFYONLY` | `sqlcmd`, senha em arquivo 600 |
 
-## Switches e roteadores
+## cPanel/WHM e arquivos grandes
+
+Backups que já existem em disco (ex.: um `.tar.gz` por conta do cPanel, dezenas de GB) não
+vão por FTP: o agente (1.1+) cifra cada arquivo **como está** e o envia **um de cada vez**
+(cifra, envia, apaga só a cópia cifrada — os originais nunca são alterados), então o disco
+do cliente só precisa caber o maior arquivo. No `agent.conf`:
+
+```bash
+WORK_DIR="/backup/pulse-work"                      # partição grande, fora de /backup/cpanel
+BACKUP_FILES=( "/backup/cpanel/@today/accounts/*.tar.gz" )   # só a pasta da data de hoje
+BACKUP_PATHS=( "/etc" "/backup/cpanel/@today/system" )       # a pasta system, pequena, vai inteira
+```
+
+`@today` vira a data do servidor (`2026-10-16`) e **falha se a pasta de hoje não existir**
+(não reenvia a de ontem); `@latest` pega a pasta datada mais recente. Arquivo alterado há menos
+de `FILES_MIN_AGE_MINUTES` (10) ainda está sendo gravado e não é enviado — agende o agente
+depois que o backup do cPanel termina. A verificação confere o gzip até o fim e o SHA-256 do
+conteúdo. Em **Contas cPanel** (menu) há uma linha por conta, com busca, versões e download.
+Planeje o espaço: o `.tar.gz` não comprime nem deduplica (um dia completo pode passar de 400 GB).
+
+## Switches, roteadores e OLTs
 
 Cadastre em **Equipamentos de rede** (fabricante, protocolo, IP de origem) e, para
 FTP, as contas em **Configuração → Contas FTP**. O painel mostra os comandos de cada
-fabricante (Datacom DmOS via TFTP, Huawei VRP e Juniper Junos via FTP). Cada
+fabricante (Datacom DmOS via TFTP; Huawei VRP, Juniper Junos e Fiberhome via FTP). Cada
 configuração recebida é validada, cifrada com a chave GPG e guardada como uma versão.
+Nas **OLTs Fiberhome** cada OLT envia direto, do IP dela, e é um equipamento; o campo
+**IP da UNM2000** libera a UNM2000, que depois apaga/renomeia o arquivo (esses comandos
+respondem sucesso sem alterar nada — o resto continua só de gravação).
 Detalhes em [docs/network-devices.md](docs/network-devices.md).
 
 ## Validação dos backups
@@ -101,7 +127,8 @@ Cada parte do backup é conferida pelo worker:
    sem gravar nada em disco, e testa:
    pastas → gzip íntegro e tar legível até o fim (conta entradas);
    MySQL/PostgreSQL → marcador de fim de dump presente (dump truncado é reprovado);
-   SQL Server → cabeçalho MTF do `.bak`; e o SHA-256 do conteúdo decifrado bate com o do cliente.
+   SQL Server → cabeçalho MTF do `.bak`; arquivos enviados como estão → gzip íntegro até o fim;
+   e o SHA-256 do conteúdo decifrado bate com o do cliente.
 4. **Reverificação periódica** (`REVERIFY_INTERVAL_DAYS`, padrão 30): detecta
    corrupção silenciosa no disco do servidor.
 
@@ -112,13 +139,21 @@ Sem a chave privada no worker, os passos 1, 2 e 4 continuam (modo "integridade")
 Execuções por dia (sucesso / aviso / falha), volume recebido, disco usado × livre,
 crescimento do armazenamento, clientes que mais ocupam espaço, status de verificação,
 clientes atrasados (sem backup dentro do intervalo esperado) e problemas recentes.
+**Contas cPanel** lista cada conta com a cópia mais recente e o histórico de versões, e a
+lista de **Backups** tem busca por conta, pasta ou banco.
+
+O menu **Ajuda** traz o passo a passo, já com os dados do seu servidor, de: baixar e decifrar,
+servidor Linux, cPanel/WHM, Juniper (Junos), Datacom (DmOS) e UNM2000 (Fiberhome).
 
 Papéis: **admin** (tudo, inclusive usuários, auditoria, baixar e excluir backups),
 **operador** (clientes, reverificação), **auditor** (leitura).
 
 ## Restauração
 
-Ver [docs/restore.md](docs/restore.md) — resumo:
+No painel (admin), **Backups → detalhe → Baixar** pede a chave privada e a senha e **decifra no
+navegador** (a chave não é enviada ao servidor) — serve para arquivos pequenos/médios, como a
+configuração de um equipamento. `.gpg` baixa o arquivo ainda cifrado. Para pastas e dumps
+grandes use o `gpg` no terminal. Ver [docs/restore.md](docs/restore.md) — resumo:
 
 ```bash
 gpg --import backup-key.sec.asc

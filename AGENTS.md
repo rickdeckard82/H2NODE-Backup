@@ -20,6 +20,8 @@ de `src/index.css`, componentes de `components/ui.tsx`, gráficos SVG próprios 
 
 - **Nunca grave dado de backup em claro no servidor.** O worker decifra só em pipe (memória) para testar.
 - **A chave privada GPG só vai para o worker** (`secrets/private/`, montada só nele). O backend nunca a recebe.
+- O agente **nunca altera os arquivos de origem** (`BACKUP_FILES`/`BACKUP_PATHS`): só lê, e apaga apenas as cópias cifradas que criou no `WORK_DIR`.
+- O receptor FTP é só de gravação. A única exceção é o IP de UNM2000 (`manager_ip` das OLTs Fiberhome): `DELE`/`RNFR`/`RNTO` respondem sucesso **sem fazer nada**. Não amplie isso.
 - O manifesto do agente é **entrada não confiável**: todo nome de arquivo passa por `storage.safe_child`.
 - O `authorized_keys` é **gerado** (`services/sshkeys.py`); toda chave fica presa a `rrsync -wo -no-del` na
   pasta do cliente. Não afrouxe isso.
@@ -52,10 +54,11 @@ Renomeie o arquivo gerado para `AAAAMMDD_NNNN_descricao.py` com `revision = "NNN
 
 ## Mapa
 
-- `agent/` — agente bash + instalador + exemplo de `agent.conf`.
+- `agent/` — agente bash + instalador + exemplo de `agent.conf` (`BACKUP_PATHS` tar+gzip; `BACKUP_FILES` arquivos como estão; `@today`/`@latest`).
 - `sshd/` — receptor rsync/SSH (Debian + rrsync).
 - `backend/app/services/` — `ingest.py` (recepção), `verify.py` (análise), `retention.py`, `gpg.py`, `sshkeys.py`.
 - `backend/app/receivers/` — receptores FTP (pyftpdlib) e TFTP (próprio, só WRQ); `services/receivers.py`
   (receivers.json + fila netin/), `services/netingest.py` (cifra na chegada), `services/netconfig.py` (validação).
 - `backend/app/worker.py` — loop do worker. `backend/app/api/routes/` — API.
-- `frontend/src/features/` — páginas. `docs/` — segurança, restauração, deploy.
+- `frontend/src/features/` — páginas (`help/` = menu Ajuda por equipamento; `accounts/` = Contas cPanel).
+  Mudou o procedimento de um equipamento/agente? Atualize a página de ajuda correspondente. `docs/` — segurança, restauração, deploy.

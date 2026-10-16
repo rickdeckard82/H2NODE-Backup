@@ -19,10 +19,19 @@ sistema compensa no que controla — só IPs cadastrados, receptores só de grav
 sessões isoladas, cifragem GPG imediata na chegada e remoção do original —, mas o
 trecho de rede entre equipamento e servidor deve ser a rede de gerência ou uma VPN.
 
+## Decifrar pelo painel
+
+O botão **Baixar** do detalhe do backup decifra **no navegador** (OpenPGP.js): o servidor só entrega
+o `.gpg`; a chave privada e a senha são digitadas na hora, ficam só na memória da página e somem ao
+fechar a janela. O backend continua sem nunca receber a chave privada. Cada download aparece na
+auditoria. Só administradores baixam.
+
 ## Dados em claro no cliente
 
 Pastas e dumps saem do `tar`/`mysqldump`/`pg_dump` direto para o `gpg` por pipe —
-nada em claro é gravado no disco do cliente. A exceção é o **SQL Server**, que só sabe
+nada em claro é gravado no disco do cliente. Arquivos enviados como estão (`BACKUP_FILES`, ex.
+cPanel) são lidos e cifrados na hora; o agente só apaga a cópia **cifrada** que criou no `WORK_DIR`
+e nunca altera os originais. A exceção é o **SQL Server**, que só sabe
 gravar o `.bak` em disco: ele é verificado (`RESTORE VERIFYONLY`), cifrado e apagado em
 seguida, em `MSSQL_BACKUP_DIR` (modo 700).
 

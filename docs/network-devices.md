@@ -51,6 +51,23 @@ set system archival configuration archive-sites "ftp://juniper:<senha>@<servidor
 commit
 ```
 
+**Fiberhome (OLTs e UNM2000) — FTP.** A UNM2000 comanda a exportação, mas **cada OLT envia
+direto ao servidor, do IP dela**, um arquivo `<ID>_<MMDD>` por dia (texto, `!WOS system config file`):
+
+1. Contas FTP: a mesma conta que a UNM2000 usa (ex. `fiberhome`).
+2. **Um equipamento por OLT**: fabricante *Fiberhome (OLT / UNM2000)*, FTP, IP de origem = IP da OLT.
+3. Em cada OLT, o campo **IP da UNM2000 (gerenciador)**: depois que a OLT envia, a UNM2000 entra
+   no FTP para apagar o arquivo antigo e **renomear** o novo. O servidor responde sucesso a
+   `DELE`/`RNFR`/`RNTO` desse IP **sem alterar nada** (o arquivo já foi guardado e cifrado); sem isso
+   a UNM2000 acusa "XFTP server connection failed" e repete a tarefa. O IP da UNM2000 **não** é
+   cadastrado como equipamento (o sistema recusa o mesmo IP nas duas funções).
+4. Libere os IPs no ufw (`ufw-setup.sh device <IP> ftp`; pode ser a faixa das OLTs) e aponte o
+   cadastro de FTP de backup da UNM2000 para este servidor (porta 21, modo passivo).
+5. Intervalo esperado: o da tarefa de exportação (ex. 24 h).
+
+O cadastro de FTP **de firmware** da UNM2000 (as OLTs *baixam* o arquivo) não deve apontar para
+cá: o receptor é só de gravação.
+
 ## Validação
 
 | Fabricante | Na recepção e na verificação profunda |
@@ -58,7 +75,7 @@ commit
 | Huawei | texto (ou `.zip` com o `.cfg`) terminando em `return` |
 | Juniper | `.gz` íntegro, bloco `system`, chaves `{ }` balanceadas |
 | Datacom | texto com comandos de primeiro nível do DmOS (`hostname`, `dot1q`, `interface`…) |
-| Fiberhome (UNM2000) | texto da OLT com `!WOS system config file` ou `hostname`; cada OLT envia o próprio arquivo (`<ID>_<MMDD>`) e é um equipamento (IP de origem = IP da OLT); o **IP da UNM2000** é informado em cada OLT (campo "IP da UNM2000") |
+| Fiberhome (OLT / UNM2000) | texto da OLT com `!WOS system config file` ou `hostname`; cada OLT envia o próprio arquivo (`<ID>_<MMDD>`) e é um equipamento (IP de origem = IP da OLT); o **IP da UNM2000** é informado em cada OLT (campo "IP da UNM2000") |
 | Genérico | texto não vazio com 3+ linhas |
 
 Arquivo vazio, truncado ou binário vira backup **com falha** (aparece no painel).
@@ -96,6 +113,8 @@ Configuração idêntica à anterior é marcada como "idêntica ao backup anteri
 - **"IP não autorizado" / conexão fechada**: o IP de origem não bate com o
   cadastrado (NAT no caminho? `source` diferente no DmOS?). Veja
   `docker compose logs ftp tftp`.
+- **UNM2000 acusa "XFTP server connection failed" / repete a tarefa**: o IP dela não está no campo
+  "IP da UNM2000" das OLTs (`ftp_unknown_ip` no log). Procure `ftp_manager_noop` para confirmar.
 - **Junos não envia**: confira `show log messages | match archiv` no roteador e a
   faixa passiva liberada no ufw.
 - **TFTP para no meio**: firewall no caminho bloqueando as portas efêmeras de

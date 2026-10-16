@@ -16,7 +16,9 @@ export default function DecryptHelpPage() {
         <Step n={1} title="Abra o backup">
           <p>
             Em <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/backups">Backups</Link>, clique na
-            execução desejada. Só administradores baixam arquivos.
+            execução desejada (a busca filtra por conta, pasta ou banco), ou procure a conta em{" "}
+            <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/accounts">Contas cPanel</Link>. Só administradores
+            baixam arquivos.
           </p>
         </Step>
         <Step n={2} title="Clique em Baixar">

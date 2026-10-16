@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.6.0";
+export const APP_VERSION = "0.6.1";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.6.1",
+    date: "2026-10-16",
+    changes: [
+      "Documentação e Ajuda atualizadas: servidor Linux (atalho do agente em /usr/bin, horário do cron, BACKUP_FILES), baixar e decifrar (Contas cPanel e busca), README, segurança e guias de equipamentos (Fiberhome/UNM2000).",
+      "Instalador do agente cria o atalho /usr/bin/pulse-backup-agent (o PATH do root/sudo nem sempre inclui /usr/local/sbin).",
+    ],
+  },
   {
     version: "0.6.0",
     date: "2026-10-16",

@@ -46,8 +46,9 @@ export default function LinuxHelpPage() {
 cd /root/pulse-agent && ./install.sh --cron "30 2 * * *"`}
           />
           <p>
-            O instalador copia o agente para <Code>/usr/local/sbin/pulse-backup-agent</Code>, cria{" "}
-            <Code>/etc/pulse-backup/</Code>, agenda no crontab do root (aqui, todo dia às 02:30) e gera a chave SSH do agente.
+            O instalador copia o agente para <Code>/usr/local/sbin/pulse-backup-agent</Code> (com atalho em{" "}
+            <Code>/usr/bin</Code>), cria <Code>/etc/pulse-backup/</Code>, agenda no crontab do root (aqui, todo dia às 02:30) e gera a
+            chave SSH do agente.
             No fim ele imprime a <b>chave pública SSH</b> (também em <Code>/etc/pulse-backup/id_ed25519.pub</Code>).
           </p>
         </Step>
@@ -83,12 +84,26 @@ cd /root/pulse-agent && ./install.sh --cron "30 2 * * *"`}
           <p>
             No <Code>agent.conf</Code> ajuste <Code>BACKUP_PATHS</Code> (comece só com <Code>/etc</Code>) e, se houver bancos, ligue{" "}
             <Code>MYSQL_ENABLED</Code>, <Code>POSTGRES_ENABLED</Code> ou <Code>MSSQL_ENABLED</Code>. Exclusões vão em{" "}
-            <Code>EXCLUDES</Code>.
+            <Code>EXCLUDES</Code>. Para enviar arquivos que <b>já existem</b> (como os backups de conta do cPanel) use{" "}
+            <Code>BACKUP_FILES</Code>: veja <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/help/cpanel">cPanel / WHM</Link>.
           </p>
+          <Note>
+            O agente só <b>lê</b> as pastas e arquivos de origem: nunca os altera nem apaga. Apaga apenas as cópias cifradas que ele
+            mesmo criou na pasta de trabalho (<Code>WORK_DIR</Code>).
+          </Note>
         </Step>
 
         <Step n={5} title="Teste e rode o primeiro backup">
           <CopyBlock label="No cliente" text={`sudo pulse-backup-agent test   # confere config, chave, cifra, pastas e conexão\nsudo pulse-backup-agent run    # faz o backup agora`} />
+          <Note>
+            Se aparecer <Code>command not found</Code>, o <Code>PATH</Code> do root/sudo não inclui{" "}
+            <Code>/usr/local/sbin</Code>: use o caminho completo <Code>/usr/local/sbin/pulse-backup-agent</Code> ou crie o atalho{" "}
+            <Code>ln -s /usr/local/sbin/pulse-backup-agent /usr/bin/pulse-backup-agent</Code> (o instalador novo já faz isso).
+          </Note>
+          <p>
+            Para mudar o horário depois, edite o crontab do root (<Code>crontab -e</Code>): reexecutar o instalador não altera a linha
+            existente.
+          </p>
           <p>
             A execução aparece em Backups com <b>sucesso</b> e <b>verificado</b>. O log do agente fica em{" "}
             <Code>/var/log/pulse-backup.log</Code>.
@@ -99,6 +114,9 @@ cd /root/pulse-agent && ./install.sh --cron "30 2 * * *"`}
       <Card className="space-y-3 p-5 text-sm">
         <h2 className="text-base font-bold">Se o teste falhar</h2>
         <ul className="list-disc space-y-1.5 pl-5">
+          <li>
+            <b>command not found</b> — veja o aviso do passo anterior (atalho em <Code>/usr/bin</Code>).
+          </li>
           <li>
             <b>Connection timed out</b> na 2222 — o ufw está descartando: o IP de saída do cliente não foi liberado (passo 3). No
             servidor, <Code>sudo tcpdump -ni any &apos;tcp port 2222&apos;</Code> mostra a origem real. Confira também o DNS do{" "}
