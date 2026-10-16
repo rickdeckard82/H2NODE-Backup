@@ -9,6 +9,7 @@ const DashboardPage = lazy(() => import("./features/dashboard/DashboardPage"));
 const ClientsPage = lazy(() => import("./features/clients/ClientsPage"));
 const DevicesPage = lazy(() => import("./features/devices/DevicesPage"));
 const FtpAccountsPage = lazy(() => import("./features/settings/FtpAccountsPage"));
+const AccountsPage = lazy(() => import("./features/accounts/AccountsPage"));
 const BackupsPage = lazy(() => import("./features/backups/BackupsPage"));
 const ServerPage = lazy(() => import("./features/settings/ServerPage"));
 const SystemUsersPage = lazy(() => import("./features/system-users/SystemUsersPage"));
@@ -67,6 +68,7 @@ export const router = createBrowserRouter([
       { path: "clients", element: <ClientsPage /> },
       { path: "devices", element: <DevicesPage /> },
       { path: "backups", element: <BackupsPage /> },
+      { path: "accounts", element: <AccountsPage /> },
       {
         path: "settings/ftp-accounts",
         element: (

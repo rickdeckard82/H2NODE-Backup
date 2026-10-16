@@ -32,7 +32,7 @@ umask 077
 # devolver variáveis). Funciona porque o script não tem controle de jobs.
 shopt -s lastpipe
 
-AGENT_VERSION="1.1.0"
+AGENT_VERSION="1.2.0"
 CONF_DIR="/etc/pulse-backup"
 CONF_FILE="${PULSE_BACKUP_CONF:-$CONF_DIR/agent.conf}"
 LOCK_FILE="/run/pulse-backup-agent.lock"
@@ -104,7 +104,7 @@ load_config() {
     SSH_KEY="$CONF_DIR/id_ed25519"; KNOWN_HOSTS="$CONF_DIR/known_hosts"
     GPG_PUBLIC_KEY="$CONF_DIR/backup-key.pub.asc"; GPG_FINGERPRINT=""
     WORK_DIR="/var/tmp/pulse-backup"
-    BACKUP_PATHS=(); EXCLUDES=(); ONE_FILE_SYSTEM="no"; BACKUP_FILES=()
+    BACKUP_PATHS=(); EXCLUDES=(); ONE_FILE_SYSTEM="no"; BACKUP_FILES=(); FILES_MIN_AGE_MINUTES="10"
     MYSQL_ENABLED="no"; MYSQL_DATABASES=("all"); MYSQL_DEFAULTS_FILE=""; MYSQL_DUMP_OPTS=""
     POSTGRES_ENABLED="no"; POSTGRES_DATABASES=("all"); POSTGRES_OS_USER="postgres"; POSTGRES_GLOBALS="yes"
     MSSQL_ENABLED="no"; MSSQL_DATABASES=("all"); MSSQL_SERVER="localhost"; MSSQL_USER="sa"
@@ -118,6 +118,7 @@ load_config() {
     [ -n "$SERVER_HOST" ] || die "SERVER_HOST não definido"
     [[ "$SERVER_PORT" =~ ^[0-9]+$ ]] || die "SERVER_PORT inválido"
     [[ "$UPLOAD_RETRIES" =~ ^[0-9]+$ ]] || UPLOAD_RETRIES=3
+    [[ "$FILES_MIN_AGE_MINUTES" =~ ^[0-9]+$ ]] || FILES_MIN_AGE_MINUTES=10
 }
 
 # ----------------------------------------------------------------------- GPG --
@@ -216,17 +217,52 @@ next_prefix() { COMP_INDEX=$((COMP_INDEX + 1)); printf -v PREFIX '%02d' "$COMP_I
 
 errtail() { [ -s "$1" ] && tail -c 1500 "$1" | tr '\n' ' '; }
 
+# resolve_latest_path <caminho com @latest> — imprime o caminho com "@latest" trocado pela pasta
+# mais recente (nome começando com dígito, como 2026-10-16 do cPanel); nada se não achar.
+resolve_latest_path() {
+    local pat="$1" pre post newest="" d
+    pre="${pat%%@latest*}"
+    post="${pat#*@latest}"
+    [[ "$pre" == */ ]] || return 0
+    for d in "$pre"[0-9]*/; do [ -d "$d" ] && newest="$d"; done   # o glob já vem em ordem
+    [ -n "$newest" ] || return 0
+    printf '%s%s\n' "$newest" "${post#/}"
+}
+
+# expand_date_tokens <caminho> — troca "@today" pela data de hoje (AAAA-MM-DD, relógio do servidor)
+# e "@latest" pela pasta datada mais recente. Sem token, devolve o caminho como está.
+expand_date_tokens() {
+    local pat="$1"
+    if [[ "$pat" == *"@today"* ]]; then
+        printf '%s\n' "${pat//@today/$(date +%F)}"
+    elif [[ "$pat" == *"@latest"* ]]; then
+        resolve_latest_path "$pat"
+    else
+        printf '%s\n' "$pat"
+    fi
+}
+
 backup_paths() {
     local p
     for p in "${BACKUP_PATHS[@]}"; do
         [ -n "$p" ] || continue
+        local orig="$p"
+        p="$(expand_date_tokens "$p")"
+        if [ -z "$p" ]; then
+            add_component files "$orig" "" failed "nenhuma pasta datada encontrada para @latest" 0
+            continue
+        fi
         local name prefix file t0 err
         name="$(safe_name "$p")"
         next_prefix; prefix="$PREFIX"
         file="$prefix-files-$name.tar.gz.gpg"
         t0=$SECONDS
         if [ ! -e "$p" ]; then
-            add_component files "$p" "" failed "caminho não existe" 0
+            if [[ "$orig" == *"@today"* ]]; then
+                add_component files "$p" "" failed "a pasta de hoje não existe (o backup de hoje já terminou?)" 0
+            else
+                add_component files "$p" "" failed "caminho não existe" 0
+            fi
             continue
         fi
         local args=(--create --file=- --numeric-owner --warning=no-file-changed --warning=no-file-removed)
@@ -263,18 +299,12 @@ backup_paths() {
 # ---- Arquivos como estão (BACKUP_FILES)
 
 # resolve_file_pattern <padrão>  — imprime os arquivos que casam, um por linha.
-# "@latest" no caminho vira a pasta mais recente (nome começando com dígito, como
-# 2026-10-16 do cPanel): /backup/cpanel/@latest/accounts/*.tar.gz
+# "@today" no caminho vira a data de hoje (2026-10-16); "@latest", a pasta datada mais recente.
+# Ex. do cPanel (só a pasta do dia): /backup/cpanel/@today/accounts/*.tar.gz
 resolve_file_pattern() {
-    local pat="$1" pre post newest="" d
-    if [[ "$pat" == *"@latest"* ]]; then
-        pre="${pat%%@latest*}"
-        post="${pat#*@latest}"
-        [[ "$pre" == */ ]] || return 0
-        for d in "$pre"[0-9]*/; do [ -d "$d" ] && newest="$d"; done   # o glob já vem em ordem
-        [ -n "$newest" ] || return 0
-        pat="$newest${post#/}"
-    fi
+    local pat
+    pat="$(expand_date_tokens "$1")"
+    [ -n "$pat" ] || return 0
     compgen -G "$pat" | sort
 }
 
@@ -291,13 +321,18 @@ backup_files() {
         local list=()
         mapfile -t list < <(resolve_file_pattern "$pat")
         if [ "${#list[@]}" -eq 0 ]; then
-            add_component file "$pat" "" failed "nenhum arquivo encontrado para o padrão" 0
+            add_component file "$pat" "" failed "nenhum arquivo encontrado para o padrão (para @today: o backup de hoje já terminou?)" 0
             continue
         fi
         for f in "${list[@]}"; do
             [ -f "$f" ] && [ ! -L "$f" ] || continue
             # nunca processa o que está na pasta de trabalho do próprio agente
             case "$f" in "${WORK_DIR%/}"/*) continue ;; esac
+            # arquivo alterado há pouco ainda pode estar sendo gravado (backup do cPanel em andamento)
+            if [ "$FILES_MIN_AGE_MINUTES" -gt 0 ] && [ -n "$(find "$f" -mmin "-$FILES_MIN_AGE_MINUTES" 2>/dev/null)" ]; then
+                add_component file "$(basename "$f")" "" failed "ainda em gravação (alterado há menos de $FILES_MIN_AGE_MINUTES min): rode o agente depois que o backup terminar" 0
+                continue
+            fi
             local base prefix file t0 err dur
             base="$(basename "$f")"
             next_prefix; prefix="$PREFIX"
@@ -696,8 +731,14 @@ cmd_test() {
         echo "✗ Cifra falhou"; ok=0
     fi
     local p
+    local rp
     for p in "${BACKUP_PATHS[@]}"; do
-        [ -e "$p" ] && echo "• Pasta $p: ok" || { echo "✗ Pasta $p não existe"; ok=0; }
+        rp="$(expand_date_tokens "$p")"
+        if [ -n "$rp" ] && [ -e "$rp" ]; then
+            echo "• Pasta $p: ok${rp:+ ($rp)}"
+        else
+            echo "✗ Pasta $p não existe"; ok=0
+        fi
     done
     local pat f biggest=0 nfiles=0 size
     for pat in "${BACKUP_FILES[@]}"; do

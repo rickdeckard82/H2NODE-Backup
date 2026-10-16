@@ -331,3 +331,42 @@ def test_file_kind_non_gzip_checks_hash_only(db, web01, keyring, keys, tmp_path)
     b = db.query(Backup).one()
     verify.verify_backup(db, b, keyring)
     assert b.verify_status == VerifyStatus.ok, b.verify_message
+
+
+def test_accounts_search_and_history(auth_client, seeded, keys, tmp_path):
+    """Busca por conta (cPanel): lista por conta, filtro por nome e histórico de versões."""
+    c = Client(slug="cpanel", name="cPanel")
+    seeded.add(c)
+    seeded.commit()
+    pub = keys["server"][0]
+    tar = _tar_gz({"homedir/a": b"x" * 100})
+    # dois dias; cliente1 nos dois, abc só no segundo
+    neo = ("file", "cliente1.tar.gz", "01-file-cliente1.tar.gz.gpg", tar)
+    upload("cpanel", "20261015T060000Z-aaaaaa", [neo], pub, tmp_path)
+    upload("cpanel", "20261016T060000Z-bbbbbb", [
+        neo,
+        ("file", "abc.tar.gz", "02-file-abc.tar.gz.gpg", tar + b"\x00"),
+        ("files", "/etc", "03-files-etc.tar.gz.gpg", tar),
+    ], pub, tmp_path)
+    ingest.scan(seeded)
+
+    accts = auth_client.get("/api/backups/accounts").json()
+    assert accts["total"] == 2  # só kind=file; a pasta /etc não entra
+    by_name = {a["name"]: a for a in accts["items"]}
+    assert by_name["cliente1.tar.gz"]["versions"] == 2
+    assert by_name["abc.tar.gz"]["versions"] == 1
+    assert [a["name"] for a in accts["items"]] == ["abc.tar.gz", "cliente1.tar.gz"]  # ordem alfabética
+
+    found = auth_client.get("/api/backups/accounts", params={"q": "CLI"}).json()
+    assert [a["name"] for a in found["items"]] == ["cliente1.tar.gz"]
+
+    hist = auth_client.get("/api/backups/accounts/history",
+                           params={"client_id": c.id, "name": "cliente1.tar.gz"}).json()
+    assert [h["run_name"] for h in hist] == ["20261016T060000Z-bbbbbb", "20261015T060000Z-aaaaaa"]
+    dl = f"/api/backups/{hist[0]['backup_id']}/components/{hist[0]['component_id']}/download"
+    assert auth_client.get(dl).status_code == 200
+
+    # busca na lista de backups: só as execuções que contêm a conta
+    assert auth_client.get("/api/backups", params={"q": "abc"}).json()["total"] == 1
+    assert auth_client.get("/api/backups", params={"q": "cliente1"}).json()["total"] == 2
+    assert auth_client.get("/api/backups", params={"q": "inexistente"}).json()["total"] == 0

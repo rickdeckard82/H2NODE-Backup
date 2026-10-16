@@ -269,6 +269,7 @@ export default function BackupsPage() {
   const status = params.get("status") ?? "";
   const verify = params.get("verify") ?? "";
   const problems = params.get("problems") === "1";
+  const qParam = params.get("q") ?? "";
   const open = params.get("open");
 
   function setParam(k: string, v: string) {
@@ -281,13 +282,14 @@ export default function BackupsPage() {
 
   const clients = useQuery({ queryKey: ["clients", ""], queryFn: () => api.get<Client[]>("/clients") });
   const list = useQuery({
-    queryKey: ["backups", clientId, status, verify, problems, page],
+    queryKey: ["backups", clientId, status, verify, problems, qParam, page],
     queryFn: () =>
       api.get<Page<Backup>>("/backups", {
         client_id: clientId,
         status,
         verify_status: verify,
         problems: problems || undefined,
+        q: qParam,
         page,
         page_size: 25,
       }),
@@ -303,6 +305,13 @@ export default function BackupsPage() {
       />
 
       <Card className="mb-3 flex flex-wrap items-center gap-2">
+        <input
+          className="input max-w-[14rem]"
+          placeholder="Buscar conta, pasta ou banco…"
+          value={qParam}
+          onChange={(e) => setParam("q", e.target.value)}
+          title="Mostra só as execuções que contêm uma parte com esse nome (ex.: a conta do cPanel)"
+        />
         <select className="input max-w-[14rem]" value={clientId} onChange={(e) => setParam("client", e.target.value)}>
           <option value="">Todas as origens</option>
           {(["server", "network"] as const).map((k) => {

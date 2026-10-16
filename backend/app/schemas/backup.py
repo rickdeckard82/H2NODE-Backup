@@ -53,3 +53,31 @@ class BackupDetailOut(BackupOut):
     components: list[BackupComponentOut]
     errors: list[str] = []
     hostname: str | None = None
+
+
+class AccountOut(BaseModel):
+    """Um arquivo/conta (ex.: backup de conta do cPanel) com a cópia mais recente e o nº de versões."""
+
+    client_id: int
+    client_name: str
+    name: str
+    versions: int
+    last_backup_id: int
+    last_component_id: int
+    last_received_at: UtcDatetime
+    size_bytes: int
+    status: str
+    verify_status: str | None
+    file_name: str | None
+
+
+class AccountVersionOut(BaseModel):
+    backup_id: int
+    component_id: int
+    run_name: str
+    received_at: UtcDatetime
+    size_bytes: int
+    status: str
+    verify_status: str | None
+    verify_message: str | None
+    file_name: str | None

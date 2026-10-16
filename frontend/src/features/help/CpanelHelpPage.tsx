@@ -15,11 +15,13 @@ export default function CpanelHelpPage() {
         <h2 className="text-base font-bold">Como funciona</h2>
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            O próprio cPanel continua gerando os backups por conta em <Code>/backup/cpanel/AAAA-MM-DD/accounts/*.tar.gz</Code>.
-            O agente do Pulse Backup roda <b>depois</b> dele, no crontab do root, e envia a pasta datada mais recente.
+            O próprio cPanel continua gerando os backups por conta em <Code>/backup/cpanel/AAAA-MM-DD/accounts/*.tar.gz</Code> (e a
+            pasta <Code>system</Code>). O agente do Pulse Backup roda <b>depois</b> dele, no crontab do root, e envia <b>só a pasta
+            da data de hoje</b> (<Code>@today</Code>). Se a pasta de hoje não existir (o backup do cPanel falhou ou atrasou), o
+            agente acusa falha em vez de reenviar a de ontem.
           </li>
           <li>
-            Cada arquivo é <b>cifrado como está</b> (sem refazer tar nem compressão), enviado e só então a <b>cópia cifrada</b> é
+            Cada conta é <b>cifrada como está</b> (sem refazer tar nem compressão), enviado e só então a <b>cópia cifrada</b> é
             apagada, antes de passar ao próximo. A pasta de trabalho só precisa caber o <b>maior</b> arquivo.
             <b>Os backups do cPanel em <Code>/backup/cpanel</Code> nunca são alterados nem apagados</b>: o agente só os lê, e
             a retenção de lá continua sendo a do próprio cPanel.
@@ -51,8 +53,10 @@ export default function CpanelHelpPage() {
           </p>
           <CopyBlock label="Comandos" text={`scp -r agent/ root@<ip-do-cpanel>:/root/pulse-agent\n# no cPanel, como root:\ncd /root/pulse-agent && ./install.sh --cron "0 6 * * *"`} />
           <p>
-            Escolha o horário <b>depois</b> que o backup do cPanel termina, para não enviar um arquivo ainda em gravação (o
-            servidor acusaria gzip truncado).
+            Escolha o horário <b>depois</b> que o backup do cPanel termina. Arquivos alterados há menos de 10 minutos
+            (<Code>FILES_MIN_AGE_MINUTES</Code>) ainda estão sendo gravados e o agente se recusa a enviá-los. A data de{" "}
+            <Code>@today</Code> é a do relógio do servidor do cPanel: o horário do cron deve ser <b>no mesmo dia</b> em que o
+            cPanel termina (por exemplo, o cPanel termina às 04:00 e o agente roda às 06:00).
           </p>
         </Step>
 
@@ -73,29 +77,45 @@ export default function CpanelHelpPage() {
             text={`# Pasta de trabalho: precisa caber o MAIOR arquivo cifrado (+1 GB) — use uma partição grande
 WORK_DIR="/backup/pulse-work"
 
-# Backups de conta do cPanel; "@latest" = a pasta datada mais recente
+# Cada conta do cPanel, só da pasta de HOJE (ex.: /backup/cpanel/2026-10-16/accounts/*.tar.gz)
 BACKUP_FILES=(
-  "/backup/cpanel/@latest/accounts/*.tar.gz"
-  # "/backup/cpanel/@latest/system/*"
+  "/backup/cpanel/@today/accounts/*.tar.gz"
+)
+
+# A pasta "system" é pequena: vai inteira (um único .tar.gz cifrado)
+BACKUP_PATHS=(
+  "/etc"
+  "/backup/cpanel/@today/system"
 )
 
 # opcional: não limite o envio durante a noite, ou limite em KB/s
 BWLIMIT=""`}
           />
           <Note>
-            Pastas como <Code>/etc</Code> continuam em <Code>BACKUP_PATHS</Code>. O que está em <Code>BACKUP_FILES</Code> não
-            passa pelo tar: cada arquivo é cifrado como está.
+            O que está em <Code>BACKUP_FILES</Code> não passa pelo tar: cada arquivo é cifrado como está. Pastas inteiras vão em{" "}
+            <Code>BACKUP_PATHS</Code>. Use <Code>@latest</Code> no lugar de <Code>@today</Code> só se quiser a pasta datada mais
+            recente, qualquer que seja a data.
           </Note>
         </Step>
 
         <Step n={4} title="Teste e rode o primeiro backup">
           <CopyBlock label="No cPanel" text={`sudo pulse-backup-agent test   # lista quantos arquivos achou e confere o espaço em WORK_DIR\nsudo pulse-backup-agent run`} />
           <p>
-            O <Code>test</Code> avisa se o <Code>WORK_DIR</Code> não comporta o maior arquivo. Em{" "}
-            <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/backups">Backups</Link> cada conta aparece
-            como um componente do tipo <b>Arquivo</b>. Acompanhe o envio em <Code>/var/log/pulse-backup.log</Code>.
+            O <Code>test</Code> avisa se o <Code>WORK_DIR</Code> não comporta o maior arquivo. Acompanhe o envio em{" "}
+            <Code>/var/log/pulse-backup.log</Code>.
           </p>
         </Step>
+      </Card>
+
+      <Card className="space-y-3 p-5 text-sm">
+        <h2 className="text-base font-bold">Encontrar uma conta ou domínio</h2>
+        <p>
+          Em <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/accounts">Contas cPanel</Link> há uma linha por
+          conta, com a cópia mais recente, o tamanho, o número de versões e a verificação. Digite parte do nome da conta ou do
+          domínio na busca; clicar abre o <b>histórico</b> da conta, com cada versão e os botões Baixar e .gpg. A caixa de busca de{" "}
+          <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/backups">Backups</Link> também filtra as execuções que
+          contêm uma conta.
+        </p>
       </Card>
 
       <Card className="space-y-5 p-5">

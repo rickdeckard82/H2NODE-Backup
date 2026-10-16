@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import client_ip, enforce_csrf, require_admin, require_auditor, require_operator
 from app.core.db import get_db
 from app.models import Backup, BackupComponent, BackupStatus, Client, SystemUser, VerifyStatus
-from app.schemas.backup import BackupDetailOut, BackupOut
+from app.schemas.backup import AccountOut, AccountVersionOut, BackupDetailOut, BackupOut
 from app.schemas.common import Message, Page
 from app.services import audit, storage
 from app.services.ingest import refresh_client_stats
@@ -48,10 +48,17 @@ def list_backups(
     until: datetime | None = None,
     include_deleted: bool = False,
     problems: bool = False,
+    q: str | None = Query(None, max_length=100),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=200),
 ) -> Page[BackupOut]:
     stmt = select(Backup)
+    if q:
+        # busca pelo nome de uma parte (conta, pasta, banco): só os backups que a contêm
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(Backup.id.in_(
+            select(BackupComponent.backup_id).where(BackupComponent.name.ilike(like))
+        ))
     if client_id:
         stmt = stmt.where(Backup.client_id == client_id)
     if status_:
@@ -73,6 +80,86 @@ def list_backups(
         .limit(page_size).offset((page - 1) * page_size)
     ).scalars().unique()
     return Page(items=[_to_out(b) for b in rows], total=total, page=page, page_size=page_size)
+
+
+def _live_files():
+    """Componentes "arquivo" (kind=file) de backups que ainda estão guardados."""
+    return (
+        BackupComponent.kind == "file",
+        Backup.deleted_at.is_(None),
+        Backup.storage_path.is_not(None),
+    )
+
+
+@router.get("/accounts", response_model=Page[AccountOut])
+def list_accounts(
+    db: Session = Depends(get_db),
+    _: SystemUser = Depends(require_auditor),
+    q: str | None = Query(None, max_length=100),
+    client_id: int | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+) -> Page[AccountOut]:
+    """Uma linha por conta/arquivo (ex.: cada conta do cPanel) com a cópia mais recente."""
+    part = (Backup.client_id, BackupComponent.name)
+    order = (Backup.received_at.desc(), Backup.id.desc())
+    inner = (
+        select(
+            Backup.client_id.label("client_id"), Client.name.label("client_name"),
+            BackupComponent.name.label("name"), BackupComponent.id.label("component_id"),
+            BackupComponent.backup_id.label("backup_id"), Backup.received_at.label("received_at"),
+            BackupComponent.size_bytes.label("size_bytes"), BackupComponent.status.label("status"),
+            BackupComponent.verify_status.label("verify_status"),
+            BackupComponent.file_name.label("file_name"),
+            func.row_number().over(partition_by=part, order_by=order).label("rn"),
+            func.count().over(partition_by=part).label("versions"),
+        )
+        .join(Backup, Backup.id == BackupComponent.backup_id)
+        .join(Client, Client.id == Backup.client_id)
+        .where(*_live_files())
+    )
+    if client_id:
+        inner = inner.where(Backup.client_id == client_id)
+    if q:
+        inner = inner.where(BackupComponent.name.ilike(f"%{q.strip()}%"))
+    sub = inner.subquery()
+    latest = select(sub).where(sub.c.rn == 1)
+    total = db.execute(select(func.count()).select_from(latest.subquery())).scalar_one()
+    rows = db.execute(
+        latest.order_by(sub.c.name, sub.c.client_name).limit(page_size).offset((page - 1) * page_size)
+    ).all()
+    items = [
+        AccountOut(
+            client_id=r.client_id, client_name=r.client_name, name=r.name, versions=r.versions,
+            last_backup_id=r.backup_id, last_component_id=r.component_id, last_received_at=r.received_at,
+            size_bytes=r.size_bytes, status=r.status, verify_status=r.verify_status, file_name=r.file_name,
+        )
+        for r in rows
+    ]
+    return Page(items=items, total=total, page=page, page_size=page_size)
+
+
+@router.get("/accounts/history", response_model=list[AccountVersionOut])
+def account_history(
+    client_id: int, name: str = Query(max_length=255),
+    db: Session = Depends(get_db), _: SystemUser = Depends(require_auditor),
+) -> list[AccountVersionOut]:
+    """Todas as cópias guardadas de uma conta/arquivo, da mais recente para a mais antiga."""
+    rows = db.execute(
+        select(BackupComponent, Backup)
+        .join(Backup, Backup.id == BackupComponent.backup_id)
+        .where(*_live_files(), Backup.client_id == client_id, BackupComponent.name == name)
+        .order_by(Backup.received_at.desc(), Backup.id.desc())
+        .limit(500)
+    ).all()
+    return [
+        AccountVersionOut(
+            backup_id=b.id, component_id=c.id, run_name=b.run_name, received_at=b.received_at,
+            size_bytes=c.size_bytes, status=c.status, verify_status=c.verify_status,
+            verify_message=c.verify_message, file_name=c.file_name,
+        )
+        for c, b in rows
+    ]
 
 
 @router.get("/{backup_id}", response_model=BackupDetailOut)

@@ -242,8 +242,13 @@ ONE_FILE_SYSTEM="no"
 # Cada arquivo é cifrado como está e enviado um a um (cifra, envia, apaga): a pasta
 # WORK_DIR só precisa caber o MAIOR arquivo. "@latest" = a pasta datada mais recente.
 BACKUP_FILES=(
-  # "/backup/cpanel/@latest/accounts/*.tar.gz"
+  # só a pasta de HOJE (2026-10-16): se o backup de hoje não existir, o agente acusa falha
+  # "/backup/cpanel/@today/accounts/*.tar.gz"
 )
+# "@latest" no lugar de "@today" pega a pasta datada mais recente (reenvia a de ontem se a de hoje falhar).
+# Arquivo alterado há menos de FILES_MIN_AGE_MINUTES (padrão 10) ainda está em gravação: não é enviado.
+# Pastas pequenas (ex.: a pasta "system" do cPanel) vão inteiras, em BACKUP_PATHS, também com "@today":
+#   BACKUP_PATHS=( "/etc" "/backup/cpanel/@today/system" )
 
 # ---- MySQL / MariaDB ----  (autenticação: unix_socket do root ou MYSQL_DEFAULTS_FILE)
 MYSQL_ENABLED="no"

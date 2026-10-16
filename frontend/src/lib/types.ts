@@ -150,6 +150,32 @@ export const KIND_LABEL: Record<BackupComponent["kind"], string> = {
   config: "Configuração",
 };
 
+export interface Account {
+  client_id: number;
+  client_name: string;
+  name: string;
+  versions: number;
+  last_backup_id: number;
+  last_component_id: number;
+  last_received_at: string;
+  size_bytes: number;
+  status: string;
+  verify_status: string | null;
+  file_name: string | null;
+}
+
+export interface AccountVersion {
+  backup_id: number;
+  component_id: number;
+  run_name: string;
+  received_at: string;
+  size_bytes: number;
+  status: string;
+  verify_status: string | null;
+  verify_message: string | null;
+  file_name: string | null;
+}
+
 export interface FtpAccount {
   id: number;
   username: string;

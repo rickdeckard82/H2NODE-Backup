@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.5.2";
+export const APP_VERSION = "0.6.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.6.0",
+    date: "2026-10-16",
+    changes: [
+      "Nova página Contas cPanel: uma linha por conta (ou arquivo enviado como está), com a cópia mais recente, tamanho, nº de versões e verificação; busca por conta/domínio e histórico de versões com download (decifrado ou .gpg).",
+      "Backups: caixa de busca por conta, pasta ou banco (mostra só as execuções que contêm o nome).",
+      "Agente 1.2.0: @today (só a pasta da data de hoje, falha se não existir) e @latest em BACKUP_FILES e BACKUP_PATHS — a pasta system do cPanel vai inteira. Arquivos alterados há menos de 10 min (FILES_MIN_AGE_MINUTES) não são enviados, pois ainda estão sendo gravados.",
+    ],
+  },
   {
     version: "0.5.2",
     date: "2026-10-16",
