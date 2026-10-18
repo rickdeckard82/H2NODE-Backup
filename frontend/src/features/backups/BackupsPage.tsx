@@ -261,7 +261,8 @@ function BackupDetailModal({ id, onClose }: { id: number | null; onClose: () => 
   );
 }
 
-export default function BackupsPage() {
+/** `vendor` = página filtrada por fabricante (ex.: MikroTik → Backups). */
+export default function BackupsPage({ vendor }: { vendor?: "mikrotik" }) {
   const fmtDate = useFmtDate();
   const [params, setParams] = useSearchParams();
   const [page, setPage] = useState(1);
@@ -280,11 +281,15 @@ export default function BackupsPage() {
     if (k !== "open") setPage(1);
   }
 
-  const clients = useQuery({ queryKey: ["clients", ""], queryFn: () => api.get<Client[]>("/clients") });
+  const clients = useQuery({
+    queryKey: ["clients", "", vendor ?? ""],
+    queryFn: () => api.get<Client[]>("/clients", { vendor }),
+  });
   const list = useQuery({
-    queryKey: ["backups", clientId, status, verify, problems, qParam, page],
+    queryKey: ["backups", vendor ?? "", clientId, status, verify, problems, qParam, page],
     queryFn: () =>
       api.get<Page<Backup>>("/backups", {
+        vendor,
         client_id: clientId,
         status,
         verify_status: verify,
@@ -299,8 +304,12 @@ export default function BackupsPage() {
   return (
     <div>
       <PageHeader
-        title="Backups"
-        subtitle="Execuções recebidas dos clientes e o resultado da verificação"
+        title={vendor ? "Backups — MikroTik" : "Backups"}
+        subtitle={
+          vendor
+            ? "Configurações exportadas dos MikroTik e o resultado da verificação"
+            : "Execuções recebidas dos clientes e o resultado da verificação"
+        }
         actions={<RefreshButton keys={["backups", "backup"]} />}
       />
 
@@ -313,8 +322,13 @@ export default function BackupsPage() {
           title="Mostra só as execuções que contêm uma parte com esse nome (ex.: a conta do cPanel)"
         />
         <select className="input max-w-[14rem]" value={clientId} onChange={(e) => setParam("client", e.target.value)}>
-          <option value="">Todas as origens</option>
-          {(["server", "network"] as const).map((k) => {
+          <option value="">{vendor ? "Todos os MikroTik" : "Todas as origens"}</option>
+          {vendor && clients.data?.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+          {!vendor && (["server", "network"] as const).map((k) => {
             const items = clients.data?.filter((c) => c.kind === k) ?? [];
             return items.length ? (
               <optgroup key={k} label={k === "server" ? "Servidores" : "Equipamentos de rede"}>

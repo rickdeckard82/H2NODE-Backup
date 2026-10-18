@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.7.0";
+export const APP_VERSION = "0.7.1";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.1",
+    date: "2026-10-18",
+    changes: [
+      "Menu: Backups e Contas cPanel sobem para logo abaixo de Equipamentos de rede, acima do grupo MikroTik.",
+      "Novo MikroTik → Backups: a lista de backups só com os MikroTik (filtros de equipamento, resultado e verificação).",
+    ],
+  },
   {
     version: "0.7.0",
     date: "2026-10-18",

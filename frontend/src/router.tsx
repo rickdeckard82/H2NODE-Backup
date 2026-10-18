@@ -71,6 +71,7 @@ export const router = createBrowserRouter([
       { path: "clients", element: <ClientsPage /> },
       { path: "devices", element: <DevicesPage /> },
       { path: "mikrotik", element: <MikrotikPage /> },
+      { path: "mikrotik/backups", element: <BackupsPage key="mikrotik" vendor="mikrotik" /> },
       {
         path: "mikrotik/credentials",
         element: (

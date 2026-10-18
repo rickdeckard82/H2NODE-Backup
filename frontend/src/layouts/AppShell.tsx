@@ -14,6 +14,8 @@ interface NavLeaf {
   label: string;
   icon: IconName;
   roles?: Role[];
+  /** só ativo no caminho exato (ex.: /mikrotik não acende em /mikrotik/backups) */
+  end?: boolean;
 }
 
 interface NavGroup {
@@ -30,16 +32,17 @@ const NAV: NavEntry[] = [
   { to: "/", label: "Painel", icon: "home" },
   { to: "/clients", label: "Servidores", icon: "server" },
   { to: "/devices", label: "Equipamentos de rede", icon: "router" },
+  { to: "/backups", label: "Backups", icon: "archive" },
+  { to: "/accounts", label: "Contas cPanel", icon: "database" },
   {
     label: "MikroTik",
     icon: "router",
     children: [
-      { to: "/mikrotik", label: "Hosts", icon: "router" },
+      { to: "/mikrotik", label: "Hosts", icon: "router", end: true },
+      { to: "/mikrotik/backups", label: "Backups", icon: "archive" },
       { to: "/mikrotik/credentials", label: "Usuário de acesso", icon: "key", roles: ["admin", "operator"] },
     ],
   },
-  { to: "/backups", label: "Backups", icon: "archive" },
-  { to: "/accounts", label: "Contas cPanel", icon: "database" },
   {
     label: "Configuração",
     icon: "settings",
@@ -241,6 +244,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                         <NavLink
                           key={c.to}
                           to={c.to}
+                          end={c.end}
                           onClick={() => setOpen(false)}
                           title={railCollapsed ? c.label : undefined}
                           className={({ isActive }) =>

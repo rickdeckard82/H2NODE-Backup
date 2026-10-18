@@ -42,6 +42,8 @@ def list_backups(
     db: Session = Depends(get_db),
     _: SystemUser = Depends(require_auditor),
     client_id: int | None = None,
+    # só os backups de equipamentos deste fabricante (ex.: mikrotik)
+    vendor: str | None = Query(None, max_length=16),
     status_: BackupStatus | None = Query(None, alias="status"),
     verify_status: VerifyStatus | None = None,
     since: datetime | None = None,
@@ -61,6 +63,8 @@ def list_backups(
         ))
     if client_id:
         stmt = stmt.where(Backup.client_id == client_id)
+    if vendor:
+        stmt = stmt.where(Backup.client_id.in_(select(Client.id).where(Client.vendor == vendor)))
     if status_:
         stmt = stmt.where(Backup.status == status_)
     if verify_status:

@@ -266,6 +266,8 @@ def test_api_credentials_and_mikrotik_hosts(auth_client, isolated_paths):
 
     r = auth_client.get("/api/clients", params={"vendor": "mikrotik"})
     assert [c["slug"] for c in r.json()] == ["rb-core"]
+    r = auth_client.get("/api/backups", params={"vendor": "mikrotik"})
+    assert r.status_code == 200 and r.json()["total"] == 0
     assert auth_client.get("/api/device-credentials").json()[0]["device_count"] == 1
 
     r = auth_client.patch(f"/api/clients/{dev['id']}", json={"pull_port": 8022})
