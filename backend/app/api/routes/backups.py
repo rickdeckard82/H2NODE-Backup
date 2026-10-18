@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import UTC, date, datetime, time, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import client_ip, enforce_csrf, require_admin, require_auditor, require_operator
@@ -95,18 +96,40 @@ def _live_files():
     )
 
 
+def _day_bounds(day: date, user: SystemUser) -> tuple[datetime, datetime]:
+    """Início e fim (UTC, sem tz — como no banco) do dia no fuso do operador."""
+    try:
+        tz = ZoneInfo(user.timezone or "UTC")
+    except (ZoneInfoNotFoundError, ValueError):
+        tz = ZoneInfo("UTC")
+    start = datetime.combine(day, time.min, tzinfo=tz)
+    end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=tz)
+    return (start.astimezone(UTC).replace(tzinfo=None), end.astimezone(UTC).replace(tzinfo=None))
+
+
 @router.get("/accounts", response_model=Page[AccountOut])
 def list_accounts(
     db: Session = Depends(get_db),
-    _: SystemUser = Depends(require_auditor),
+    user: SystemUser = Depends(require_auditor),
     q: str | None = Query(None, max_length=100),
     client_id: int | None = None,
+    # só as contas com cópia recebida neste dia (no fuso do operador); mostra a cópia desse dia
+    day: date | None = None,
+    sort: str = Query("name", pattern="^(name|client|received|size|versions|verify)$"),
+    order: str = Query("asc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
 ) -> Page[AccountOut]:
-    """Uma linha por conta/arquivo (ex.: cada conta do cPanel) com a cópia mais recente."""
+    """Uma linha por conta/arquivo (ex.: cada conta do cPanel) com a cópia mais recente
+    (ou a do dia escolhido). "versions" conta sempre todas as cópias guardadas."""
     part = (Backup.client_id, BackupComponent.name)
-    order = (Backup.received_at.desc(), Backup.id.desc())
+    if day:
+        start, end = _day_bounds(day, user)
+        in_day = case((and_(Backup.received_at >= start, Backup.received_at < end), 1), else_=0)
+    else:
+        # sempre 1; é um CASE porque um literal no ORDER BY vira número de coluna
+        in_day = case((Backup.id.is_not(None), 1), else_=0)
+    order_by = (in_day.desc(), Backup.received_at.desc(), Backup.id.desc())
     inner = (
         select(
             Backup.client_id.label("client_id"), Client.name.label("client_name"),
@@ -115,7 +138,8 @@ def list_accounts(
             BackupComponent.size_bytes.label("size_bytes"), BackupComponent.status.label("status"),
             BackupComponent.verify_status.label("verify_status"),
             BackupComponent.file_name.label("file_name"),
-            func.row_number().over(partition_by=part, order_by=order).label("rn"),
+            in_day.label("in_day"),
+            func.row_number().over(partition_by=part, order_by=order_by).label("rn"),
             func.count().over(partition_by=part).label("versions"),
         )
         .join(Backup, Backup.id == BackupComponent.backup_id)
@@ -127,10 +151,15 @@ def list_accounts(
     if q:
         inner = inner.where(BackupComponent.name.ilike(f"%{q.strip()}%"))
     sub = inner.subquery()
-    latest = select(sub).where(sub.c.rn == 1)
+    latest = select(sub).where(sub.c.rn == 1, sub.c.in_day == 1)
     total = db.execute(select(func.count()).select_from(latest.subquery())).scalar_one()
+    col = {
+        "name": sub.c.name, "client": sub.c.client_name, "received": sub.c.received_at,
+        "size": sub.c.size_bytes, "versions": sub.c.versions, "verify": sub.c.verify_status,
+    }[sort]
+    key = (col.asc() if order == "asc" else col.desc()).nulls_last()
     rows = db.execute(
-        latest.order_by(sub.c.name, sub.c.client_name).limit(page_size).offset((page - 1) * page_size)
+        latest.order_by(key, sub.c.name, sub.c.client_name).limit(page_size).offset((page - 1) * page_size)
     ).all()
     items = [
         AccountOut(

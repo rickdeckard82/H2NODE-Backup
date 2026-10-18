@@ -7,7 +7,7 @@ import json
 import os
 import subprocess
 import tarfile
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -359,6 +359,27 @@ def test_accounts_search_and_history(auth_client, seeded, keys, tmp_path):
 
     found = auth_client.get("/api/backups/accounts", params={"q": "CLI"}).json()
     assert [a["name"] for a in found["items"]] == ["cliente1.tar.gz"]
+
+    # ordenação pelas colunas
+    def names(**params):
+        return [a["name"] for a in auth_client.get("/api/backups/accounts", params=params).json()["items"]]
+
+    assert names(sort="name", order="desc") == ["cliente1.tar.gz", "abc.tar.gz"]
+    assert names(sort="versions", order="desc") == ["cliente1.tar.gz", "abc.tar.gz"]
+    assert names(sort="size", order="desc") == ["abc.tar.gz", "cliente1.tar.gz"]  # abc tem 1 byte a mais
+    assert auth_client.get("/api/backups/accounts", params={"sort": "x"}).status_code == 422
+
+    # escolher a data: só as contas com cópia naquele dia (fuso do operador), mostrando a cópia do dia
+    runs = {b.run_name: b for b in seeded.query(Backup)}
+    runs["20261015T060000Z-aaaaaa"].received_at = datetime(2026, 10, 15, 9, 0)
+    runs["20261016T060000Z-bbbbbb"].received_at = datetime(2026, 10, 16, 9, 0)
+    seeded.commit()
+    day15 = auth_client.get("/api/backups/accounts", params={"day": "2026-10-15"}).json()
+    assert [(a["name"], a["last_backup_id"], a["versions"]) for a in day15["items"]] == [
+        ("cliente1.tar.gz", runs["20261015T060000Z-aaaaaa"].id, 2)
+    ]
+    assert names(day="2026-10-16") == ["abc.tar.gz", "cliente1.tar.gz"]
+    assert names(day="2026-10-17") == []
 
     hist = auth_client.get("/api/backups/accounts/history",
                            params={"client_id": c.id, "name": "cliente1.tar.gz"}).json()

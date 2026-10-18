@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.7.1";
+export const APP_VERSION = "0.7.2";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.2",
+    date: "2026-10-18",
+    changes: [
+      "Contas cPanel: escolha uma data para ver só as contas com cópia naquele dia (e a cópia desse dia, pronta para baixar).",
+      "Contas cPanel: clique em Conta, Servidor, Última cópia, Tamanho, Versões ou Verificação para ordenar; clique de novo para inverter (▲/▼).",
+    ],
+  },
   {
     version: "0.7.1",
     date: "2026-10-18",
