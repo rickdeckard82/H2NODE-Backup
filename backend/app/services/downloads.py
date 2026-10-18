@@ -24,6 +24,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from app.core.config import settings
+from app.core.logging import logger
 from app.services import gpg, storage
 
 AGENT_FILES = (("pulse-backup-agent.sh", 0o755), ("install.sh", 0o755), ("agent.conf.example", 0o644))
@@ -134,29 +135,60 @@ def _uploaded_title(name: str) -> tuple[str, str]:
     return "Arquivo enviado", "other"
 
 
-def list_items() -> list[Item]:
+def _problem(problems: list[str], what: str, e: OSError) -> None:
+    where = f" em {e.filename}" if e.filename else ""
+    reason = "sem permissão de leitura" if isinstance(e, PermissionError) else (e.strerror or str(e))
+    problems.append(f"{what}: {reason}{where}")
+    logger.warning("download_unreadable", what=what, error=str(e))
+
+
+def list_items() -> tuple[list[Item], list[str]]:
+    """Itens disponíveis e os problemas encontrados (um arquivo ilegível não esconde os outros)."""
     items: list[Item] = []
-    bundle = agent_bundle()
+    problems: list[str] = []
+    try:
+        bundle = agent_bundle()
+    except OSError as e:
+        bundle = None
+        _problem(problems, f"agente Linux ({settings.agent_dir})", e)
     if bundle:
         name, data, when = bundle
         items.append(Item(name, "Agente Linux (servidores e cPanel)", "linux", "agent", len(data),
                           hashlib.sha256(data).hexdigest(), when, agent_version()))
-    built = _files(build_dir())
+    built: list[Path] = []
+    uploaded: list[Path] = []
+    try:
+        built = _files(build_dir())
+    except OSError as e:
+        _problem(problems, f"instalador compilado ({settings.client_dist_dir})", e)
+    try:
+        uploaded = _files(uploads_dir())
+    except OSError as e:
+        _problem(problems, "arquivos enviados", e)
     seen = {p.name for p in built}
-    files = [(p, "build") for p in built] + [(p, "uploaded") for p in _files(uploads_dir()) if p.name not in seen]
+    files = [(p, "build") for p in built] + [(p, "uploaded") for p in uploaded if p.name not in seen]
     for p, source in files:
         title, platform = _uploaded_title(p.name)
         m = _VERSION_RE.search(p.name)
-        st = p.stat()
-        items.append(Item(p.name, title, platform, source, st.st_size, _sha256_file(p),
+        try:
+            st = p.stat()
+            sha = _sha256_file(p)
+        except OSError as e:
+            _problem(problems, p.name, e)
+            continue
+        items.append(Item(p.name, title, platform, source, st.st_size, sha,
                           datetime.fromtimestamp(st.st_mtime, UTC).replace(tzinfo=None),
                           m.group(1) if m else None))
-    pub = gpg.public_key_info()
+    try:
+        pub = gpg.public_key_info()
+    except OSError as e:
+        pub = None
+        _problem(problems, f"chave pública ({settings.backup_public_key_path})", e)
     if pub:
         data = pub.armored.encode()
         items.append(Item(KEY_NAME, "Chave pública GPG dos backups", "key", "key", len(data),
                           hashlib.sha256(data).hexdigest(), datetime.now(UTC).replace(tzinfo=None), None))
-    return items
+    return items, problems
 
 
 def open_item(name: str) -> tuple[bytes | Path, str] | None:

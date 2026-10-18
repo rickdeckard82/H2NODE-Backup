@@ -20,6 +20,11 @@ interface DownloadItem {
   version: string | null;
 }
 
+interface DownloadsOut {
+  items: DownloadItem[];
+  problems: string[];
+}
+
 interface LinkOut {
   url: string;
   expires_at: string;
@@ -76,7 +81,7 @@ export default function DownloadsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [linkFor, setLinkFor] = useState<{ item: DownloadItem; link: LinkOut } | null>(null);
 
-  const list = useQuery({ queryKey: ["downloads"], queryFn: () => api.get<DownloadItem[]>("/downloads") });
+  const list = useQuery({ queryKey: ["downloads"], queryFn: () => api.get<DownloadsOut>("/downloads") });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["downloads"] });
 
   const makeLink = useMutation({
@@ -103,7 +108,8 @@ export default function DownloadsPage() {
     onError: (e) => toast("err", e instanceof ApiError ? e.detail : "Erro ao remover"),
   });
 
-  const items = list.data ?? [];
+  const items = list.data?.items ?? [];
+  const problems = list.data?.problems ?? [];
   const hasWindows = items.some((i) => i.platform === "windows");
 
   return (
@@ -138,7 +144,28 @@ export default function DownloadsPage() {
 
       {list.isLoading && <Spinner className="h-5 w-5 text-brand-600" />}
 
-      {!list.isLoading && !hasWindows && (
+      {list.isError && (
+        <Card className="mb-3 text-sm text-rose-600 dark:text-rose-400">
+          Não foi possível listar os downloads: {list.error instanceof ApiError ? list.error.detail : String(list.error)}
+        </Card>
+      )}
+
+      {problems.length > 0 && (
+        <Card className="mb-3 space-y-1 text-sm text-amber-700 dark:text-amber-300">
+          <div className="font-semibold">O servidor não conseguiu ler alguns arquivos:</div>
+          <ul className="list-disc pl-5 font-mono text-xs">
+            {problems.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            O painel roda como uid 10001: os arquivos precisam ser legíveis por todos (ex.:{" "}
+            <span className="font-mono">chmod -R a+rX agent</span> na pasta do projeto).
+          </div>
+        </Card>
+      )}
+
+      {list.isSuccess && !hasWindows && (
         <Card className="mb-3 text-sm text-slate-600 dark:text-slate-300">
           Nenhum instalador do <b>cliente Windows</b> disponível ainda. Ele é compilado pelo próprio servidor (serviço{" "}
           <span className="font-mono">client-builder</span>) ao atualizar com{" "}

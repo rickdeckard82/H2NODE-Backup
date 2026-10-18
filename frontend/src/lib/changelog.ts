@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.2";
+export const APP_VERSION = "0.9.3";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.3",
+    date: "2026-10-18",
+    changes: [
+      "Downloads: um arquivo que o servidor não consegue ler (ex.: permissão) deixa de esvaziar a página inteira — os demais aparecem e a página diz qual arquivo falhou e por quê.",
+      "Downloads: erro ao carregar a lista agora aparece na tela, em vez da mensagem de que não há instalador.",
+    ],
+  },
   {
     version: "0.9.2",
     date: "2026-10-18",

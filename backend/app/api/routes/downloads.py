@@ -37,14 +37,20 @@ class DownloadOut(BaseModel):
     version: str | None
 
 
+class DownloadsOut(BaseModel):
+    items: list[DownloadOut]
+    problems: list[str]
+
+
 class LinkOut(BaseModel):
     url: str
     expires_at: UtcDatetime
 
 
-@router.get("", response_model=list[DownloadOut])
-def list_downloads(_: SystemUser = Depends(require_auditor)) -> list[DownloadOut]:
-    return [DownloadOut(**vars(i)) for i in downloads.list_items()]
+@router.get("", response_model=DownloadsOut)
+def list_downloads(_: SystemUser = Depends(require_auditor)) -> DownloadsOut:
+    items, problems = downloads.list_items()
+    return DownloadsOut(items=[DownloadOut(**vars(i)) for i in items], problems=problems)
 
 
 @router.get("/file/{name}")
@@ -124,7 +130,7 @@ async def upload(name: str, request: Request, actor: SystemUser = Depends(requir
                  actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request),
                  after={"size": size})
     db.commit()
-    item = next(i for i in downloads.list_items() if i.name == name)
+    item = next(i for i in downloads.list_items()[0] if i.name == name)
     return DownloadOut(**vars(item))
 
 
