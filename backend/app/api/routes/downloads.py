@@ -98,6 +98,9 @@ async def upload(name: str, request: Request, actor: SystemUser = Depends(requir
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                             "nome inválido: use letras, números, ponto, hífen e extensão .exe, .msi, .zip "
                             "ou .tar.gz (o agente Linux é gerado sozinho)")
+    if name in downloads.built_names():
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "este arquivo é compilado pelo próprio servidor (client-builder) — não precisa enviar")
     d = downloads.uploads_dir()
     d.mkdir(parents=True, exist_ok=True)
     dest = storage.safe_child(d, name)

@@ -78,8 +78,8 @@ export default function WindowsHelpPage() {
             instalador novo por cima: a configuração é mantida.
           </p>
           <CopyBlock
-            label="Gerar o instalador (máquina com Go, Node, Wails e NSIS) e enviar em Downloads → Enviar arquivo"
-            text={"make windows-installer\n# resultado: windows-client/build/bin/PulseBackup-Setup-<versão>.exe"}
+            label="O servidor compila o instalador sozinho ao atualizar (só quando o cliente mudou) e o publica em Downloads"
+            text={"git pull && docker compose build && docker compose up -d"}
           />
           <Note tone="warn">
             O instalador não é assinado digitalmente: o Windows SmartScreen pode avisar “editor desconhecido”. Clique em “Mais

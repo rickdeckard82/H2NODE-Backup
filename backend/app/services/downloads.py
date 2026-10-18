@@ -2,8 +2,9 @@
 
 - Agente Linux: um .tar.gz montado NA HORA a partir da pasta agent/ do repositório
   (montada só-leitura no backend em AGENT_DIR) — sempre a versão que está no servidor.
-- Arquivos enviados pelo administrador (ex.: o instalador do Windows, compilado fora
-  do servidor): ficam em STORAGE_PATH/downloads/.
+- Instalador do cliente Windows: compilado pelo serviço client-builder a cada
+  `docker compose build` em que windows-client/ mudou; chega em CLIENT_DIST_DIR (só-leitura).
+- Arquivos enviados pelo administrador: ficam em STORAGE_PATH/downloads/.
 - A chave pública GPG dos backups.
 
 Links temporários (para `curl` no servidor do cliente, sem login): HMAC do nome + validade
@@ -40,7 +41,7 @@ class Item:
     name: str
     title: str
     platform: str  # linux | windows | key | other
-    source: str  # agent | uploaded | key
+    source: str  # agent | build | uploaded | key
     size: int
     sha256: str
     updated_at: datetime
@@ -53,6 +54,22 @@ def uploads_dir() -> Path:
 
 def agent_dir() -> Path:
     return Path(settings.agent_dir)
+
+
+def build_dir() -> Path:
+    return Path(settings.client_dist_dir)
+
+
+def _files(d: Path) -> list[Path]:
+    """Arquivos publicáveis de uma pasta, do mais novo para o mais antigo."""
+    if not d.is_dir():
+        return []
+    ok = [p for p in d.iterdir() if not p.is_symlink() and p.is_file() and UPLOAD_RE.match(p.name)]
+    return sorted(ok, key=lambda x: x.stat().st_mtime, reverse=True)
+
+
+def built_names() -> set[str]:
+    return {p.name for p in _files(build_dir())}
 
 
 def agent_version() -> str | None:
@@ -124,16 +141,16 @@ def list_items() -> list[Item]:
         name, data, when = bundle
         items.append(Item(name, "Agente Linux (servidores e cPanel)", "linux", "agent", len(data),
                           hashlib.sha256(data).hexdigest(), when, agent_version()))
-    d = uploads_dir()
-    if d.is_dir():
-        for p in sorted(d.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
-            if p.is_symlink() or not p.is_file() or not UPLOAD_RE.match(p.name):
-                continue
-            title, platform = _uploaded_title(p.name)
-            m = _VERSION_RE.search(p.name)
-            items.append(Item(p.name, title, platform, "uploaded", p.stat().st_size, _sha256_file(p),
-                              datetime.fromtimestamp(p.stat().st_mtime, UTC).replace(tzinfo=None),
-                              m.group(1) if m else None))
+    built = _files(build_dir())
+    seen = {p.name for p in built}
+    files = [(p, "build") for p in built] + [(p, "uploaded") for p in _files(uploads_dir()) if p.name not in seen]
+    for p, source in files:
+        title, platform = _uploaded_title(p.name)
+        m = _VERSION_RE.search(p.name)
+        st = p.stat()
+        items.append(Item(p.name, title, platform, source, st.st_size, _sha256_file(p),
+                          datetime.fromtimestamp(st.st_mtime, UTC).replace(tzinfo=None),
+                          m.group(1) if m else None))
     pub = gpg.public_key_info()
     if pub:
         data = pub.armored.encode()
@@ -151,10 +168,11 @@ def open_item(name: str) -> tuple[bytes | Path, str] | None:
     if bundle and name == bundle[0]:
         return bundle[1], "application/gzip"
     if UPLOAD_RE.match(name):
-        p = storage.safe_child(uploads_dir(), name)
-        if p.is_file() and not p.is_symlink():
-            exe = name.lower().endswith(".exe")
-            return p, "application/vnd.microsoft.portable-executable" if exe else "application/octet-stream"
+        for d in (build_dir(), uploads_dir()):
+            p = storage.safe_child(d, name)
+            if p.is_file() and not p.is_symlink():
+                exe = name.lower().endswith(".exe")
+                return p, "application/vnd.microsoft.portable-executable" if exe else "application/octet-stream"
     return None
 
 

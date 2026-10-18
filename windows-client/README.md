@@ -41,6 +41,9 @@ make windows-installer        # na raiz: wails build + makensis
 # -> windows-client/build/bin/PulseBackup.exe e PulseBackup-Setup-<versão>.exe
 ```
 
+No servidor isso é automático: o serviço `client-builder` do `docker-compose.yml` compila com o
+`Dockerfile` desta pasta (Linux, sem Windows) e publica o instalador na página Downloads.
+
 Ou à mão: `wails build -clean -trimpath` e `makensis -DVERSION=0.2.0 installer\pulse-backup.nsi`.
 Também compila a partir do Linux (`wails build -platform windows/amd64` + `apt install nsis`).
 O instalador não é assinado (SmartScreen avisa “editor desconhecido”).

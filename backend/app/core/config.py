@@ -92,6 +92,8 @@ class Settings(BaseSettings):
     # Pasta agent/ do repositório montada só-leitura: o .tar.gz do agente Linux é montado
     # a partir dela na hora do download (sempre a versão do servidor).
     agent_dir: str = Field(default="/agent", alias="AGENT_DIR")
+    # Instalador do cliente Windows compilado pelo serviço client-builder (volume só-leitura).
+    client_dist_dir: str = Field(default="/client-dist", alias="CLIENT_DIST_DIR")
 
     # ---- Coletor (puller): MikroTik por SSH ----
     # Coletas simultâneas e tempo máximo sem resposta do equipamento.

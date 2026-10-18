@@ -15,6 +15,7 @@ volumes:
   ssh_shared:
   ssh_hostkeys:
   receivers_shared:   # receivers.json: IPs de equipamentos + contas FTP (hash)
+  client_dist:    # instalador do cliente Windows compilado pelo client-builder
   caddy_data:     # certificados Let's Encrypt (não apague: limite de emissão)
   caddy_config:
 
@@ -83,6 +84,18 @@ services:
       - ssh_shared:/ssh
       - ssh_hostkeys:/etc/ssh/keys
 
+  # ───────────── client-builder: compila o instalador do cliente Windows ─────────────
+  # O `docker compose build` recompila (Go + Wails + NSIS, no Linux) só quando algo em
+  # windows-client/ mudou; na subida o container copia o PulseBackup-Setup-<versão>.exe
+  # para o volume client_dist e termina. O backend o publica em Downloads.
+  client-builder:
+    build:
+      context: ./windows-client
+    restart: "no"
+    network_mode: none
+    volumes:
+      - client_dist:/out
+
   # ─────────────────────────── Backend (API) ─────────────────────────
   backend:
     build:
@@ -109,6 +122,8 @@ services:
       - receivers_shared:/netcfg
       # Agente Linux para a página Downloads (o .tar.gz é montado na hora).
       - ./agent:/agent:ro
+      # Instalador do cliente Windows compilado pelo client-builder.
+      - client_dist:/client-dist:ro
       # Só a chave PÚBLICA — o backend nunca vê a privada.
       - ${SECRETS_DIR:-./secrets}/backup-key.pub.asc:/keys/backup-key.pub.asc:ro
     networks:

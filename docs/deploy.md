@@ -95,6 +95,14 @@ git pull && docker compose build --pull && docker compose up -d
 As migrações rodam na subida do backend. O agente nos clientes é atualizado
 reexecutando `agent/install.sh` (mantém o `agent.conf`).
 
+A página **Downloads** acompanha a atualização sozinha:
+- o `.tar.gz` do agente Linux é montado na hora a partir de `agent/`;
+- o instalador do cliente Windows é compilado pelo serviço `client-builder` (Go + Wails + NSIS
+  dentro do Docker, sem Windows). O `build` só recompila quando algo em `windows-client/` mudou;
+  no `up` o container copia o `PulseBackup-Setup-<versão>.exe` para o volume `client_dist`
+  (lido só-leitura pelo backend) e termina — `Exited (0)` no `docker compose ps -a` é o normal.
+  Para recompilar à força: `docker compose build --no-cache client-builder && docker compose up -d client-builder`.
+
 ## Backup do próprio painel
 
 O PostgreSQL guarda só metadados (cadastro, histórico); os backups em si estão no

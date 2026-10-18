@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.1";
+export const APP_VERSION = "0.9.2";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.2",
+    date: "2026-10-18",
+    changes: [
+      "Downloads: o instalador do cliente Windows passa a ser compilado pelo próprio servidor (serviço client-builder: Go + Wails + NSIS, sem precisar de Windows) a cada atualização em que o cliente mudou, e aparece sozinho na página, pronto para baixar por HTTPS ou por link de 1 h.",
+      "O agente Linux continua sendo montado na hora a partir do agente do servidor: atualizou o servidor, o download já é a versão nova.",
+      "Enviar arquivo segue disponível para outros pacotes; o instalador compilado pelo servidor não pode ser substituído nem excluído pela página.",
+    ],
+  },
   {
     version: "0.9.1",
     date: "2026-10-18",

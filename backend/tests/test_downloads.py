@@ -66,3 +66,22 @@ def test_upload_installer(auth_client, monkeypatch, tmp_path):
     assert auth_client.get("/api/downloads/file/PulseBackup-Setup-0.2.0.exe").content == exe
     assert auth_client.delete("/api/downloads/PulseBackup-Setup-0.2.0.exe").status_code == 204
     assert auth_client.get("/api/downloads/file/PulseBackup-Setup-0.2.0.exe").status_code == 404
+
+
+def test_built_installer(auth_client, monkeypatch, tmp_path):
+    """O instalador do client-builder aparece sozinho, tem prioridade e não pode ser trocado/excluído."""
+    _agent(monkeypatch, tmp_path)
+    dist = tmp_path / "client-dist"
+    dist.mkdir()
+    exe = b"MZ" + b"\x01" * 500
+    (dist / "PulseBackup-Setup-0.3.0.exe").write_bytes(exe)
+    (dist / ".PulseBackup-Setup-0.3.0.exe.tmp").write_bytes(b"MZ")  # cópia pela metade: ignorada
+    monkeypatch.setattr(settings, "client_dist_dir", str(dist))
+    items = auth_client.get("/api/downloads").json()
+    win = [i for i in items if i["platform"] == "windows"]
+    assert len(win) == 1 and win[0]["source"] == "build" and win[0]["version"] == "0.3.0"
+    assert win[0]["sha256"] == hashlib.sha256(exe).hexdigest()
+    assert auth_client.get("/api/downloads/file/PulseBackup-Setup-0.3.0.exe").content == exe
+    assert auth_client.put("/api/downloads/PulseBackup-Setup-0.3.0.exe", content=b"MZ").status_code == 409
+    assert auth_client.delete("/api/downloads/PulseBackup-Setup-0.3.0.exe").status_code == 404
+    assert (dist / "PulseBackup-Setup-0.3.0.exe").read_bytes() == exe

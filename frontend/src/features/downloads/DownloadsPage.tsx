@@ -13,7 +13,7 @@ interface DownloadItem {
   name: string;
   title: string;
   platform: "linux" | "windows" | "key" | "other";
-  source: "agent" | "uploaded" | "key";
+  source: "agent" | "build" | "uploaded" | "key";
   size: number;
   sha256: string;
   updated_at: string;
@@ -140,9 +140,11 @@ export default function DownloadsPage() {
 
       {!list.isLoading && !hasWindows && (
         <Card className="mb-3 text-sm text-slate-600 dark:text-slate-300">
-          Nenhum instalador do <b>cliente Windows</b> disponível ainda. Gere com <span className="font-mono">make windows-installer</span>{" "}
-          (numa máquina com Go, Node, Wails e NSIS) e {can("admin") ? "envie aqui com" : "peça a um administrador para enviar em"}{" "}
-          <b>Enviar arquivo</b> o <span className="font-mono">PulseBackup-Setup-&lt;versão&gt;.exe</span>.
+          Nenhum instalador do <b>cliente Windows</b> disponível ainda. Ele é compilado pelo próprio servidor (serviço{" "}
+          <span className="font-mono">client-builder</span>) ao atualizar com{" "}
+          <span className="font-mono">docker compose build &amp;&amp; docker compose up -d</span>. Compilado fora,{" "}
+          {can("admin") ? "envie aqui com" : "um administrador envia em"} <b>Enviar arquivo</b> o{" "}
+          <span className="font-mono">PulseBackup-Setup-&lt;versão&gt;.exe</span>.
         </Card>
       )}
 
@@ -158,7 +160,12 @@ export default function DownloadsPage() {
                 </div>
                 <div className="mt-0.5 truncate font-mono text-xs text-slate-500 dark:text-slate-400">{it.name}</div>
                 <div className="text-xs text-slate-400 dark:text-slate-500">
-                  {fmtBytes(it.size)} · {it.source === "agent" ? "gerado do agente deste servidor" : fmtDate(it.updated_at)}
+                  {fmtBytes(it.size)} ·{" "}
+                  {it.source === "agent"
+                    ? "gerado do agente deste servidor"
+                    : it.source === "build"
+                      ? `compilado por este servidor em ${fmtDate(it.updated_at)}`
+                      : `enviado em ${fmtDate(it.updated_at)}`}
                 </div>
               </div>
               {PLATFORM[it.platform].help && (
