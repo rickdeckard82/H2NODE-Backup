@@ -103,3 +103,17 @@ def test_unreadable_file_does_not_hide_the_rest(auth_client, monkeypatch, tmp_pa
     [problem] = r.json()["problems"]
     assert problem.startswith("agente Linux (")
     assert problem.endswith("sem permissão de leitura em /agent/install.sh")
+
+
+def test_only_latest_windows_installer(auth_client, monkeypatch, tmp_path):
+    """Instalador antigo enviado à mão some da lista quando há um mais novo."""
+    _agent(monkeypatch, tmp_path)
+    dist = tmp_path / "client-dist"
+    dist.mkdir()
+    (dist / "PulseBackup-Setup-0.2.4.exe").write_bytes(b"MZ new")
+    monkeypatch.setattr(settings, "client_dist_dir", str(dist))
+    assert auth_client.put("/api/downloads/PulseBackup-Setup-0.2.0.exe", content=b"MZ old").status_code == 200
+    win = [i for i in auth_client.get("/api/downloads/list").json()["items"] if i["platform"] == "windows"]
+    assert [i["name"] for i in win] == ["PulseBackup-Setup-0.2.4.exe"]
+    # continua no disco até o administrador excluir
+    assert auth_client.delete("/api/downloads/PulseBackup-Setup-0.2.0.exe").status_code == 204

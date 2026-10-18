@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.5";
+export const APP_VERSION = "0.9.6";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.6",
+    date: "2026-10-18",
+    changes: [
+      "Downloads: só o instalador do Windows mais novo aparece; versões antigas enviadas à mão ficam escondidas.",
+      "Downloads: a chave pública aparece como \"chave deste servidor\" (não como arquivo enviado).",
+    ],
+  },
   {
     version: "0.9.5",
     date: "2026-10-18",

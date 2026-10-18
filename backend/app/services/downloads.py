@@ -142,6 +142,20 @@ def _problem(problems: list[str], what: str, e: OSError) -> None:
     logger.warning("download_unreadable", what=what, error=str(e))
 
 
+def _vkey(v: str | None) -> tuple[int, ...]:
+    return tuple(int(x) for x in v.split(".")) if v else ()
+
+
+def _latest_windows(items: list[Item]) -> list[Item]:
+    """Só o instalador do Windows mais novo (o compilado ganha empate); versões antigas
+    enviadas à mão ficam escondidas — o administrador pode excluí-las do disco antes."""
+    win = [i for i in items if i.platform == "windows"]
+    if len(win) < 2:
+        return items
+    best = max(win, key=lambda i: (_vkey(i.version), i.source == "build", i.updated_at))
+    return [i for i in items if i.platform != "windows" or i is best]
+
+
 def list_items() -> tuple[list[Item], list[str]]:
     """Itens disponíveis e os problemas encontrados (um arquivo ilegível não esconde os outros)."""
     items: list[Item] = []
@@ -179,6 +193,7 @@ def list_items() -> tuple[list[Item], list[str]]:
         items.append(Item(p.name, title, platform, source, st.st_size, sha,
                           datetime.fromtimestamp(st.st_mtime, UTC).replace(tzinfo=None),
                           m.group(1) if m else None))
+    items = _latest_windows(items)
     try:
         pub = gpg.public_key_info()
     except OSError as e:

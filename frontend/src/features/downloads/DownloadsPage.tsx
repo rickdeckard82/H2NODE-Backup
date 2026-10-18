@@ -192,7 +192,9 @@ export default function DownloadsPage() {
                     ? "gerado do agente deste servidor"
                     : it.source === "build"
                       ? `compilado por este servidor em ${fmtDate(it.updated_at)}`
-                      : `enviado em ${fmtDate(it.updated_at)}`}
+                      : it.source === "key"
+                        ? "chave deste servidor"
+                        : `enviado em ${fmtDate(it.updated_at)}`}
                 </div>
               </div>
               {PLATFORM[it.platform].help && (
