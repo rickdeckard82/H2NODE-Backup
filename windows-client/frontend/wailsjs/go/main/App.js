@@ -26,16 +26,16 @@ export function Disconnect() {
   return window['go']['main']['App']['Disconnect']();
 }
 
+export function Elevate() {
+  return window['go']['main']['App']['Elevate']();
+}
+
+export function GetLog() {
+  return window['go']['main']['App']['GetLog']();
+}
+
 export function GetState() {
   return window['go']['main']['App']['GetState']();
-}
-
-export function OpenConfigDir() {
-  return window['go']['main']['App']['OpenConfigDir']();
-}
-
-export function OpenLog() {
-  return window['go']['main']['App']['OpenLog']();
 }
 
 export function Quit() {
@@ -58,12 +58,16 @@ export function SaveSchedule(arg1) {
   return window['go']['main']['App']['SaveSchedule'](arg1);
 }
 
-export function SetStartWithWindows(arg1) {
-  return window['go']['main']['App']['SetStartWithWindows'](arg1);
+export function SetVSS(arg1) {
+  return window['go']['main']['App']['SetVSS'](arg1);
 }
 
 export function ShowWindow() {
   return window['go']['main']['App']['ShowWindow']();
+}
+
+export function StartService() {
+  return window['go']['main']['App']['StartService']();
 }
 
 export function TestConnection(arg1, arg2) {

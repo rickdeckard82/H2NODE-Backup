@@ -1,6 +1,6 @@
-// Package config guarda a configuração e o histórico do cliente em
-// %APPDATA%\PulseBackup (por usuário do Windows). O token de envio fica protegido
-// com DPAPI: só este usuário, nesta máquina, consegue decifrá-lo.
+// Package config guarda a configuração e o histórico do cliente. No serviço, em
+// %ProgramData%\PulseBackup (só SYSTEM e Administradores). O token de envio fica
+// protegido com DPAPI da conta que roda o serviço (SYSTEM): só ela o decifra.
 package config
 
 import (
@@ -27,17 +27,18 @@ type Schedule struct {
 
 // Config é o que o usuário escolhe na interface.
 type Config struct {
-	ServerURL        string        `json:"server_url"`
-	TokenProtected   string        `json:"token_protected"` // DPAPI, base64
-	ClientID         string        `json:"client_id"`
-	ClientName       string        `json:"client_name"`
-	PublicKey        string        `json:"public_key"` // chave fixada ao conectar (não muda sozinha)
-	Fingerprint      string        `json:"fingerprint"`
-	Items            []engine.Item `json:"items"`
-	Excludes         []string      `json:"excludes"`
-	Schedule         Schedule      `json:"schedule"`
-	WorkDir          string        `json:"work_dir"`
-	StartWithWindows bool          `json:"start_with_windows"`
+	ServerURL      string        `json:"server_url"`
+	TokenProtected string        `json:"token_protected"` // DPAPI, base64
+	ClientID       string        `json:"client_id"`
+	ClientName     string        `json:"client_name"`
+	PublicKey      string        `json:"public_key"` // chave fixada ao conectar (não muda sozinha)
+	Fingerprint    string        `json:"fingerprint"`
+	Items          []engine.Item `json:"items"`
+	Excludes       []string      `json:"excludes"`
+	Schedule       Schedule      `json:"schedule"`
+	WorkDir        string        `json:"work_dir"`
+	// UseVSS: lê os arquivos de uma cópia de sombra (arquivos abertos e travados entram).
+	UseVSS bool `json:"use_vss"`
 }
 
 // DefaultExcludes: temporários do Office, do Windows e de navegadores.
@@ -94,7 +95,7 @@ func defaults() Config {
 	return Config{
 		Excludes: append([]string(nil), DefaultExcludes...),
 		Schedule: Schedule{Mode: "daily", Time: "12:30", CatchUp: true},
-		WorkDir:  filepath.Join(LocalDir(), "work"),
+		UseVSS:   true,
 	}
 }
 
@@ -126,9 +127,6 @@ func (s *Store) Load() (Config, error) {
 	err := readJSON(filepath.Join(s.dir, "config.json"), &c)
 	if errors.Is(err, os.ErrNotExist) {
 		return defaults(), nil
-	}
-	if c.WorkDir == "" {
-		c.WorkDir = defaults().WorkDir
 	}
 	return c, err
 }

@@ -42,7 +42,7 @@ func startTray(a *App) *tray {
 			t.cancel = systray.AddMenuItem("Cancelar backup", "")
 			t.cancel.Disable()
 			systray.AddSeparator()
-			quit := systray.AddMenuItem("Sair", "Encerra o Pulse Backup (o backup agendado deixa de rodar)")
+			quit := systray.AddMenuItem("Fechar o ícone", "Fecha esta janela e o ícone; o serviço continua fazendo os backups")
 			systray.SetOnTapped(a.ShowWindow) // clique no ícone abre a janela
 			t.mu.Lock()
 			t.ready = true
@@ -55,7 +55,7 @@ func startTray(a *App) *tray {
 						a.ShowWindow()
 					case <-t.runNow.ClickedCh:
 						if err := a.RunNow(); err != nil {
-							a.logf("bandeja: %v", err)
+							a.logger.Printf("bandeja: %v", err)
 							a.ShowWindow()
 						}
 					case <-t.cancel.ClickedCh:
@@ -71,7 +71,7 @@ func startTray(a *App) *tray {
 	select {
 	case <-ready:
 	case <-time.After(5 * time.Second):
-		a.logf("ícone da bandeja não iniciou")
+		a.logger.Printf("ícone da bandeja não iniciou")
 	}
 	return t
 }
@@ -90,6 +90,9 @@ func (t *tray) update(st UIState) {
 	}
 	state, tip := "", "Pulse Backup"
 	switch {
+	case !st.ServiceOK:
+		state = "failed"
+		tip = "Pulse Backup — o serviço não está rodando"
 	case st.Running:
 		state = "running"
 		tip = "Pulse Backup — backup em andamento"
@@ -104,7 +107,7 @@ func (t *tray) update(st UIState) {
 			tip = "Pulse Backup — último backup: " + ts.Local().Format("02/01 15:04")
 		}
 	}
-	if !st.Connected {
+	if st.ServiceOK && !st.Connected {
 		tip = "Pulse Backup — não conectado ao servidor"
 	}
 	if state != t.state {
@@ -113,11 +116,14 @@ func (t *tray) update(st UIState) {
 	}
 	systray.SetTooltip(tip)
 	t.statusMI.SetTitle(tip)
-	if st.Running {
+	if st.Running || !st.ServiceOK {
 		t.runNow.Disable()
-		t.cancel.Enable()
 	} else {
 		t.runNow.Enable()
+	}
+	if st.Running {
+		t.cancel.Enable()
+	} else {
 		t.cancel.Disable()
 	}
 }

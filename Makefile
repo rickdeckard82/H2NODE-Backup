@@ -2,7 +2,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 DEV := docker compose -f docker-compose.yml -f docker-compose.dev.yml
 
-.PHONY: help init keys build up dev down clean ps logs migrate seed test-backend test-e2e lint-agent windows-client test-windows-client
+.PHONY: help init keys build up dev down clean ps logs migrate seed test-backend test-e2e lint-agent windows-client windows-installer test-windows-client
 
 help: ## Lista os alvos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n",$$1,$$2}'
@@ -62,8 +62,11 @@ test-e2e: ## Teste ponta a ponta: stack isolada + agente real (MariaDB e Postgre
 windows-client: ## Gera windows-client/build/bin/PulseBackup.exe (requer Go, Node e o CLI do Wails v2)
 	cd windows-client && wails build -clean -trimpath -platform windows/amd64
 
+windows-installer: windows-client ## Gera windows-client/build/bin/PulseBackup-Setup-<versão>.exe (requer também o NSIS: makensis)
+	cd windows-client && makensis -V2 -DVERSION=$$(grep -oP 'Version = "\K[0-9.]+' main.go) installer/pulse-backup.nsi
+
 test-windows-client: ## Testes do cliente Windows (Go) + tsc/eslint da interface
-	cd windows-client && go vet ./internal/... . && go test ./internal/...
+	cd windows-client && go vet ./internal/... . && go test ./...
 	cd windows-client/frontend && npm ci && npx tsc --noEmit && npx eslint . --max-warnings 0
 
 lint-agent: ## shellcheck do agente

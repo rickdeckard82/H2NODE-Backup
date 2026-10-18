@@ -154,6 +154,13 @@ func (c *Client) withRetry(ctx context.Context, fn func() error) error {
 	}
 }
 
+// SetRetries muda quantas vezes um pedido é tentado (1 = sem novas tentativas).
+func (c *Client) SetRetries(n int) {
+	if n >= 1 {
+		c.retries = n
+	}
+}
+
 // Hello confere o token e traz a chave pública e os limites do envio.
 func (c *Client) Hello(ctx context.Context) (*Hello, error) {
 	var h Hello

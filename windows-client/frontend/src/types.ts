@@ -14,7 +14,7 @@ export interface Schedule {
 }
 
 export interface Progress {
-  phase: "preparing" | "packing" | "uploading" | "closing" | "done";
+  phase: "preparing" | "snapshot" | "packing" | "uploading" | "closing" | "done";
   item: string;
   index: number;
   count: number;
@@ -54,13 +54,19 @@ export interface UIState {
   excludes: string[];
   schedule: Schedule;
   work_dir: string;
-  start_with_windows: boolean;
+  use_vss: boolean;
   running: boolean;
   progress: Progress | null;
   next_run: string;
   last_success: string;
   history: RunResult[];
-  log_path: string;
+  /** o serviço do Windows respondeu */
+  service_ok: boolean;
+  service_error: string;
+  /** este processo pode mudar a configuração (elevado / administrador) */
+  admin: boolean;
+  /** janela aberta com "Abrir como administrador" */
+  admin_window: boolean;
 }
 
 export interface ConnectInfo {

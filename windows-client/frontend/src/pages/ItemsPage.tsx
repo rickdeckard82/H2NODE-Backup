@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AdminBanner } from "../AdminBanner";
 import { backend } from "../backend";
 import { errText } from "../format";
 import type { UIState } from "../types";
@@ -23,14 +24,16 @@ function FileIcon() {
 
 export default function ItemsPage({ state }: { state: UIState }) {
   const toast = useToast();
-  const [excludes, setExcludes] = useState(state.excludes.join("\n"));
+  const saved = state.excludes.join("\n");
+  const [excludes, setExcludes] = useState(saved);
   const [savingEx, setSavingEx] = useState(false);
-  const dirty = excludes.trim() !== state.excludes.join("\n").trim();
+  const dirty = excludes.trim() !== saved.trim();
+  const locked = !state.admin;
 
   useEffect(() => {
-    if (!dirty) setExcludes(state.excludes.join("\n"));
+    if (!dirty) setExcludes(saved);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.excludes]);
+  }, [saved]);
 
   async function call(fn: () => Promise<void>) {
     try {
@@ -42,6 +45,7 @@ export default function ItemsPage({ state }: { state: UIState }) {
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
+      <AdminBanner state={state} />
       <Card className="p-0">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 p-4 dark:border-slate-800">
           <div>
@@ -52,10 +56,12 @@ export default function ItemsPage({ state }: { state: UIState }) {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => call(backend.chooseFiles)}>
+            <Button variant="ghost" onClick={() => call(backend.chooseFiles)} disabled={locked}>
               Adicionar arquivos
             </Button>
-            <Button onClick={() => call(backend.chooseFolder)}>Adicionar pasta</Button>
+            <Button onClick={() => call(backend.chooseFolder)} disabled={locked}>
+              Adicionar pasta
+            </Button>
           </div>
         </div>
         {state.items.length === 0 ? (
@@ -71,7 +77,7 @@ export default function ItemsPage({ state }: { state: UIState }) {
                 <button
                   type="button"
                   className="text-rose-600 hover:underline disabled:opacity-40 dark:text-rose-400"
-                  disabled={state.running}
+                  disabled={state.running || locked}
                   onClick={() => call(() => backend.removeItem(it.path))}
                 >
                   Remover
@@ -90,13 +96,14 @@ export default function ItemsPage({ state }: { state: UIState }) {
           <textarea
             className="input h-32 font-mono text-xs"
             value={excludes}
+            disabled={locked}
             onChange={(e) => setExcludes(e.target.value)}
             spellCheck={false}
           />
         </Field>
         <div className="flex justify-end">
           <Button
-            disabled={!dirty}
+            disabled={!dirty || locked}
             loading={savingEx}
             onClick={async () => {
               setSavingEx(true);
@@ -118,7 +125,7 @@ export default function ItemsPage({ state }: { state: UIState }) {
           <span className="selectable min-w-0 flex-1 truncate font-mono text-xs" title={state.work_dir}>
             {state.work_dir}
           </span>
-          <Button variant="ghost" onClick={() => call(backend.chooseWorkDir)} disabled={state.running}>
+          <Button variant="ghost" onClick={() => call(backend.chooseWorkDir)} disabled={state.running || locked}>
             Trocar
           </Button>
         </div>
@@ -127,8 +134,9 @@ export default function ItemsPage({ state }: { state: UIState }) {
           item já compactado. Nada fica em claro nela.
         </Note>
         <p className="text-xs text-slate-400 dark:text-slate-500">
-          Arquivos abertos e travados por outro programa (ex.: .pst do Outlook aberto) são pulados e aparecem como aviso no
-          histórico. Feche o programa no horário do backup.
+          O backup roda no serviço do Windows (conta do sistema) e lê as pastas de qualquer usuário. Unidades de rede mapeadas
+          (Z:) não existem para o serviço: use o caminho <span className="font-mono">\\servidor\pasta</span>, com acesso
+          liberado para a conta do computador.
         </p>
       </Card>
     </div>

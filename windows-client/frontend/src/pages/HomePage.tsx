@@ -6,6 +6,7 @@ import { Button, Card, Note, RunBadge, useToast } from "../ui";
 
 const PHASE: Record<Progress["phase"], string> = {
   preparing: "Preparando",
+  snapshot: "Criando cópia de sombra (VSS)",
   packing: "Compactando e cifrando",
   uploading: "Enviando",
   closing: "Finalizando",
@@ -39,7 +40,7 @@ export default function HomePage({ state, go }: { state: UIState; go: (t: "items
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
-      {!state.connected && (
+      {state.service_ok && !state.connected && (
         <Note tone="warn">
           Este computador ainda não está conectado ao servidor de backup.{" "}
           <button type="button" className="font-semibold underline" onClick={() => go("server")}>
@@ -125,10 +126,10 @@ export default function HomePage({ state, go }: { state: UIState; go: (t: "items
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm text-slate-600 dark:text-slate-300">
-              Pode fechar esta janela: o Pulse Backup continua no ícone da bandeja (perto do relógio) e faz os backups no
-              horário agendado.
+              Pode fechar esta janela: os backups são feitos pelo <b>serviço do Windows</b> no horário agendado, mesmo sem
+              ninguém logado{state.use_vss ? ", lendo de uma cópia de sombra (VSS) — arquivos abertos também entram" : ""}.
             </div>
-            <Button onClick={runNow} loading={busy} disabled={!state.connected || state.items.length === 0}>
+            <Button onClick={runNow} loading={busy} disabled={!state.service_ok || !state.connected || state.items.length === 0}>
               Fazer backup agora
             </Button>
           </div>

@@ -25,8 +25,8 @@ export function installDevMock() {
     ],
     excludes: ["~$*", "*.tmp", "Thumbs.db", "desktop.ini"],
     schedule: { mode: "daily", time: "12:30", days: [1, 2, 3, 4, 5], interval_hours: 24, catch_up: true },
-    work_dir: "C:\\Users\\maria\\AppData\\Local\\PulseBackup\\work",
-    start_with_windows: true,
+    work_dir: "C:\\ProgramData\\PulseBackup\\work",
+    use_vss: true,
     running: params.get("running") === "1",
     progress:
       params.get("running") === "1"
@@ -48,7 +48,10 @@ export function installDevMock() {
       },
       { run_name: "20261016T153001Z-d4e5f6", started_at: iso(44.2 * 3600_000), finished_at: iso(44 * 3600_000), status: "success", bytes: 2100000000, components: [], errors: [] },
     ],
-    log_path: "C:\\Users\\maria\\AppData\\Local\\PulseBackup\\logs\\pulse-backup.log",
+    service_ok: params.get("service") !== "0",
+    service_error: params.get("service") === "0" ? "o serviço Pulse Backup não está rodando" : "",
+    admin: params.get("admin") !== "0",
+    admin_window: params.get("admin") !== "0",
   };
   const ok = () => Promise.resolve();
   w.go = {
@@ -57,8 +60,12 @@ export function installDevMock() {
         GetState: () => Promise.resolve(state),
         TestConnection: () => Promise.resolve({ client_id: "pc-financeiro", client_name: "PC Financeiro", fingerprint: state.fingerprint }),
         ConfirmConnection: ok, Disconnect: ok, ChooseFolder: ok, ChooseFiles: ok, RemoveItem: ok,
-        SaveExcludes: ok, ChooseWorkDir: ok, SaveSchedule: ok, SetStartWithWindows: ok, OpenLog: ok,
-        OpenConfigDir: ok, RunNow: () => Promise.reject("já existe um backup em andamento"), Cancel: ok, Quit: ok,
+        SaveExcludes: ok, ChooseWorkDir: ok, SaveSchedule: ok, SetVSS: ok, Elevate: ok, StartService: ok,
+        GetLog: () =>
+          Promise.resolve(
+            "2026/10/18 12:30:00 backup iniciado (agendado)\n2026/10/18 12:30:04 VSS: cópia de sombra de C: criada ({4f1c…}) em 4s\n2026/10/18 12:41:10 backup 20261018T153012Z-a1b2c3: success, 2147483648 bytes; erros: ",
+          ),
+        RunNow: () => Promise.reject("já existe um backup em andamento"), Cancel: ok, Quit: ok,
       },
     },
   };

@@ -4,6 +4,7 @@ go 1.27.2
 
 require (
 	fyne.io/systray v1.12.2
+	github.com/Microsoft/go-winio v0.6.2
 	github.com/ProtonMail/go-crypto v1.5.2
 	github.com/klauspost/pgzip v1.2.7
 	github.com/wailsapp/wails/v2 v2.17.0

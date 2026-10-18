@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { useEffect, useState } from "react";
-import { backend, onProgress, onState } from "./backend";
+import { backend, onState } from "./backend";
+import { errText } from "./format";
 import logoDark from "./logo-dark.svg";
 import logoLight from "./logo-light.svg";
 import HistoryPage from "./pages/HistoryPage";
@@ -9,7 +10,7 @@ import ItemsPage from "./pages/ItemsPage";
 import SchedulePage from "./pages/SchedulePage";
 import ServerPage from "./pages/ServerPage";
 import type { UIState } from "./types";
-import { Badge, Spinner } from "./ui";
+import { Badge, Button, Note, Spinner, useToast } from "./ui";
 
 const TABS = [
   { id: "home", label: "Início" },
@@ -22,20 +23,16 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 export default function App() {
+  const toast = useToast();
   const [state, setState] = useState<UIState | null>(null);
   const [tab, setTab] = useState<TabId>("home");
 
   useEffect(() => {
     backend.getState().then((s) => {
       setState(s);
-      if (!s.connected) setTab("server");
+      if (s.service_ok && !s.connected && s.admin) setTab("server");
     });
-    const offState = onState(setState);
-    const offProgress = onProgress((p) => setState((s) => (s ? { ...s, progress: p } : s)));
-    return () => {
-      offState();
-      offProgress();
-    };
+    return onState(setState);
   }, []);
 
   if (!state) {
@@ -53,11 +50,16 @@ export default function App() {
         <img src={logoDark} alt="" className="hidden h-9 w-9 dark:block" />
         <div>
           <div className="text-lg font-bold leading-tight">Pulse Backup</div>
-          <div className="text-xs text-slate-500 dark:text-slate-400">Cliente Windows · v{state.version}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            Cliente Windows{state.version ? ` · v${state.version}` : ""}
+            {state.admin_window && " · configuração (administrador)"}
+          </div>
         </div>
         <div className="ml-auto flex items-center gap-2 text-sm">
           {state.running && <Badge tone="amber">backup em andamento</Badge>}
-          {state.connected ? (
+          {!state.service_ok ? (
+            <Badge tone="red">serviço parado</Badge>
+          ) : state.connected ? (
             <Badge tone="green">conectado: {state.client_name}</Badge>
           ) : (
             <Badge tone="red">não conectado</Badge>
@@ -84,6 +86,19 @@ export default function App() {
       </nav>
 
       <main className="flex-1 overflow-y-auto p-5">
+        {!state.service_ok && (
+          <div className="mx-auto mb-4 max-w-4xl">
+            <Note tone="error">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  O serviço do Pulse Backup não está rodando: nenhum backup é feito.
+                  {state.service_error && !state.service_error.includes("não está rodando") && ` (${state.service_error})`}
+                </span>
+                <Button onClick={() => backend.startService().catch((e) => toast("err", errText(e)))}>Iniciar serviço</Button>
+              </div>
+            </Note>
+          </div>
+        )}
         {tab === "home" && <HomePage state={state} go={setTab} />}
         {tab === "items" && <ItemsPage state={state} />}
         {tab === "schedule" && <SchedulePage state={state} />}

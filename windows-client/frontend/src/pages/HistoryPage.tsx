@@ -1,25 +1,53 @@
 import { useState } from "react";
 import { backend } from "../backend";
-import { fmtBytes, fmtDate } from "../format";
+import { errText, fmtBytes, fmtDate } from "../format";
 import type { UIState } from "../types";
-import { Badge, Button, Card, RunBadge } from "../ui";
+import { Badge, Button, Card, RunBadge, useToast } from "../ui";
 
 const COMP_TONE = { ok: "green", warning: "amber", failed: "red" } as const;
 const COMP_LABEL = { ok: "ok", warning: "aviso", failed: "falhou" } as const;
 
+function LogModal({ text, onClose }: { text: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-6 dark:bg-black/60" onClick={onClose}>
+      <div className="card flex max-h-full w-full max-w-5xl flex-col p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between">
+          <div className="font-semibold">Log do serviço</div>
+          <Button variant="ghost" onClick={onClose}>
+            Fechar
+          </Button>
+        </div>
+        <pre className="selectable min-h-0 flex-1 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 font-mono text-xs dark:bg-slate-950">
+          {text || "(vazio)"}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
 export default function HistoryPage({ state }: { state: UIState }) {
+  const toast = useToast();
   const [open, setOpen] = useState<string | null>(null);
+  const [log, setLog] = useState<string | null>(null);
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={() => backend.openConfigDir()}>
-          Pasta de configuração
-        </Button>
-        <Button variant="ghost" onClick={() => backend.openLog()}>
-          Abrir log
+        <Button
+          variant="ghost"
+          disabled={!state.service_ok}
+          onClick={() =>
+            backend
+              .getLog()
+              // mais recente no topo
+              .then((t) => setLog(t.trimEnd().split("\n").reverse().join("\n")))
+              .catch((e) => toast("err", errText(e)))
+          }
+        >
+          Ver log do serviço
         </Button>
       </div>
+      {log !== null && <LogModal text={log} onClose={() => setLog(null)} />}
       <Card className="overflow-x-auto p-0">
         <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
           <thead className="bg-slate-50 dark:bg-slate-800/50">

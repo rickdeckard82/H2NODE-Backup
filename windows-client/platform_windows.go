@@ -3,36 +3,31 @@
 package main
 
 import (
-	"fmt"
+	"errors"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
-	"syscall"
 
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )
 
-const runKey = `Software\Microsoft\Windows\CurrentVersion\Run`
+var errUACCanceled = errors.New("elevação cancelada pelo usuário")
 
-// setAutostart liga/desliga a abertura no login (HKCU\...\Run, só deste usuário).
-func setAutostart(on bool) error {
-	k, _, err := registry.CreateKey(registry.CURRENT_USER, runKey, registry.SET_VALUE)
-	if err != nil {
-		return err
-	}
-	defer k.Close()
-	if !on {
-		if err := k.DeleteValue("PulseBackup"); err != nil && err != registry.ErrNotExist {
-			return err
-		}
-		return nil
-	}
+// runElevated abre este executável como administrador (janela do UAC).
+func runElevated(args ...string) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	return k.SetStringValue("PulseBackup", fmt.Sprintf(`"%s" --background`, exe))
+	verb, _ := windows.UTF16PtrFromString("runas")
+	file, _ := windows.UTF16PtrFromString(exe)
+	params, _ := windows.UTF16PtrFromString(strings.Join(args, " "))
+	err = windows.ShellExecute(0, verb, file, params, nil, windows.SW_SHOWNORMAL)
+	if errors.Is(err, windows.ERROR_CANCELLED) {
+		return errUACCanceled
+	}
+	return err
 }
 
 // osInfo: "Windows 11 Pro 24H2 (build 26100)". O registro diz "Windows 10" também no
@@ -54,12 +49,4 @@ func osInfo() string {
 		s += " (build " + build + ")"
 	}
 	return s
-}
-
-// openPath abre um arquivo ou pasta no Explorer.
-func openPath(p string) error {
-	cmd := exec.Command("explorer.exe", p)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	_ = cmd.Start() // explorer.exe devolve código 1 mesmo quando abre
-	return nil
 }

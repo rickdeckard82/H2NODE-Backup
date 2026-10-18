@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AdminBanner } from "../AdminBanner";
 import { backend } from "../backend";
 import { errText } from "../format";
 import type { ConnectInfo, UIState } from "../types";
@@ -14,6 +15,7 @@ export default function ServerPage({ state }: { state: UIState }) {
   const [token, setToken] = useState("");
   const [info, setInfo] = useState<ConnectInfo | null>(null);
   const [busy, setBusy] = useState(false);
+  const locked = !state.admin;
 
   async function test() {
     setBusy(true);
@@ -44,6 +46,7 @@ export default function ServerPage({ state }: { state: UIState }) {
   if (state.connected) {
     return (
       <div className="mx-auto max-w-3xl space-y-4">
+        <AdminBanner state={state} />
         <Card className="space-y-3 p-5">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -68,7 +71,7 @@ export default function ServerPage({ state }: { state: UIState }) {
           <div className="flex justify-end">
             <Button
               variant="danger"
-              disabled={state.running}
+              disabled={state.running || locked}
               onClick={async () => {
                 if (!window.confirm("Desconectar? O token deste computador é apagado e os backups param.")) return;
                 try {
@@ -88,6 +91,7 @@ export default function ServerPage({ state }: { state: UIState }) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
+      <AdminBanner state={state} />
       <Card className="space-y-4 p-5">
         <div>
           <div className="font-semibold">Conectar ao Pulse Backup</div>
@@ -97,11 +101,12 @@ export default function ServerPage({ state }: { state: UIState }) {
           </p>
         </div>
         <Field label="Endereço do servidor">
-          <input className="input font-mono" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://backup.suaempresa.com.br" />
+          <input className="input font-mono" value={url} disabled={locked} onChange={(e) => setUrl(e.target.value)} placeholder="https://backup.suaempresa.com.br" />
         </Field>
-        <Field label="Token" hint="Começa com pbu_. Fica guardado protegido pelo Windows (só este usuário consegue ler).">
+        <Field label="Token" hint="Começa com pbu_. Fica guardado no serviço, protegido pelo Windows (DPAPI da conta do sistema).">
           <input
             className="input font-mono"
+            disabled={locked}
             type="password"
             value={token}
             onChange={(e) => setToken(e.target.value)}
@@ -110,7 +115,7 @@ export default function ServerPage({ state }: { state: UIState }) {
           />
         </Field>
         <div className="flex justify-end">
-          <Button variant="ghost" onClick={test} loading={busy && !info} disabled={!url.trim() || !token.trim()}>
+          <Button variant="ghost" onClick={test} loading={busy && !info} disabled={locked || !url.trim() || !token.trim()}>
             Testar conexão
           </Button>
         </div>

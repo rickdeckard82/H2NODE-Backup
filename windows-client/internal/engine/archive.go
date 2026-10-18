@@ -36,16 +36,14 @@ func excluded(name string, patterns []string) bool {
 	return false
 }
 
-// writeTar grava a pasta `root` em `tw`, com caminhos relativos começando pelo nome
-// da própria pasta (Documentos/…) e separador "/". Não segue links simbólicos nem
+// writeTar grava a pasta `root` em `tw`, com caminhos relativos começando por `base`
+// (o nome da pasta original: Documentos/…, mesmo lendo da cópia de sombra) e "/". Não segue links simbólicos nem
 // junções (evita laços, como "Dados de Aplicativos" no perfil do Windows). Só LÊ os
 // arquivos de origem.
-func writeTar(ctx context.Context, root string, excludes []string, tw *tar.Writer, onBytes func(int64)) (*ArchiveStats, error) {
+func writeTar(ctx context.Context, root, base string, excludes []string, tw *tar.Writer, onBytes func(int64)) (*ArchiveStats, error) {
 	st := &ArchiveStats{}
-	root = filepath.Clean(root)
-	base := filepath.Base(root)
-	if base == "." || base == string(filepath.Separator) || strings.HasSuffix(base, ":") || strings.HasSuffix(base, `:\`) {
-		base = strings.TrimRight(strings.ReplaceAll(root, ":", ""), `\/`) // C:\ -> "C"
+	if !strings.HasPrefix(root, `\\?\`) {
+		root = filepath.Clean(root) // Clean mexeria no prefixo \\?\ da cópia de sombra
 	}
 	buf := make([]byte, 1<<20)
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, walkErr error) error {

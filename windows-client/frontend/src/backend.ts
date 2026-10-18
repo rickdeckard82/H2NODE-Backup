@@ -3,7 +3,7 @@
 import * as App from "../wailsjs/go/main/App";
 import { config } from "../wailsjs/go/models";
 import { EventsOn } from "../wailsjs/runtime/runtime";
-import type { ConnectInfo, Progress, Schedule, UIState } from "./types";
+import type { ConnectInfo, Schedule, UIState } from "./types";
 
 export const backend = {
   getState: () => App.GetState() as unknown as Promise<UIState>,
@@ -16,9 +16,10 @@ export const backend = {
   saveExcludes: (lines: string[]) => App.SaveExcludes(lines),
   chooseWorkDir: () => App.ChooseWorkDir(),
   saveSchedule: (s: Schedule) => App.SaveSchedule(config.Schedule.createFrom(s)),
-  setStartWithWindows: (on: boolean) => App.SetStartWithWindows(on),
-  openLog: () => App.OpenLog(),
-  openConfigDir: () => App.OpenConfigDir(),
+  setVSS: (on: boolean) => App.SetVSS(on),
+  getLog: () => App.GetLog(),
+  elevate: () => App.Elevate(),
+  startService: () => App.StartService(),
   runNow: () => App.RunNow(),
   cancel: () => App.Cancel(),
   quit: () => App.Quit(),
@@ -26,8 +27,4 @@ export const backend = {
 
 export function onState(cb: (s: UIState) => void): () => void {
   return EventsOn("state", (s: UIState) => cb(s));
-}
-
-export function onProgress(cb: (p: Progress) => void): () => void {
-  return EventsOn("progress", (p: Progress) => cb(p));
 }

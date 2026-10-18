@@ -33,6 +33,19 @@ import (
 type Item struct {
 	Path  string `json:"path"`
 	IsDir bool   `json:"is_dir"`
+	// Source: de onde ler, se não for Path (ex.: o mesmo caminho dentro da cópia de
+	// sombra do VSS). O nome no backup continua sendo Path.
+	Source string `json:"-"`
+	// Note entra na mensagem do componente; NoteWarn o marca como aviso.
+	Note     string `json:"-"`
+	NoteWarn bool   `json:"-"`
+}
+
+func (it Item) src() string {
+	if it.Source != "" {
+		return it.Source
+	}
+	return it.Path
 }
 
 // Options de uma execução.
@@ -265,7 +278,7 @@ func packItem(ctx context.Context, o Options, work string, i int, it Item, repor
 		kind = "files"
 	}
 	comp := Component{Kind: kind, Name: truncRunes(it.Path, 255), Status: "failed"}
-	info, err := os.Stat(it.Path)
+	info, err := os.Stat(it.src())
 	switch {
 	case err != nil:
 		comp.Message = "não encontrado: " + err.Error()
@@ -274,7 +287,7 @@ func packItem(ctx context.Context, o Options, work string, i int, it Item, repor
 		comp.Message = "o caminho mudou de tipo (pasta/arquivo) desde que foi escolhido"
 		return comp, ""
 	}
-	base := filepath.Base(filepath.Clean(it.Path))
+	base := baseName(it.Path)
 	file := fmt.Sprintf("%02d-%s-%s.gpg", i+1, kind, safeName(base))
 	if it.IsDir {
 		file = fmt.Sprintf("%02d-%s-%s.tar.gz.gpg", i+1, kind, safeName(base))
@@ -315,7 +328,7 @@ func packItem(ctx context.Context, o Options, work string, i int, it Item, repor
 			}
 		}()
 		tw := tar.NewWriter(gz)
-		st, werr := writeTar(ctx, it.Path, o.Excludes, tw, onBytes)
+		st, werr := writeTar(ctx, it.src(), base, o.Excludes, tw, onBytes)
 		if werr != nil {
 			return fail("erro lendo a pasta: " + werr.Error())
 		}
@@ -337,7 +350,7 @@ func packItem(ctx context.Context, o Options, work string, i int, it Item, repor
 			warn = append(warn, "pasta vazia")
 		}
 	} else {
-		f, err := os.Open(it.Path)
+		f, err := os.Open(it.src())
 		if err != nil {
 			return fail("não foi possível ler (em uso por outro programa?): " + err.Error())
 		}
@@ -362,12 +375,28 @@ func packItem(ctx context.Context, o Options, work string, i int, it Item, repor
 	comp.PlainSize = plain.n
 	comp.PlainSHA256 = plain.sum()
 	comp.Status = "ok"
+	if it.Note != "" {
+		comp.Message = strings.TrimSpace(comp.Message + " — " + it.Note)
+		if it.NoteWarn {
+			comp.Status = "warning"
+		}
+	}
 	if len(warn) > 0 {
 		comp.Status = "warning"
 		comp.Message = strings.TrimSpace(comp.Message + " — " + strings.Join(warn, "; "))
 	}
 	comp.DurationS = int64(time.Since(t0).Seconds())
 	return comp, path
+}
+
+// baseName: "Documentos" para C:\Users\x\Documentos; "C" para a raiz C:\ (vira a pasta
+// de topo do tar e parte do nome do .gpg).
+func baseName(p string) string {
+	b := filepath.Base(filepath.Clean(p))
+	if b == `\` || b == "/" || b == "." || strings.HasSuffix(b, ":") {
+		return strings.Trim(strings.ReplaceAll(filepath.VolumeName(p), ":", ""), `\/`)
+	}
+	return b
 }
 
 func truncRunes(s string, n int) string {
