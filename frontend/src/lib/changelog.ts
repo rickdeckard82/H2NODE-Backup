@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.3";
+export const APP_VERSION = "0.9.4";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,13 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.4",
+    date: "2026-10-18",
+    changes: [
+      "Downloads: a página voltava vazia (\"Failed to fetch\") porque o nginx do painel redirecionava a lista para um endereço HTTP que o navegador bloqueia. Agora o agente Linux, o instalador do Windows e a chave pública aparecem.",
+    ],
+  },
   {
     version: "0.9.3",
     date: "2026-10-18",
