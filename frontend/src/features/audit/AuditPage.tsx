@@ -14,6 +14,8 @@ const ACTION_TONE: Record<string, Tone> = {
   delete: "red",
   login: "blue",
   lockout: "red",
+  login_failed: "red",
+  logout: "slate",
   download: "amber",
   verify: "blue",
   reset_mfa: "amber",

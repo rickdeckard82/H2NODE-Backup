@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
+import { MfaGate } from "./components/MfaGate";
 import { Spinner, ToastProvider } from "./components/ui";
 import { AppShell } from "./layouts/AppShell";
 import { useAuth, type Role } from "./lib/auth";
@@ -46,11 +47,13 @@ function Shell() {
   return (
     <ToastProvider>
       <Protected>
-        <AppShell>
-          <Suspense fallback={<Loader />}>
-            <Outlet />
-          </Suspense>
-        </AppShell>
+        <MfaGate>
+          <AppShell>
+            <Suspense fallback={<Loader />}>
+              <Outlet />
+            </Suspense>
+          </AppShell>
+        </MfaGate>
       </Protected>
     </ToastProvider>
   );

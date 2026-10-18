@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.0";
+export const APP_VERSION = "0.9.1";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.1",
+    date: "2026-10-18",
+    changes: [
+      "Segurança: 2FA obrigatório para administradores e operadores (MFA_REQUIRED_ROLES). Sem 2FA a conta só consegue ativá-lo, trocar a senha ou sair — o servidor recusa o resto.",
+      "Segurança: código 2FA errado passa a contar para o bloqueio progressivo da conta (antes só a senha contava), e conta bloqueada também recusa o código.",
+      "Auditoria: toda tentativa de login que falha (senha, usuário inexistente, código 2FA, conta bloqueada) e o logout passam a ser registrados.",
+      "Dependências: PyJWT 2.15.1 (corrige avisos publicados na 2.13), pytest 9.1.1 e golang.org/x/crypto v0.58 no cliente Windows.",
+    ],
+  },
   {
     version: "0.9.0",
     date: "2026-10-18",

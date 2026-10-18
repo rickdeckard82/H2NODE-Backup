@@ -7,7 +7,7 @@ packages = { find = { include = ["app*"] } }
 
 [project]
 name = "pulse-backup-backend"
-version = "0.9.0"
+version = "0.9.1"
 description = "API e worker do Pulse Backup (gestão de backups cifrados de servidores Linux)"
 requires-python = ">=3.12"
 dependencies = [
@@ -19,7 +19,7 @@ dependencies = [
     "alembic==1.14.0",
     "pydantic==2.10.4",
     "pydantic-settings==2.7.0",
-    "pyjwt==2.13.0",
+    "pyjwt==2.15.1",
     "argon2-cffi==23.1.0",
     "cryptography==50.0.1",
     "pyotp==2.10.0",
@@ -33,7 +33,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest==8.3.4",
+    "pytest==9.1.1",
     "httpx==0.28.1",
     "ruff==0.8.4",
 ]

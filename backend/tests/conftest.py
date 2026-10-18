@@ -5,6 +5,8 @@ os.environ.setdefault("FERNET_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
 os.environ.setdefault("COOKIE_SECURE", "false")
 os.environ.setdefault("BOOTSTRAP_ADMIN_PASSWORD", "changeme-admin-123")
+# 2FA obrigatório é testado à parte (test_security.py); os demais testes usam admin sem 2FA
+os.environ.setdefault("MFA_REQUIRED_ROLES", "")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

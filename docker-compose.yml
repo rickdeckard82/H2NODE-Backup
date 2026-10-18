@@ -32,6 +32,8 @@ x-backend-env: &backend-env
   INCOMING_STALE_HOURS: ${INCOMING_STALE_HOURS:-12}
   REVERIFY_INTERVAL_DAYS: ${REVERIFY_INTERVAL_DAYS:-30}
   OVERDUE_GRACE_MINUTES: ${OVERDUE_GRACE_MINUTES:-120}
+  # 2FA obrigatório para estes papéis (vazio = opcional; "-" e não ":-" para aceitar vazio)
+  MFA_REQUIRED_ROLES: ${MFA_REQUIRED_ROLES-admin,operator}
   RECEIVERS_SHARED_DIR: /netcfg
   NET_PUBLIC_HOST: ${NET_PUBLIC_HOST:-}
   FTP_PORT: ${FTP_PORT:-21}

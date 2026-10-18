@@ -30,6 +30,7 @@ export POSTGRES_PASSWORD=e2e-postgres
 export JWT_SECRET="$(openssl rand -hex 32)"
 export FERNET_KEY="$(openssl rand -base64 32 | tr '+/' '-_')"
 export BOOTSTRAP_ADMIN_PASSWORD="e2e-admin-password"
+export MFA_REQUIRED_ROLES=""   # o e2e usa a API como admin sem 2FA
 export SSH_PUBLIC_HOST=host.docker.internal
 export SSH_PUBLIC_PORT=$SSH_PORT
 export WEB_PORT PUBLIC_DOMAIN=localhost ACME_EMAIL=e2e@localhost

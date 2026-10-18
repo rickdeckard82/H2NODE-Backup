@@ -83,7 +83,9 @@ desafio **TLS-ALPN-01** pela 443 (basta ela liberada) ou **HTTP-01** pela 80. Os
 certificados ficam no volume `caddy_data` — não apague (o Let's Encrypt limita
 emissões repetidas).
 
-Painel: `https://PUBLIC_DOMAIN` (usuário `admin`, senha mostrada pelo `make init`).
+Painel: `https://PUBLIC_DOMAIN` (usuário `admin`, senha mostrada pelo `make init`). No primeiro
+acesso o painel exige ativar o 2FA (aplicativo autenticador): administradores e operadores só
+usam o painel com 2FA (`MFA_REQUIRED_ROLES`, no `.env`; vazio deixa opcional).
 
 ## 5. Atualização
 

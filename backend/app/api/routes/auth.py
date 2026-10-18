@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import client_ip, enforce_csrf, get_current_user
+from app.api.deps import client_ip, enforce_csrf, get_current_user, mfa_setup_pending
 from app.core.config import settings
 from app.core.crypto import decrypt, encrypt
 from app.core.db import get_db
@@ -52,6 +52,39 @@ _TOKEN_GC_KEEP_DAYS = 1  # remove tokens expirados/revogados há mais de 1 dia
 
 def _lockout_minutes(strikes: int) -> int:
     return min(_LOCKOUT_BASE_MINUTES * (2 ** max(strikes - 1, 0)), _LOCKOUT_CAP_MINUTES)
+
+
+def me_out(user: SystemUser) -> MeOut:
+    out = MeOut.model_validate(user)
+    out.mfa_setup_required = mfa_setup_pending(user)
+    return out
+
+
+def _locked(user: SystemUser) -> bool:
+    return bool(user.locked_until and user.locked_until > utcnow())
+
+
+def _register_failure(db: Session, request: Request, user: SystemUser | None, username: str,
+                      reason: str) -> None:
+    """Toda falha de login (senha OU código 2FA) entra na auditoria e conta para o bloqueio
+    progressivo da conta — o 2FA não pode ser tentado à vontade por quem já tem a senha."""
+    audit.record(
+        db, action="login_failed", entity_type="system_user", entity_id=user.id if user else None,
+        actor_username=(user.username if user else username)[:64], ip_address=client_ip(request),
+        user_agent=request.headers.get("user-agent"), after={"reason": reason},
+    )
+    if user is not None:
+        user.failed_login_count += 1
+        if user.failed_login_count >= _MAX_FAILED_LOGINS:
+            user.lockout_strikes += 1
+            user.locked_until = utcnow() + timedelta(minutes=_lockout_minutes(user.lockout_strikes))
+            user.failed_login_count = 0
+            audit.record(
+                db, action="lockout", entity_type="system_user", entity_id=user.id,
+                actor_username=user.username, ip_address=client_ip(request),
+                after={"locked_until": user.locked_until, "reason": reason},
+            )
+    db.commit()
 
 
 def _mfa_code_ok(user: SystemUser, code: str) -> bool:
@@ -135,7 +168,7 @@ def _complete_login(
         user_agent=request.headers.get("user-agent"),
     )
     db.commit()
-    return SessionOut(user=MeOut.model_validate(user), csrf_token=csrf)
+    return SessionOut(user=me_out(user), csrf_token=csrf)
 
 
 @router.post("/login", response_model=SessionOut)
@@ -148,7 +181,11 @@ def login(
     ).scalar_one_or_none()
 
     # Conta bloqueada por tentativas malsucedidas.
-    if user is not None and user.locked_until and user.locked_until > utcnow():
+    if user is not None and _locked(user):
+        audit.record(db, action="login_failed", entity_type="system_user", entity_id=user.id,
+                     actor_username=user.username, ip_address=client_ip(request),
+                     after={"reason": "conta bloqueada"})
+        db.commit()
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             "conta temporariamente bloqueada por excesso de tentativas; tente mais tarde",
@@ -161,20 +198,8 @@ def login(
     )
 
     if user is None or not password_ok:
-        if user is not None:
-            user.failed_login_count += 1
-            if user.failed_login_count >= _MAX_FAILED_LOGINS:
-                user.lockout_strikes += 1
-                user.locked_until = utcnow() + timedelta(
-                    minutes=_lockout_minutes(user.lockout_strikes)
-                )
-                user.failed_login_count = 0
-                audit.record(
-                    db, action="lockout", entity_type="system_user", entity_id=user.id,
-                    actor_username=user.username, ip_address=client_ip(request),
-                    after={"locked_until": user.locked_until},
-                )
-            db.commit()
+        _register_failure(db, request, user, body.username,
+                          "usuário inexistente" if user is None else "senha incorreta")
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "credenciais inválidas")
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "conta desativada")
@@ -202,7 +227,13 @@ def verify_mfa(
     user = db.get(SystemUser, int(payload["sub"]))
     if user is None or not user.is_active or not user.mfa_enabled or not user.mfa_secret:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "sessão de 2FA inválida")
+    if _locked(user):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "conta temporariamente bloqueada por excesso de tentativas; tente mais tarde",
+        )
     if not _mfa_code_ok(user, body.code):
+        _register_failure(db, request, user, user.username, "código 2FA inválido")
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "código de 2FA inválido")
     return _complete_login(db, response, user, request)
 
@@ -249,6 +280,10 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)) 
             db.query(RefreshToken).filter(RefreshToken.jti == payload["jti"]).update(
                 {"revoked": True}
             )
+            user = db.get(SystemUser, int(payload["sub"]))
+            if user is not None:
+                audit.record(db, action="logout", entity_type="system_user", entity_id=user.id,
+                             actor_id=user.id, actor_username=user.username, ip_address=client_ip(request))
             db.commit()
         except jwt.InvalidTokenError:
             pass
@@ -258,7 +293,7 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)) 
 
 @router.get("/me", response_model=MeOut)
 def me(user: SystemUser = Depends(get_current_user)) -> MeOut:
-    return MeOut.model_validate(user)
+    return me_out(user)
 
 
 @router.patch("/me", response_model=MeOut, dependencies=[Depends(enforce_csrf)])
@@ -277,7 +312,7 @@ def update_me(
         user.timezone = body.timezone
     db.commit()
     db.refresh(user)
-    return MeOut.model_validate(user)
+    return me_out(user)
 
 
 @router.patch("/me/password", response_model=Message, dependencies=[Depends(enforce_csrf)])

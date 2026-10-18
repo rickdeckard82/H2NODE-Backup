@@ -26,6 +26,8 @@ class MeOut(BaseModel):
     timezone: str
     mfa_enabled: bool
     mfa_recovery_codes_remaining: int = 0
+    # papel exige 2FA e a conta ainda não ativou: o painel só deixa ativar (ver deps)
+    mfa_setup_required: bool = False
     last_login_at: UtcDatetime | None
 
 

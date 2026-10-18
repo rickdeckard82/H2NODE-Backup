@@ -29,6 +29,20 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> SystemU
     return user
 
 
+def mfa_setup_pending(user: SystemUser) -> bool:
+    """Papel exige 2FA (MFA_REQUIRED_ROLES) e a conta ainda não ativou."""
+    return not user.mfa_enabled and user.role.value in settings.mfa_required_role_set
+
+
+def require_mfa_ready(user: SystemUser) -> SystemUser:
+    if mfa_setup_pending(user):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "2FA obrigatório: ative a autenticação em duas etapas para usar o painel",
+        )
+    return user
+
+
 def enforce_csrf(request: Request) -> None:
     """Double-submit cookie: header X-CSRF-Token deve coincidir com o cookie."""
     if request.method not in _UNSAFE_METHODS:
@@ -43,6 +57,8 @@ def require_roles(*roles: SystemRole):
     allowed: Iterable[SystemRole] = roles
 
     def _dep(user: SystemUser = Depends(get_current_user)) -> SystemUser:
+        # toda rota do painel (exceto /auth: perfil, senha e ativação do 2FA) passa aqui
+        require_mfa_ready(user)
         if user.role == SystemRole.admin:
             return user
         if user.role not in allowed:

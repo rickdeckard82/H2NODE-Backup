@@ -21,6 +21,8 @@ export interface Me {
   timezone: string;
   mfa_enabled: boolean;
   mfa_recovery_codes_remaining: number;
+  /** o papel exige 2FA e a conta ainda não ativou (o painel só deixa ativar) */
+  mfa_setup_required: boolean;
   last_login_at: string | null;
 }
 

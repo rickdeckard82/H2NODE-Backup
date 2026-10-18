@@ -13,6 +13,7 @@ from app.api.deps import (
     enforce_csrf,
     get_current_user,
     require_admin,
+    require_mfa_ready,
     require_auditor,
     require_operator,
 )
@@ -57,7 +58,7 @@ def download_file(
         if not downloads.check(name, t):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "link inválido ou expirado — gere outro no painel")
     else:
-        actor = get_current_user(request, db)
+        actor = require_mfa_ready(get_current_user(request, db))
     found = downloads.open_item(name)
     if found is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "arquivo não encontrado")

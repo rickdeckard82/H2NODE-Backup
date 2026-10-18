@@ -10,7 +10,7 @@
 | Interceptação na rede | SSH (KEX/cifras modernas), host key fixada no `known_hosts` do cliente (`StrictHostKeyChecking=yes`), e o conteúdo já vai cifrado. |
 | Corrupção (transferência ou disco) | SHA-256 por arquivo conferido na chegada e na reverificação periódica; MDC do GPG; teste do conteúdo decifrado. |
 | Backup "verde" que não restaura | Verificação profunda: tar lido até o fim, dump com marcador final, destinatário GPG correto. |
-| Acesso indevido ao painel | Login com Argon2id, bloqueio progressivo após 5 erros, rate-limit, 2FA TOTP com códigos de recuperação, cookies `HttpOnly`/`SameSite=Strict`/`Secure`, CSRF double-submit, refresh token com rotação e detecção de reuso, papéis, trilha de auditoria (inclusive downloads). |
+| Acesso indevido ao painel | Login com Argon2id, bloqueio progressivo após 5 erros (senha **ou código 2FA**: os dois contam), rate-limit, 2FA TOTP com códigos de recuperação **obrigatório para administrador e operador** (`MFA_REQUIRED_ROLES`; sem 2FA a conta só consegue ativá-lo), toda falha de login auditada, cookies `HttpOnly`/`SameSite=Strict`/`Secure`, CSRF double-submit, refresh token com rotação e detecção de reuso, papéis, trilha de auditoria (inclusive downloads). |
 
 ## Envio por HTTPS (cliente Windows)
 

@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(alias="JWT_SECRET")
     jwt_algorithm: str = "HS256"
     access_token_ttl_minutes: int = Field(default=15, alias="ACCESS_TOKEN_TTL_MINUTES")
+    # Papéis que só usam o painel com 2FA ativo (separados por vírgula; vazio = 2FA opcional).
+    # Sem 2FA, a conta só consegue ativá-lo, trocar a senha e sair.
+    mfa_required_roles: str = Field(default="admin,operator", alias="MFA_REQUIRED_ROLES")
     refresh_token_ttl_days: int = Field(default=7, alias="REFRESH_TOKEN_TTL_DAYS")
     fernet_key: str = Field(alias="FERNET_KEY")
 
@@ -131,6 +134,10 @@ class Settings(BaseSettings):
         if len(v) < 32:
             raise ValueError("JWT_SECRET deve ter no mínimo 32 caracteres (use: openssl rand -hex 32)")
         return v
+
+    @property
+    def mfa_required_role_set(self) -> set[str]:
+        return {r.strip() for r in self.mfa_required_roles.split(",") if r.strip()}
 
     @property
     def access_cookie_name(self) -> str:
