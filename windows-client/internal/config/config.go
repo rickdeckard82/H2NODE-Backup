@@ -142,7 +142,26 @@ func (s *Store) LoadHistory() History {
 	defer s.mu.Unlock()
 	var h History
 	_ = readJSON(filepath.Join(s.dir, "history.json"), &h)
+	repairHistory(&h)
 	return h
+}
+
+// repairHistory: até o cliente 0.2.3 o FinishedAt saía zerado (ano 1) — usa a hora de
+// início nesses registros e refaz o último sucesso/tentativa a partir deles.
+func repairHistory(h *History) {
+	for i := range h.Runs {
+		if r := &h.Runs[i]; r.FinishedAt.IsZero() {
+			r.FinishedAt = r.StartedAt
+		}
+	}
+	for _, r := range h.Runs { // mais recente primeiro
+		if h.LastAttempt.IsZero() {
+			h.LastAttempt = r.FinishedAt
+		}
+		if h.LastSuccess.IsZero() && (r.Status == "success" || r.Status == "partial") {
+			h.LastSuccess = r.FinishedAt
+		}
+	}
 }
 
 // AddRun registra uma execução no histórico.
@@ -151,6 +170,10 @@ func (s *Store) AddRun(r engine.Result) (History, error) {
 	defer s.mu.Unlock()
 	var h History
 	_ = readJSON(filepath.Join(s.dir, "history.json"), &h)
+	repairHistory(&h)
+	if r.FinishedAt.IsZero() {
+		r.FinishedAt = time.Now().UTC()
+	}
 	h.LastAttempt = r.FinishedAt
 	if r.Status == "success" || r.Status == "partial" {
 		h.LastSuccess = r.FinishedAt

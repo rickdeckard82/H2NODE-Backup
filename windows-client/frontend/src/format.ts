@@ -19,8 +19,9 @@ export function fmtDate(v: string | null | undefined): string {
 
 export function fmtAgo(v: string | null | undefined): string {
   if (!v) return "nunca";
-  const s = (Date.now() - new Date(v).getTime()) / 1000;
-  if (Number.isNaN(s)) return "—";
+  const t = new Date(v);
+  if (Number.isNaN(t.getTime()) || t.getFullYear() < 2000) return "—";
+  const s = (Date.now() - t.getTime()) / 1000;
   if (s < 60) return "agora há pouco";
   if (s < 3600) return `há ${Math.floor(s / 60)} min`;
   if (s < 86400) return `há ${Math.floor(s / 3600)} h`;

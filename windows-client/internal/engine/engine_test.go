@@ -151,6 +151,9 @@ func TestRunEndToEnd(t *testing.T) {
 	if res.Status != "partial" { // o item que sumiu falha; os outros vão
 		t.Fatalf("status %q, erros %v", res.Status, res.Errors)
 	}
+	if res.FinishedAt.IsZero() || res.FinishedAt.Before(res.StartedAt) {
+		t.Fatalf("hora de término %v (início %v)", res.FinishedAt, res.StartedAt)
+	}
 	var m Manifest
 	if err := json.Unmarshal(fs.manifest[res.RunName], &m); err != nil {
 		t.Fatal(err)

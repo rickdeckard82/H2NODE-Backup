@@ -141,8 +141,10 @@ func (c *countingHash) sum() string { return hex.EncodeToString(c.h.Sum(nil)) }
 
 // Run executa o backup. Erros de um item viram componente "failed" e o backup segue;
 // falha de envio (rede) interrompe os itens restantes.
-func Run(ctx context.Context, cl *api.Client, o Options, report func(Progress), logf func(string, ...any)) Result {
-	res := Result{StartedAt: time.Now().UTC(), Status: "failed"}
+// Retorno nomeado de propósito: o defer que marca FinishedAt precisa alterar o valor
+// devolvido (com `return res` sem nome, a cópia sai antes do defer e a hora fica zerada).
+func Run(ctx context.Context, cl *api.Client, o Options, report func(Progress), logf func(string, ...any)) (res Result) {
+	res = Result{StartedAt: time.Now().UTC(), Status: "failed"}
 	if report == nil {
 		report = func(Progress) {}
 	}

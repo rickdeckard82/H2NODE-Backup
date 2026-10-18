@@ -98,3 +98,27 @@ func TestStoreTokenAndHistory(t *testing.T) {
 		t.Fatalf("histórico inesperado: %d runs", len(h.Runs))
 	}
 }
+
+func TestHistoryRepairsZeroFinishedAt(t *testing.T) {
+	st, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// registro de antes do 0.2.3: FinishedAt zerado, último sucesso nunca gravado
+	start := time.Date(2026, 10, 18, 21, 0, 0, 0, time.UTC)
+	if err := writeJSON(st.dir+"/history.json", History{Runs: []engine.Result{{StartedAt: start, Status: "success"}}}); err != nil {
+		t.Fatal(err)
+	}
+	h := st.LoadHistory()
+	if !h.Runs[0].FinishedAt.Equal(start) || !h.LastSuccess.Equal(start) || !h.LastAttempt.Equal(start) {
+		t.Fatalf("histórico não reparado: %+v", h)
+	}
+	// execução nova sem FinishedAt (não deveria acontecer) ganha a hora atual
+	h, err = st.AddRun(engine.Result{StartedAt: start, Status: "failed"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.Runs[0].FinishedAt.IsZero() || !h.LastSuccess.Equal(start) {
+		t.Fatalf("AddRun: %+v", h)
+	}
+}

@@ -12,7 +12,7 @@
   "info": {
     "companyName": "Pulse Backup",
     "productName": "Pulse Backup",
-    "productVersion": "0.2.3",
+    "productVersion": "0.2.4",
     "copyright": "",
     "comments": "Cliente Windows do Pulse Backup: backup cifrado de pastas e arquivos"
   }
