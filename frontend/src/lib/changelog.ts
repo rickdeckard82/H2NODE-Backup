@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.7.2";
+export const APP_VERSION = "0.7.3";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.3",
+    date: "2026-10-18",
+    changes: [
+      "Agente 1.3.0 (cPanel): confere se todas as contas do servidor têm backup na pasta do dia. Cada conta que faltar (backup do WHM ainda rodando ou conta pulada) aparece como falha e a execução fica parcial, em vez de parecer completa. Respeita contas com backup desligado, suspensas e criadas há menos de 24 h; desligue com CPANEL_CHECK_ACCOUNTS=\"no\".",
+      "Ajuda → cPanel / WHM: horário recomendado do agente à noite (depois do backup do WHM) e como investigar um dia com contas faltando.",
+    ],
+  },
   {
     version: "0.7.2",
     date: "2026-10-18",

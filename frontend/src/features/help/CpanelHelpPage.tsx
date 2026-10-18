@@ -21,6 +21,12 @@ export default function CpanelHelpPage() {
             agente acusa falha em vez de reenviar a de ontem.
           </li>
           <li>
+            Agente 1.3.0 ou mais novo: confere se <b>todas as contas</b> do servidor (<Code>/var/cpanel/users</Code>) têm backup na
+            pasta do dia. Cada conta que faltar aparece como <b>falhou</b> na execução (resultado <i>parcial</i>), em vez de a
+            execução parecer completa. Contas com backup desligado no WHM, suspensas (se o WHM não copia suspensas) e criadas há
+            menos de 24 h não contam.
+          </li>
+          <li>
             Cada conta é <b>cifrada como está</b> (sem refazer tar nem compressão), enviado e só então a <b>cópia cifrada</b> é
             apagada, antes de passar ao próximo. A pasta de trabalho só precisa caber o <b>maior</b> arquivo.
             <b>Os backups do cPanel em <Code>/backup/cpanel</Code> nunca são alterados nem apagados</b>: o agente só os lê, e
@@ -48,15 +54,21 @@ export default function CpanelHelpPage() {
         <Step n={1} title="Instale o agente no servidor cPanel (como root)">
           <p>
             Igual a <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/help/linux">Servidor Linux</Link>
-            : copie a pasta <Code>agent/</Code> e rode o instalador. Use a <b>versão 1.1.0 ou mais nova</b> do agente (é a
-            que entende <Code>BACKUP_FILES</Code>).
+            : copie a pasta <Code>agent/</Code> e rode o instalador. Use a <b>versão 1.3.0 ou mais nova</b> do agente (entende{" "}
+            <Code>BACKUP_FILES</Code> e confere as contas do dia).
           </p>
-          <CopyBlock label="Comandos" text={`scp -r agent/ root@<ip-do-cpanel>:/root/pulse-agent\n# no cPanel, como root:\ncd /root/pulse-agent && ./install.sh --cron "0 6 * * *"`} />
+          <CopyBlock label="Comandos" text={`scp -r agent/ root@<ip-do-cpanel>:/root/pulse-agent\n# no cPanel, como root:\ncd /root/pulse-agent && ./install.sh --cron "0 22 * * *"`} />
           <p>
-            Escolha o horário <b>depois</b> que o backup do cPanel termina. Arquivos alterados há menos de 10 minutos
-            (<Code>FILES_MIN_AGE_MINUTES</Code>) ainda estão sendo gravados e o agente se recusa a enviá-los. A data de{" "}
-            <Code>@today</Code> é a do relógio do servidor do cPanel: o horário do cron deve ser <b>no mesmo dia</b> em que o
-            cPanel termina (por exemplo, o cPanel termina às 04:00 e o agente roda às 06:00).
+            Escolha o horário <b>depois</b> que o backup do cPanel termina, com folga. O backup do WHM começa às 02:00 (padrão) e a
+            duração muda muito de um dia para outro: num servidor grande ele pode terminar de madrugada num dia e no meio da
+            tarde no outro. Por isso o recomendado é rodar o agente <b>à noite</b> (ex.: 22:00): o WHM já terminou e os dois
+            não disputam o disco. A data de <Code>@today</Code> é a do relógio do servidor do cPanel, então o agente tem de rodar
+            no <b>mesmo dia</b> em que o backup do WHM começou.
+          </p>
+          <p>
+            Arquivos alterados há menos de 10 minutos (<Code>FILES_MIN_AGE_MINUTES</Code>) ainda estão sendo gravados e não são
+            enviados. O horário do WHM fica em WHM → Server Configuration → <i>Configure cPanel Cron Jobs</i> (comando{" "}
+            <Code>/usr/local/cpanel/bin/backup</Code>); os dias, em Backup Configuration.
           </p>
         </Step>
 
@@ -101,8 +113,28 @@ BWLIMIT=""`}
         <Step n={4} title="Teste e rode o primeiro backup">
           <CopyBlock label="No cPanel" text={`sudo pulse-backup-agent test   # lista quantos arquivos achou e confere o espaço em WORK_DIR\nsudo pulse-backup-agent run`} />
           <p>
-            O <Code>test</Code> avisa se o <Code>WORK_DIR</Code> não comporta o maior arquivo. Acompanhe o envio em{" "}
-            <Code>/var/log/pulse-backup.log</Code>.
+            O <Code>test</Code> avisa se o <Code>WORK_DIR</Code> não comporta o maior arquivo e lista as contas sem backup na
+            pasta de hoje. Acompanhe o envio em <Code>/var/log/pulse-backup.log</Code>.
+          </p>
+        </Step>
+
+        <Step n={5} title="Se faltarem contas num dia">
+          <p>
+            Veja se o WHM terminou antes de o agente rodar: compare a hora da última conta gravada com a hora de início do agente
+            (o log do agente está em UTC; o <Code>ls</Code>, no horário do servidor).
+          </p>
+          <CopyBlock
+            label="No cPanel"
+            text={`ls /backup/cpanel/AAAA-MM-DD/accounts | wc -l
+ls -l --time-style=+%F_%T /backup/cpanel/AAAA-MM-DD/accounts | sort -k6 | tail -1
+grep 'AAAA-MM-DD' /var/log/pulse-backup.log | grep -E 'início|enviado|FALHOU'
+ls -t /usr/local/cpanel/logs/cpbackup/ | head -3`}
+          />
+          <p>
+            Agente antes do fim do WHM: mova o cron para mais tarde. Contas faltando na própria pasta do WHM: veja o log do
+            backup do cPanel (espaço em disco é a causa mais comum). Para reenviar um dia, troque <Code>@today</Code> pela data
+            (ex.: <Code>2026-10-17</Code>) no <Code>agent.conf</Code>, rode <Code>pulse-backup-agent run</Code> e volte ao{" "}
+            <Code>@today</Code>.
           </p>
         </Step>
       </Card>

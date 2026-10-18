@@ -317,6 +317,10 @@ BACKUP_FILES=(
 )
 # "@latest" no lugar de "@today" pega a pasta datada mais recente (reenvia a de ontem se a de hoje falhar).
 # Arquivo alterado há menos de FILES_MIN_AGE_MINUTES (padrão 10) ainda está em gravação: não é enviado.
+# Servidor cPanel: o agente confere se TODAS as contas (/var/cpanel/users) têm backup na pasta
+# ".../accounts/" do dia; cada conta que faltar vira falha no painel (backup do WHM ainda rodando
+# ou conta pulada). Respeita contas com backup desligado e "Backup Suspended Accounts".
+# CPANEL_CHECK_ACCOUNTS="auto"   # auto (padrão) | no
 # Pastas pequenas (ex.: a pasta "system" do cPanel) vão inteiras, em BACKUP_PATHS, também com "@today":
 #   BACKUP_PATHS=( "/etc" "/backup/cpanel/@today/system" )
 

@@ -100,7 +100,9 @@ BACKUP_PATHS=( "/etc" "/backup/cpanel/@today/system" )       # a pasta system, p
 `@today` vira a data do servidor (`2026-10-16`) e **falha se a pasta de hoje não existir**
 (não reenvia a de ontem); `@latest` pega a pasta datada mais recente. Arquivo alterado há menos
 de `FILES_MIN_AGE_MINUTES` (10) ainda está sendo gravado e não é enviado — agende o agente
-depois que o backup do cPanel termina. A verificação confere o gzip até o fim e o SHA-256 do
+depois que o backup do cPanel termina (à noite, ex. 22:00: a duração do backup do WHM varia
+muito). O agente confere se todas as contas de `/var/cpanel/users` têm backup na pasta do dia
+e acusa cada uma que faltar (`CPANEL_CHECK_ACCOUNTS`). A verificação confere o gzip até o fim e o SHA-256 do
 conteúdo. Em **Contas cPanel** (menu) há uma linha por conta, com busca, versões e download.
 Planeje o espaço: o `.tar.gz` não comprime nem deduplica (um dia completo pode passar de 400 GB).
 

@@ -32,7 +32,7 @@ umask 077
 # devolver variáveis). Funciona porque o script não tem controle de jobs.
 shopt -s lastpipe
 
-AGENT_VERSION="1.2.0"
+AGENT_VERSION="1.3.0"
 CONF_DIR="/etc/pulse-backup"
 CONF_FILE="${PULSE_BACKUP_CONF:-$CONF_DIR/agent.conf}"
 LOCK_FILE="/run/pulse-backup-agent.lock"
@@ -105,6 +105,7 @@ load_config() {
     GPG_PUBLIC_KEY="$CONF_DIR/backup-key.pub.asc"; GPG_FINGERPRINT=""
     WORK_DIR="/var/tmp/pulse-backup"
     BACKUP_PATHS=(); EXCLUDES=(); ONE_FILE_SYSTEM="no"; BACKUP_FILES=(); FILES_MIN_AGE_MINUTES="10"
+    CPANEL_CHECK_ACCOUNTS="auto"
     MYSQL_ENABLED="no"; MYSQL_DATABASES=("all"); MYSQL_DEFAULTS_FILE=""; MYSQL_DUMP_OPTS=""
     POSTGRES_ENABLED="no"; POSTGRES_DATABASES=("all"); POSTGRES_OS_USER="postgres"; POSTGRES_GLOBALS="yes"
     MSSQL_ENABLED="no"; MSSQL_DATABASES=("all"); MSSQL_SERVER="localhost"; MSSQL_USER="sa"
@@ -119,6 +120,7 @@ load_config() {
     [[ "$SERVER_PORT" =~ ^[0-9]+$ ]] || die "SERVER_PORT inválido"
     [[ "$UPLOAD_RETRIES" =~ ^[0-9]+$ ]] || UPLOAD_RETRIES=3
     [[ "$FILES_MIN_AGE_MINUTES" =~ ^[0-9]+$ ]] || FILES_MIN_AGE_MINUTES=10
+    case "$CPANEL_CHECK_ACCOUNTS" in auto|yes|no) ;; *) CPANEL_CHECK_ACCOUNTS="auto" ;; esac
 }
 
 # ----------------------------------------------------------------------- GPG --
@@ -164,6 +166,12 @@ ERRORS=()
 COMP_INDEX=0
 ANY_FAILED=0
 ANY_OK=0
+# Conferência das contas do cPanel: contas presentes nas pastas ".../accounts/" do BACKUP_FILES.
+declare -A CPANEL_PRESENT=()
+CPANEL_DIRS=()
+CPANEL_USERS_DIR="/var/cpanel/users"
+CPANEL_BACKUP_CONFIG="/var/cpanel/backups/config"
+CPANEL_EXT=".tar.gz"
 
 # encrypt_stream <arquivo-saida.gpg>  — lê stdin, calcula SHA-256/tamanho do que
 # entra (conteúdo comprimido, antes da cifra) e grava o .gpg.
@@ -314,6 +322,76 @@ upload_one() {
     rm -f "$RUN_DIR/$1"
 }
 
+# ---- cPanel: contas que o WHM deveria ter copiado e não estão na pasta do dia
+
+# cpanel_check_on <padrão> — a conferência vale para este padrão do BACKUP_FILES?
+# auto/yes: padrões com "/accounts/" (backup de contas do WHM) num servidor com cPanel.
+cpanel_check_on() {
+    [ "$CPANEL_CHECK_ACCOUNTS" != "no" ] || return 1
+    [[ "$1" == */accounts/* ]] || return 1
+    [ -d "$CPANEL_USERS_DIR" ]
+}
+
+# account_of <arquivo> — "abcs.tar.gz" -> "abcs"
+account_of() {
+    local n="${1##*/}"
+    n="${n%.tar.gz}"; n="${n%.tgz}"; n="${n%.tar.zst}"; n="${n%.tar}"
+    printf '%s' "$n"
+}
+
+# cpanel_note_files <arquivo>... — registra as contas encontradas (antes de enviar: o que
+# conta é o WHM ter gerado; falha de envio já vira componente próprio).
+cpanel_note_files() {
+    local f
+    for f in "$@"; do
+        [ -f "$f" ] || continue
+        CPANEL_PRESENT["$(account_of "$f")"]=1
+        case "$f" in *.tar.gz) CPANEL_EXT=".tar.gz" ;; *.tgz) CPANEL_EXT=".tgz" ;; *.tar) CPANEL_EXT=".tar" ;; esac
+    done
+    CPANEL_DIRS+=("$(dirname "$1")")
+}
+
+# cpanel_expected_accounts — contas que o WHM deve copiar, uma por linha. Respeita a
+# configuração do WHM: backup de contas desligado, conta com backup desligado (BACKUP=0)
+# e contas suspensas quando "Backup Suspended Accounts" está desligado. Ignora contas
+# criadas nas últimas 24 h (podem ter nascido depois do backup começar).
+cpanel_expected_accounts() {
+    local cfg="$CPANEL_BACKUP_CONFIG" f u start skip_susp=0 now
+    grep -qE "^BACKUPACCTS: *'?(no|0)'?\s*$" "$cfg" 2>/dev/null && return 0
+    grep -qE "^BACKUPSUSPENDEDACCTS: *'?(no|0)'?\s*$" "$cfg" 2>/dev/null && skip_susp=1
+    now="$(date +%s)"
+    for f in "$CPANEL_USERS_DIR"/*; do
+        [ -f "$f" ] || continue
+        u="${f##*/}"
+        [[ "$u" =~ ^[a-z0-9][a-z0-9_.-]*$ ]] || continue
+        grep -q '^BACKUP=0' "$f" && continue
+        [ "$skip_susp" -eq 1 ] && grep -q '^SUSPENDED=1' "$f" && continue
+        start="$(sed -n 's/^STARTDATE=\([0-9][0-9]*\).*/\1/p' "$f" | head -n 1)"
+        [ -n "$start" ] && [ $((now - start)) -lt 86400 ] && continue
+        printf '%s\n' "$u"
+    done
+}
+
+# cpanel_missing_accounts — contas esperadas que não estão em nenhuma pasta conferida.
+cpanel_missing_accounts() {
+    local u
+    while read -r u; do
+        [ -n "$u" ] && [ -z "${CPANEL_PRESENT[$u]:-}" ] && printf '%s\n' "$u"
+    done < <(cpanel_expected_accounts | sort)
+}
+
+# check_cpanel_accounts — cada conta sem backup do dia vira um componente "falhou":
+# a execução fica "parcial" no painel em vez de parecer completa.
+check_cpanel_accounts() {
+    [ "${#CPANEL_DIRS[@]}" -gt 0 ] || return 0
+    local missing=() u
+    mapfile -t missing < <(cpanel_missing_accounts)
+    [ "${#missing[@]}" -gt 0 ] || { log INFO "cPanel: todas as contas têm backup em ${CPANEL_DIRS[*]}"; return 0; }
+    for u in "${missing[@]}"; do
+        add_component file "$u$CPANEL_EXT" "" failed "conta sem backup do WHM em ${CPANEL_DIRS[0]} — o backup do cPanel ainda não tinha terminado (rode o agente mais tarde) ou pulou a conta (veja /usr/local/cpanel/logs/cpbackup/)" 0
+    done
+}
+
 backup_files() {
     local pat f
     for pat in "${BACKUP_FILES[@]}"; do
@@ -324,6 +402,7 @@ backup_files() {
             add_component file "$pat" "" failed "nenhum arquivo encontrado para o padrão (para @today: o backup de hoje já terminou?)" 0
             continue
         fi
+        cpanel_check_on "$pat" && cpanel_note_files "${list[@]}"
         for f in "${list[@]}"; do
             [ -f "$f" ] && [ ! -L "$f" ] || continue
             # nunca processa o que está na pasta de trabalho do próprio agente
@@ -646,6 +725,7 @@ cmd_run() {
     detect_gzip
     backup_paths
     backup_files
+    check_cpanel_accounts
     backup_mysql
     backup_postgres
     backup_mssql
@@ -755,7 +835,18 @@ cmd_test() {
             [ "$size" -gt "$biggest" ] && biggest="$size"
         done
         echo "• Arquivos $pat: $nfiles encontrado(s)"
+        cpanel_check_on "$pat" && cpanel_note_files "${list[@]}"
     done
+    if [ "${#CPANEL_DIRS[@]}" -gt 0 ]; then
+        local missing=()
+        mapfile -t missing < <(cpanel_missing_accounts)
+        if [ "${#missing[@]}" -eq 0 ]; then
+            echo "• Contas do cPanel: todas com backup em ${CPANEL_DIRS[0]} ($(cpanel_expected_accounts | wc -l) contas)"
+        else
+            # aviso, não erro: durante o backup do WHM é normal faltar conta
+            echo "! Contas do cPanel sem backup em ${CPANEL_DIRS[0]} (${#missing[@]}): ${missing[*]:0:20}$([ "${#missing[@]}" -gt 20 ] && echo " …")"
+        fi
+    fi
     if [ "$nfiles" -gt 0 ]; then
         mkdir -p "$WORK_DIR" 2>/dev/null
         local avail
