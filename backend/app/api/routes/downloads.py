@@ -47,7 +47,10 @@ class LinkOut(BaseModel):
     expires_at: UtcDatetime
 
 
-@router.get("", response_model=DownloadsOut)
+# "/list": até a v0.9.3 o nginx respondia 301 (permanente, o navegador guarda) a GET
+# /api/downloads; um endereço novo não depende do cache de cada navegador.
+@router.get("/list", response_model=DownloadsOut)
+@router.get("", response_model=DownloadsOut, include_in_schema=False)
 def list_downloads(_: SystemUser = Depends(require_auditor)) -> DownloadsOut:
     items, problems = downloads.list_items()
     return DownloadsOut(items=[DownloadOut(**vars(i)) for i in items], problems=problems)

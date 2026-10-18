@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.4";
+export const APP_VERSION = "0.9.5";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,13 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.5",
+    date: "2026-10-18",
+    changes: [
+      "Downloads: a lista passa a vir de um endereço novo, para não depender do redirecionamento antigo que os navegadores guardaram em cache.",
+    ],
+  },
   {
     version: "0.9.4",
     date: "2026-10-18",

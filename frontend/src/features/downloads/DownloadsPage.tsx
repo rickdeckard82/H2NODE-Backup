@@ -81,7 +81,7 @@ export default function DownloadsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [linkFor, setLinkFor] = useState<{ item: DownloadItem; link: LinkOut } | null>(null);
 
-  const list = useQuery({ queryKey: ["downloads"], queryFn: () => api.get<DownloadsOut>("/downloads") });
+  const list = useQuery({ queryKey: ["downloads"], queryFn: () => api.get<DownloadsOut>("/downloads/list") });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["downloads"] });
 
   const makeLink = useMutation({

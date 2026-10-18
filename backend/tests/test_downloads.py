@@ -26,7 +26,7 @@ def _agent(monkeypatch, tmp_path):
 
 def test_list_and_download_agent(auth_client, monkeypatch, tmp_path):
     _agent(monkeypatch, tmp_path)
-    items = auth_client.get("/api/downloads").json()["items"]
+    items = auth_client.get("/api/downloads/list").json()["items"]
     agent = next(i for i in items if i["platform"] == "linux")
     assert agent["name"].startswith("pulse-backup-agent-") and agent["name"].endswith(".tar.gz")
     r = auth_client.get(f"/api/downloads/file/{agent['name']}")
@@ -42,7 +42,7 @@ def test_list_and_download_agent(auth_client, monkeypatch, tmp_path):
 
 def test_temporary_link_and_auth(auth_client, client, monkeypatch, tmp_path):
     _agent(monkeypatch, tmp_path)
-    name = next(i["name"] for i in auth_client.get("/api/downloads").json()["items"] if i["platform"] == "linux")
+    name = next(i["name"] for i in auth_client.get("/api/downloads/list").json()["items"] if i["platform"] == "linux")
     link = auth_client.post(f"/api/downloads/{name}/link").json()
     assert "?t=" in link["url"]
     path = link["url"].split(settings.frontend_origin.rstrip("/"), 1)[1]
@@ -77,7 +77,7 @@ def test_built_installer(auth_client, monkeypatch, tmp_path):
     (dist / "PulseBackup-Setup-0.3.0.exe").write_bytes(exe)
     (dist / ".PulseBackup-Setup-0.3.0.exe.tmp").write_bytes(b"MZ")  # cópia pela metade: ignorada
     monkeypatch.setattr(settings, "client_dist_dir", str(dist))
-    items = auth_client.get("/api/downloads").json()["items"]
+    items = auth_client.get("/api/downloads/list").json()["items"]
     win = [i for i in items if i["platform"] == "windows"]
     assert len(win) == 1 and win[0]["source"] == "build" and win[0]["version"] == "0.3.0"
     assert win[0]["sha256"] == hashlib.sha256(exe).hexdigest()
@@ -97,7 +97,7 @@ def test_unreadable_file_does_not_hide_the_rest(auth_client, monkeypatch, tmp_pa
         raise PermissionError(13, "Permission denied", "/agent/install.sh")
 
     monkeypatch.setattr(downloads, "agent_bundle", boom)
-    r = auth_client.get("/api/downloads")
+    r = auth_client.get("/api/downloads")  # endereço antigo continua valendo
     assert r.status_code == 200
     assert not any(i["platform"] == "linux" for i in r.json()["items"])
     [problem] = r.json()["problems"]
