@@ -105,6 +105,8 @@ services:
       - ${BACKUP_STORAGE_PATH:?set BACKUP_STORAGE_PATH}:/data
       - ssh_shared:/ssh
       - receivers_shared:/netcfg
+      # Agente Linux para a página Downloads (o .tar.gz é montado na hora).
+      - ./agent:/agent:ro
       # Só a chave PÚBLICA — o backend nunca vê a privada.
       - ${SECRETS_DIR:-./secrets}/backup-key.pub.asc:/keys/backup-key.pub.asc:ro
     networks:

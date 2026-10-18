@@ -38,7 +38,14 @@ export default function LinuxHelpPage() {
         <h2 className="text-base font-bold">Criar o backup</h2>
 
         <Step n={1} title="Instale o agente no servidor cliente (como root)">
-          <p>No seu computador ou no servidor de backup, copie a pasta do agente para o cliente e instale:</p>
+          <p>
+            O mais simples: em{" "}
+            <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/downloads">
+              Downloads
+            </Link>
+            , clique em <b>Link para o servidor (1 h)</b> no agente Linux e cole os comandos no cliente (baixa, confere o
+            SHA-256 e instala). Ou copie a pasta do agente:
+          </p>
           <CopyBlock
             label="Comandos"
             text={`scp -r agent/ root@<ip-do-cliente>:/root/pulse-agent

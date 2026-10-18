@@ -13,6 +13,7 @@ const MikrotikCredentialsPage = lazy(() => import("./features/mikrotik/MikrotikC
 const MikrotikHelpPage = lazy(() => import("./features/help/MikrotikHelpPage"));
 const FtpAccountsPage = lazy(() => import("./features/settings/FtpAccountsPage"));
 const AccountsPage = lazy(() => import("./features/accounts/AccountsPage"));
+const DownloadsPage = lazy(() => import("./features/downloads/DownloadsPage"));
 const BackupsPage = lazy(() => import("./features/backups/BackupsPage"));
 const ServerPage = lazy(() => import("./features/settings/ServerPage"));
 const SystemUsersPage = lazy(() => import("./features/system-users/SystemUsersPage"));
@@ -83,6 +84,7 @@ export const router = createBrowserRouter([
       },
       { path: "backups", element: <BackupsPage /> },
       { path: "accounts", element: <AccountsPage /> },
+      { path: "downloads", element: <DownloadsPage /> },
       {
         path: "settings/ftp-accounts",
         element: (

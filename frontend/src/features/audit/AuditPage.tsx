@@ -21,6 +21,8 @@ const ACTION_TONE: Record<string, Tone> = {
   accept_host_key: "amber",
   upload_token: "amber",
   upload_token_revoke: "red",
+  upload: "amber",
+  download_link: "blue",
 };
 
 const ENTITY_LABEL: Record<string, string> = {
@@ -28,6 +30,7 @@ const ENTITY_LABEL: Record<string, string> = {
   backup: "Backup",
   system_user: "Usuário do painel",
   device_credential: "Credencial MikroTik",
+  download: "Download",
 };
 
 function pretty(json: string | null) {

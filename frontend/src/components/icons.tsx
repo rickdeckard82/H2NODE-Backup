@@ -150,6 +150,14 @@ export const ArchiveIcon = (p: IconProps) => (
   </S>
 );
 
+export const DownloadIcon = (p: IconProps) => (
+  <S {...p}>
+    <path d="M12 3v12" />
+    <path d="m7 10 5 5 5-5" />
+    <path d="M5 21h14" />
+  </S>
+);
+
 export const LockIcon = (p: IconProps) => (
   <S {...p}>
     <rect x="4" y="11" width="16" height="10" rx="2" />
@@ -193,6 +201,7 @@ export const ICONS = {
   key: KeyIcon,
   hardDrive: HardDriveIcon,
   archive: ArchiveIcon,
+  download: DownloadIcon,
   lock: LockIcon,
   router: RouterIcon,
   help: HelpIcon,

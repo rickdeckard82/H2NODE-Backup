@@ -93,6 +93,8 @@ export const api = {
     request<Blob>(path, { query, raw: true }),
   upload: <T,>(path: string, form: FormData) =>
     request<T>(path, { method: "POST", body: form, form: true }),
+  /** PUT com o arquivo como corpo (sem multipart). */
+  putFile: <T,>(path: string, file: Blob) => request<T>(path, { method: "PUT", body: file, form: true }),
 };
 
 export type Page<T> = { items: T[]; total: number; page: number; page_size: number };

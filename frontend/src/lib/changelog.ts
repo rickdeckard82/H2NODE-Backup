@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.8.0";
+export const APP_VERSION = "0.9.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,24 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.0",
+    date: "2026-10-18",
+    changes: [
+      "Nova página Downloads (menu lateral): agente Linux (.tar.gz montado na hora a partir do agente deste servidor), instalador do cliente Windows e chave pública GPG, com tamanho e SHA-256.",
+      "Link para o servidor (1 h): link de download sem login, só para aquele arquivo, com os comandos prontos para baixar, conferir o SHA-256 e instalar direto no Linux (curl) ou no Windows (PowerShell).",
+      "Administradores enviam o instalador do Windows (ou outro pacote .exe/.msi/.zip/.tar.gz) pela própria página; tudo fica na auditoria.",
+    ],
+  },
+  {
+    version: "0.8.1",
+    date: "2026-10-18",
+    changes: [
+      "Cliente Windows 0.2.0: o backup roda num serviço do Windows (conta do sistema, mesmo sem ninguém logado) e lê os arquivos de uma cópia de sombra (VSS) — Outlook .pst, planilhas e bancos abertos entram. A cópia é apagada no fim; sem VSS (pendrive, rede ou falha) lê ao vivo e marca aviso.",
+      "Cliente Windows: instalador (PulseBackup-Setup-<versão>.exe, NSIS) que registra e inicia o serviço, abre o ícone da bandeja no login de todos os usuários e cria os atalhos; desinstalador incluso. Mudar a configuração exige administrador (UAC); ver o estado e fazer backup agora, não.",
+      "Ajuda → Windows atualizada (instalador, serviço, VSS, unidades de rede).",
+    ],
+  },
   {
     version: "0.8.0",
     date: "2026-10-18",

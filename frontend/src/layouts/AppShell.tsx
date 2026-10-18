@@ -34,6 +34,7 @@ const NAV: NavEntry[] = [
   { to: "/devices", label: "Equipamentos de rede", icon: "router" },
   { to: "/backups", label: "Backups", icon: "archive" },
   { to: "/accounts", label: "Contas cPanel", icon: "database" },
+  { to: "/downloads", label: "Downloads", icon: "download" },
   {
     label: "MikroTik",
     icon: "router",

@@ -19,6 +19,7 @@ from app.api.routes import (
     clients,
     dashboard,
     device_credentials,
+    downloads,
     ftp_accounts,
     health,
     server,
@@ -118,5 +119,6 @@ for r in (
     audit.router,
     system_users.router,
     agent_upload.router,
+    downloads.router,
 ):
     app.include_router(r, prefix=_p)

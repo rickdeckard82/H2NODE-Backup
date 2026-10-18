@@ -85,6 +85,11 @@ class Settings(BaseSettings):
     # Tamanho máximo de um arquivo de configuração recebido.
     net_max_file_mb: int = Field(default=64, alias="NET_MAX_FILE_MB")
 
+    # ---- Downloads (página do painel) ----
+    # Pasta agent/ do repositório montada só-leitura: o .tar.gz do agente Linux é montado
+    # a partir dela na hora do download (sempre a versão do servidor).
+    agent_dir: str = Field(default="/agent", alias="AGENT_DIR")
+
     # ---- Coletor (puller): MikroTik por SSH ----
     # Coletas simultâneas e tempo máximo sem resposta do equipamento.
     pull_concurrency: int = Field(default=4, ge=1, le=32, alias="PULL_CONCURRENCY")

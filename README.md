@@ -107,6 +107,14 @@ e acusa cada uma que faltar (`CPANEL_CHECK_ACCOUNTS`). A verificação confere o
 conteúdo. Em **Contas cPanel** (menu) há uma linha por conta, com busca, versões e download.
 Planeje o espaço: o `.tar.gz` não comprime nem deduplica (um dia completo pode passar de 400 GB).
 
+## Downloads
+
+A página **Downloads** do painel entrega o agente Linux (um `.tar.gz` montado na hora a
+partir de `agent/`, montado só-leitura no backend), o instalador do cliente Windows
+(enviado por um administrador na própria página; fica em `BACKUP_STORAGE_PATH/downloads`)
+e a chave pública GPG, com SHA-256. **Link para o servidor (1 h)** gera um link sem login,
+assinado e só para aquele arquivo, com os comandos para baixar e instalar direto no cliente.
+
 ## Computadores Windows
 
 Em **Servidores**, cadastre o computador (sem chave SSH) e clique em **Windows → Gerar

@@ -55,9 +55,13 @@ Renomeie o arquivo gerado para `AAAAMMDD_NNNN_descricao.py` com `revision = "NNN
 
 ## Mapa
 
-- `windows-client/` — cliente Windows (Go + Wails v2 + React): `internal/engine` (tar+gzip+OpenPGP e envio),
-  `internal/api` (HTTPS `/api/agent/v1`), `internal/config` (DPAPI, agendamento). `go test ./...` + `wails build`.
-  Mudança no cliente: suba `Version` em `windows-client/main.go` e `productVersion` em `wails.json`.
+- `windows-client/` — cliente Windows (Go + Wails v2 + React): serviço LocalSystem (`internal/service`, com VSS em
+  `internal/vss`) + interface/bandeja que fala com ele por named pipes (`internal/ipc`; configuração só no pipe de
+  administrador), `internal/engine` (tar+gzip+OpenPGP e envio), `internal/api` (HTTPS `/api/agent/v1`), instalador NSIS
+  em `installer/`. `go test ./...` + `make windows-installer`. Mudança no cliente: suba `Version` (main.go),
+  `productVersion` (wails.json) e `version` (frontend/package.json).
+- `backend/app/services/downloads.py` + `routes/downloads.py` — página Downloads (agente Linux gerado de `agent/`,
+  montado em AGENT_DIR; envios do admin em `STORAGE_PATH/downloads`; links temporários assinados).
 - `backend/app/api/routes/agent_upload.py` — envio HTTPS só-gravação do cliente Windows (token por cliente, hash no banco).
 - `agent/` — agente bash + instalador + exemplo de `agent.conf` (`BACKUP_PATHS` tar+gzip; `BACKUP_FILES` arquivos como estão; `@today`/`@latest`).
 - `sshd/` — receptor rsync/SSH (Debian + rrsync).

@@ -28,6 +28,14 @@
   conexão (conferindo a impressão digital). Se o servidor passar a anunciar outra chave, o
   cliente para em vez de cifrar para ela. No Windows, o token fica protegido por DPAPI.
 
+## Downloads
+
+A página Downloads exige login. O "link para o servidor" é um HMAC (JWT_SECRET) do nome
+do arquivo + validade de 1 hora: baixa só aquele arquivo, sem login, até expirar (gerar e
+usar ficam na auditoria). Só administradores enviam arquivos, com nome e extensão restritos
+(`.exe/.msi/.zip/.tar.gz`, nada servido como página) e até 512 MB; o agente Linux é gerado
+da pasta `agent/` do servidor (só-leitura), nunca de um envio.
+
 ## Equipamentos de rede (FTP/TFTP)
 
 FTP e TFTP não têm criptografia: a configuração e a senha FTP trafegam em claro. O
