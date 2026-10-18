@@ -111,15 +111,19 @@ Planeje o espaço: o `.tar.gz` não comprime nem deduplica (um dia completo pode
 
 A página **Downloads** do painel entrega o agente Linux (um `.tar.gz` montado na hora a
 partir de `agent/`, montado só-leitura no backend), o instalador do cliente Windows
-(enviado por um administrador na própria página; fica em `BACKUP_STORAGE_PATH/downloads`)
-e a chave pública GPG, com SHA-256. **Link para o servidor (1 h)** gera um link sem login,
+(compilado pelo serviço `client-builder` — Go + Wails + NSIS no Docker, sem Windows — a cada
+`docker compose build` em que `windows-client/` mudou) e a chave pública GPG, com SHA-256.
+Atualizou o servidor (`git pull && docker compose build && docker compose up -d`), os
+downloads já são as versões novas. Outros pacotes podem ser enviados em **Enviar arquivo**
+(ficam em `BACKUP_STORAGE_PATH/downloads`). **Link para o servidor (1 h)** gera um link sem login,
 assinado e só para aquele arquivo, com os comandos para baixar e instalar direto no cliente.
 
 ## Computadores Windows
 
 Em **Servidores**, cadastre o computador (sem chave SSH) e clique em **Windows → Gerar
-token**. No `PulseBackup.exe` (gerado com `wails build` em `windows-client/`), cole o
-endereço do painel e o token, confira a impressão digital da chave GPG e escolha pastas,
+token**. Baixe o `PulseBackup-Setup-<versão>.exe` em **Downloads** e instale como
+administrador (Windows 10/11 ou Windows Server de 64 bits; no Server o instalador oferece
+instalar o WebView2 junto). Na janela de configuração, cole o endereço do painel e o token, confira a impressão digital da chave GPG e escolha pastas,
 arquivos e horário. O aplicativo fica na bandeja, abre com o Windows, cifra cada item no
 próprio computador e envia por HTTPS — o worker verifica como qualquer outro backup.
 Passo a passo em **Ajuda → Windows**.

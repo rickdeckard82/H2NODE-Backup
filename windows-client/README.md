@@ -33,20 +33,26 @@ e marca o item como aviso.
 
 ## Gerar
 
-Requisitos: Go 1.24+, Node 20+, Wails CLI v2 (`go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0`)
-e NSIS 3 (`makensis`) para o instalador.
+**No servidor do painel é automático.** O serviço `client-builder` do `docker-compose.yml`
+compila com o `Dockerfile` desta pasta (Go + Wails + NSIS no Linux, sem Windows) a cada
+`docker compose build` em que algo aqui mudou, e o instalador aparece sozinho na página
+**Downloads**. Para publicar uma versão nova: suba a versão (abaixo), faça o commit e, no
+servidor, `git pull && docker compose build && docker compose up -d`.
+
+Versão (as três iguais): `Version` em `main.go`, `productVersion` em `wails.json` e
+`version` em `frontend/package.json` — ela vai no nome do instalador e no painel.
+
+À mão, para desenvolver: Go 1.24+, Node 20+, Wails CLI v2
+(`go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0`) e NSIS 3 (`makensis`).
 
 ```bash
 make windows-installer        # na raiz: wails build + makensis
 # -> windows-client/build/bin/PulseBackup.exe e PulseBackup-Setup-<versão>.exe
 ```
 
-No servidor isso é automático: o serviço `client-builder` do `docker-compose.yml` compila com o
-`Dockerfile` desta pasta (Linux, sem Windows) e publica o instalador na página Downloads.
-
-Ou à mão: `wails build -clean -trimpath` e `makensis -DVERSION=0.2.0 installer\pulse-backup.nsi`.
-Também compila a partir do Linux (`wails build -platform windows/amd64` + `apt install nsis`).
-O instalador não é assinado (SmartScreen avisa “editor desconhecido”).
+O instalador embute o bootstrapper oficial do **WebView2** (`MicrosoftEdgeWebview2Setup.exe`,
+baixado no build) e, onde o runtime falta (Windows Server), pergunta se instala junto.
+Não é assinado (SmartScreen avisa “editor desconhecido”).
 
 ## Testes
 

@@ -78,10 +78,6 @@ export default function WindowsHelpPage() {
             Server (que não traz o WebView2, usado pela janela), o instalador oferece instalá-lo junto, baixando da Microsoft.
             Para atualizar, rode o instalador novo por cima: a configuração é mantida.
           </p>
-          <CopyBlock
-            label="O servidor compila o instalador sozinho ao atualizar (só quando o cliente mudou) e o publica em Downloads"
-            text={"git pull && docker compose build && docker compose up -d"}
-          />
           <Note tone="warn">
             O instalador não é assinado digitalmente: o Windows SmartScreen pode avisar “editor desconhecido”. Clique em “Mais
             informações” → “Executar assim mesmo”.
