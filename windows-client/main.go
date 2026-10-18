@@ -29,7 +29,7 @@ import (
 var assets embed.FS
 
 // Version vai no manifesto (aparece no painel como versão do agente).
-var Version = "0.2.0"
+var Version = "0.2.1"
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "service" {

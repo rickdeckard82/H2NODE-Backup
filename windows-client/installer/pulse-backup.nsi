@@ -37,6 +37,8 @@ VIAddVersionKey "LegalCopyright" ""
 !include "MUI2.nsh"
 !include "x64.nsh"
 !include "LogicLib.nsh"
+!addincludedir "${__FILEDIR__}"
+!include "webview2.nsh"
 
 !define MUI_ICON "..\build\windows\icon.ico"
 !define MUI_UNICON "..\build\windows\icon.ico"
@@ -59,12 +61,8 @@ Function .onInit
     MessageBox MB_ICONSTOP "O ${APP} precisa do Windows 10 ou 11 de 64 bits."
     Abort
   ${EndIf}
-  SetRegView 64
   ; WebView2 (interface): já vem no Windows 11 e nos Windows 10 atualizados
-  ReadRegStr $0 HKLM "SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" "pv"
-  ${If} $0 == ""
-    ReadRegStr $0 HKCU "Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" "pv"
-  ${EndIf}
+  Call DetectWebView2
   ${If} $0 == ""
     MessageBox MB_ICONEXCLAMATION|MB_OK "Não encontrei o Microsoft Edge WebView2 Runtime, usado pela janela do ${APP}.$\r$\nO serviço de backup funciona sem ele, mas para abrir a janela instale-o em:$\r$\nhttps://developer.microsoft.com/microsoft-edge/webview2/"
   ${EndIf}
