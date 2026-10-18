@@ -11,6 +11,9 @@ RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
  && apt-get update && apt-get install -y --no-install-recommends nsis \
  && rm -rf /var/lib/apt/lists/*
 RUN go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
+# Instalador oficial (bootstrapper) do WebView2, oferecido onde ele falta (Windows Server)
+RUN curl -fsSL -o /opt/MicrosoftEdgeWebview2Setup.exe "https://go.microsoft.com/fwlink/p/?LinkId=2124703" \
+ && test "$(head -c 2 /opt/MicrosoftEdgeWebview2Setup.exe)" = "MZ"
 
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -23,7 +26,7 @@ RUN cd frontend && npm run build \
  && cd .. && wails build -s -m -skipbindings -clean -trimpath -platform windows/amd64 \
  && VERSION=$(sed -n 's/^var Version = "\([0-9.]*\)"/\1/p' main.go) \
  && test -n "$VERSION" \
- && makensis -V2 -DVERSION="$VERSION" installer/pulse-backup.nsi \
+ && makensis -V2 -DVERSION="$VERSION" -DWEBVIEW2_BOOTSTRAPPER=/opt/MicrosoftEdgeWebview2Setup.exe installer/pulse-backup.nsi \
  && mkdir /dist && cp build/bin/PulseBackup-Setup-*.exe /dist/ \
  && cd /dist && sha256sum *.exe
 

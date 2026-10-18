@@ -2,6 +2,10 @@
 ;
 ;   makensis /DVERSION=0.2.0 installer\pulse-backup.nsi
 ;
+; Opcional: /DWEBVIEW2_BOOTSTRAPPER=<caminho do MicrosoftEdgeWebview2Setup.exe> embute o
+; instalador oficial do WebView2 e o oferece onde ele falta (Windows Server). O build do
+; servidor (Dockerfile) e o `make windows-installer` já passam.
+;
 ; Instala em Program Files, registra e inicia o serviço "PulseBackup" (LocalSystem,
 ; início automático), abre o ícone da bandeja no login de cada usuário e cria o atalho
 ; no menu Iniciar. Atualizar = rodar o instalador novo por cima (para o serviço, troca o
@@ -21,6 +25,7 @@ SetCompressor /SOLID lzma
 !define RUN_KEY "Software\Microsoft\Windows\CurrentVersion\Run"
 
 Name "${APP}"
+Var WebView2
 OutFile "..\build\bin\PulseBackup-Setup-${VERSION}.exe"
 InstallDir "$PROGRAMFILES64\PulseBackup"
 InstallDirRegKey HKLM "${UNINST_KEY}" "InstallLocation"
@@ -61,10 +66,16 @@ Function .onInit
     MessageBox MB_ICONSTOP "O ${APP} precisa do Windows 10 ou 11 de 64 bits."
     Abort
   ${EndIf}
-  ; WebView2 (interface): já vem no Windows 11 e nos Windows 10 atualizados
+  ; WebView2 (interface): já vem no Windows 10/11; no Windows Server não
   Call DetectWebView2
-  ${If} $0 == ""
+  StrCpy $WebView2 $0
+  ${If} $WebView2 == ""
+!ifdef WEBVIEW2_BOOTSTRAPPER
+    MessageBox MB_ICONQUESTION|MB_YESNO "O Microsoft Edge WebView2 Runtime, usado pela janela do ${APP}, não está instalado (é o normal no Windows Server).$\r$\n$\r$\nInstalar junto agora? Ele é baixado da Microsoft (cerca de 180 MB).$\r$\n$\r$\nO serviço de backup funciona sem ele: sem o WebView2 só a janela de configuração não abre." /SD IDYES IDYES +2
+      StrCpy $WebView2 "recusado"
+!else
     MessageBox MB_ICONEXCLAMATION|MB_OK "Não encontrei o Microsoft Edge WebView2 Runtime, usado pela janela do ${APP}.$\r$\nO serviço de backup funciona sem ele, mas para abrir a janela instale-o em:$\r$\nhttps://developer.microsoft.com/microsoft-edge/webview2/"
+!endif
   ${EndIf}
 FunctionEnd
 
@@ -87,6 +98,18 @@ Section "Pulse Backup" SecMain
   nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /IM ${EXE}'
   Pop $0
   Sleep 1000
+
+!ifdef WEBVIEW2_BOOTSTRAPPER
+  ${If} $WebView2 == ""
+    DetailPrint "Instalando o Microsoft Edge WebView2 Runtime (baixando da Microsoft)…"
+    InitPluginsDir
+    File "/oname=$PLUGINSDIR\MicrosoftEdgeWebview2Setup.exe" "${WEBVIEW2_BOOTSTRAPPER}"
+    ExecWait '"$PLUGINSDIR\MicrosoftEdgeWebview2Setup.exe" /silent /install' $1
+    ${If} $1 != 0
+      MessageBox MB_ICONEXCLAMATION|MB_OK "Não foi possível instalar o WebView2 (código $1). O servidor tem acesso à internet?$\r$\nO backup é instalado mesmo assim. Para a janela, instale-o depois em:$\r$\nhttps://developer.microsoft.com/microsoft-edge/webview2/" /SD IDOK
+    ${EndIf}
+  ${EndIf}
+!endif
 
   SetOutPath "$INSTDIR"
   File "..\build\bin\${EXE}"

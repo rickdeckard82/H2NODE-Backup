@@ -63,7 +63,8 @@ windows-client: ## Gera windows-client/build/bin/PulseBackup.exe (requer Go, Nod
 	cd windows-client && wails build -clean -trimpath -platform windows/amd64
 
 windows-installer: windows-client ## Gera windows-client/build/bin/PulseBackup-Setup-<versão>.exe (requer também o NSIS: makensis)
-	cd windows-client && makensis -V2 -DVERSION=$$(grep -oP 'Version = "\K[0-9.]+' main.go) installer/pulse-backup.nsi
+	test -f windows-client/build/MicrosoftEdgeWebview2Setup.exe || curl -fsSL -o windows-client/build/MicrosoftEdgeWebview2Setup.exe "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
+	cd windows-client && makensis -V2 -DVERSION=$$(grep -oP 'Version = "\K[0-9.]+' main.go) -DWEBVIEW2_BOOTSTRAPPER=$(CURDIR)/windows-client/build/MicrosoftEdgeWebview2Setup.exe installer/pulse-backup.nsi
 
 test-windows-client: ## Testes do cliente Windows (Go) + tsc/eslint da interface
 	cd windows-client && go vet ./internal/... . && go test ./...
