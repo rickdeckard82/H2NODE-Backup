@@ -74,8 +74,9 @@ export default function WindowsHelpPage() {
             </Link>{" "}
             (ou gere lá um link de 1 h e baixe direto no computador) e rode como administrador. Ele instala em{" "}
             <Code>C:\Program Files\PulseBackup</Code>, registra e inicia o serviço, coloca o ícone na bandeja no login de
-            todos os usuários e cria os atalhos no menu Iniciar. Requer Windows 10 ou 11 de 64 bits. Para atualizar, rode o
-            instalador novo por cima: a configuração é mantida.
+            todos os usuários e cria os atalhos no menu Iniciar. Requer Windows 10/11 ou Windows Server de 64 bits. No Windows
+            Server (que não traz o WebView2, usado pela janela), o instalador oferece instalá-lo junto, baixando da Microsoft.
+            Para atualizar, rode o instalador novo por cima: a configuração é mantida.
           </p>
           <CopyBlock
             label="O servidor compila o instalador sozinho ao atualizar (só quando o cliente mudou) e o publica em Downloads"
