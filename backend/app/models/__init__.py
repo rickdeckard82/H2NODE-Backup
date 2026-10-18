@@ -2,6 +2,7 @@ from app.models.audit_log import AuditLog
 from app.models.backup import Backup, BackupComponent, BackupStatus, VerifyStatus
 from app.models.base import Base
 from app.models.client import Client
+from app.models.device_credential import DeviceCredential
 from app.models.ftp_account import FtpAccount
 from app.models.mfa_recovery_code import MfaRecoveryCode
 from app.models.refresh_token import RefreshToken
@@ -16,6 +17,7 @@ __all__ = [
     "BackupComponent",
     "BackupStatus",
     "Client",
+    "DeviceCredential",
     "FtpAccount",
     "MfaRecoveryCode",
     "RefreshToken",

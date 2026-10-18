@@ -11,6 +11,9 @@ retenção, verificação e alertas iguais aos dos servidores Linux).
                                      worker: valida → cifra (GPG) → apaga o original → store/
 ```
 
+> MikroTik é o contrário: o servidor **busca** a configuração por SSH. Veja
+> [MikroTik (coleta por SSH)](#mikrotik-coleta-por-ssh) no fim desta página.
+
 ## Cadastro
 
 1. **Configuração → Contas FTP** (só para FTP): crie as contas que os equipamentos
@@ -119,3 +122,40 @@ Configuração idêntica à anterior é marcada como "idêntica ao backup anteri
   faixa passiva liberada no ufw.
 - **TFTP para no meio**: firewall no caminho bloqueando as portas efêmeras de
   resposta (o ufw do servidor já trata via conntrack).
+
+## MikroTik (coleta por SSH)
+
+```
+ puller ──SSH (porta da credencial)──▶ MikroTik: /export show-sensitive
+   │  valida → cifra na memória (chave pública) → store/<equipamento>/<execução>/
+   ▼
+ worker: decifra em streaming e revalida (verificação profunda)
+```
+
+1. **MikroTik → Usuário de acesso** (admin): crie a credencial — nome, usuário, senha
+   (8–64, sem espaço, aspas, `\`, `$` ou `?`) e porta SSH padrão.
+2. Em cada MikroTik, crie o usuário (o painel mostra os comandos com a senha logo após salvar):
+
+   ```
+   /user group add name=pulse-backup policy=ssh,read,sensitive comment="Pulse Backup: somente leitura"
+   /user add name=pulse-backup group=pulse-backup password="<SENHA>" address=<IP-DO-SERVIDOR>/32 comment="Pulse Backup"
+   ```
+
+   Libere o SSH para o servidor em `/ip service` (campo `address`) e no firewall `input`.
+   No servidor não há porta para abrir.
+3. **MikroTik → Hosts**: cadastre (IP, porta opcional, credencial, intervalo de coleta)
+   ou use **Importar lista** — uma linha por host, `IP[:porta] [nome]`.
+
+Detalhes:
+
+- O intervalo de coleta (mín. 1 h) é também o prazo do alerta de atraso. **Coletar
+  agora** agenda para o próximo ciclo do puller (`WORKER_POLL_SECONDS`).
+- RouterOS 6 não conhece `show-sensitive`: o puller repete com `/export`, que no 6 já
+  inclui os dados sensíveis.
+- "Idêntica ao backup anterior" ignora a linha de data do cabeçalho do `/export`.
+- Falha de conexão/autenticação vira uma execução **falhou** (sem arquivo) e a mensagem
+  aparece na lista de hosts. A próxima tentativa é no intervalo seguinte.
+- A chave de host é fixada na 1ª coleta; trocou o IP/porta, ela é fixada de novo. Se
+  mudar sem motivo, investigue antes de clicar em **Aceitar nova chave**.
+- `.env`: `PULL_CONCURRENCY` (coletas simultâneas, padrão 4) e `PULL_TIMEOUT_SECONDS`
+  (segundos sem resposta, padrão 60). Logs: `docker compose logs -f puller`.

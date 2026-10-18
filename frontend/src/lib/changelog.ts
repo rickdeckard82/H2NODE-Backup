@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.6.1";
+export const APP_VERSION = "0.7.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.0",
+    date: "2026-10-18",
+    changes: [
+      "Novo menu MikroTik: o Pulse Backup entra por SSH em cada MikroTik, roda /export show-sensitive (RouterOS 7; /export no 6), cifra em memória e guarda cada versão — sem nada em claro no disco. Versões em que só a data do cabeçalho mudou aparecem como idênticas à anterior.",
+      "MikroTik → Usuário de acesso: credenciais (usuário, senha cifrada no servidor, porta) e os comandos RouterOS para criar o usuário somente leitura (grupo ssh,read,sensitive, preso ao IP do servidor).",
+      "MikroTik → Hosts: cadastro individual ou importação de lista (IP[:porta] [nome] por linha), intervalo de coleta, \"Coletar agora\", erro da última coleta e chave SSH fixada na primeira coleta (se mudar, a coleta para até alguém aceitar a nova chave).",
+      "Novo serviço puller no docker-compose (rede própria com saída; só a chave pública). Ajuda → MikroTik (RouterOS): criação do backup e restauração.",
+    ],
+  },
   {
     version: "0.6.1",
     date: "2026-10-16",

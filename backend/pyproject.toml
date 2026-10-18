@@ -7,7 +7,7 @@ packages = { find = { include = ["app*"] } }
 
 [project]
 name = "pulse-backup-backend"
-version = "0.6.1"
+version = "0.7.0"
 description = "API e worker do Pulse Backup (gestão de backups cifrados de servidores Linux)"
 requires-python = ">=3.12"
 dependencies = [
@@ -28,6 +28,7 @@ dependencies = [
     "slowapi==0.1.9",
     "email-validator==2.2.0",
     "pyftpdlib==2.2.0",
+    "paramiko==3.5.1",
 ]
 
 [project.optional-dependencies]

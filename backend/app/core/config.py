@@ -85,6 +85,11 @@ class Settings(BaseSettings):
     # Tamanho máximo de um arquivo de configuração recebido.
     net_max_file_mb: int = Field(default=64, alias="NET_MAX_FILE_MB")
 
+    # ---- Coletor (puller): MikroTik por SSH ----
+    # Coletas simultâneas e tempo máximo sem resposta do equipamento.
+    pull_concurrency: int = Field(default=4, ge=1, le=32, alias="PULL_CONCURRENCY")
+    pull_timeout_seconds: int = Field(default=60, ge=5, le=600, alias="PULL_TIMEOUT_SECONDS")
+
     # ---- Chave GPG dos backups ----
     # Pública: distribuída aos clientes (cifram para ela). Privada: só no worker,
     # para a verificação profunda (decifrar e testar o conteúdo). Sem a privada o

@@ -19,6 +19,21 @@ sistema compensa no que controla — só IPs cadastrados, receptores só de grav
 sessões isoladas, cifragem GPG imediata na chegada e remoção do original —, mas o
 trecho de rede entre equipamento e servidor deve ser a rede de gerência ou uma VPN.
 
+## MikroTik (coleta por SSH)
+
+- A coleta roda no serviço **puller**, separado do worker: ele precisa de saída para a
+  rede (rede `egress`) e o worker, que tem a chave privada, continua sem saída. O puller
+  só tem a chave **pública** — cifra o `/export` na memória (stdin do gpg) e grava só o
+  `.gpg`; não consegue decifrar nada.
+- A senha das credenciais precisa ser usada, então é guardada **cifrada** (Fernet,
+  `FERNET_KEY`), não como hash. Ela nunca volta pela API. Trocar a `FERNET_KEY` invalida
+  essas senhas (o painel avisa; salve-as de novo).
+- O usuário criado no RouterOS é do grupo `ssh,read,sensitive` e preso ao IP do
+  servidor (`address=`): não consegue alterar o equipamento.
+- A chave de host SSH é fixada na primeira coleta bem-sucedida (TOFU). Se mudar, a
+  conexão é encerrada **antes** de enviar a senha, e só um operador aceita a nova chave
+  (fica na auditoria).
+
 ## Decifrar pelo painel
 
 O botão **Baixar** do detalhe do backup decifra **no navegador** (OpenPGP.js): o servidor só entrega
@@ -57,6 +72,7 @@ seguida, em `MSSQL_BACKUP_DIR` (modo 700).
 | 69/udp | receptor TFTP (rede do host) | **só os IPs dos equipamentos TFTP** (ufw) |
 | 8080 | frontend | `127.0.0.1` apenas |
 | 8000 / 5432 | backend / PostgreSQL | sem porta no host (redes internas do Compose) |
+| — | puller | nenhuma porta: só conexões de saída (SSH até os MikroTik) |
 
 Proxy, sshd e os receptores FTP/TFTP usam `network_mode: host` de propósito: portas publicadas com `ports:`
 entram por regras de iptables do Docker avaliadas antes do ufw. Não troque isso por

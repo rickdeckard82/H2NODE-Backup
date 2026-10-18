@@ -48,7 +48,8 @@ def render(db: Session) -> dict:
         for c in db.execute(
             select(Client).where(Client.kind == "network", Client.is_active.is_(True))
         ).scalars()
-        if c.mgmt_ip and c.protocol
+        # ssh (MikroTik) é coletado pelo puller: esse IP não ganha acesso aos receptores
+        if c.mgmt_ip and c.protocol in ("ftp", "tftp")
     ]
     accounts = [
         {"username": a.username, "password_hash": a.password_hash}

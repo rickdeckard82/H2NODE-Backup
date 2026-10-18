@@ -30,6 +30,14 @@ const NAV: NavEntry[] = [
   { to: "/", label: "Painel", icon: "home" },
   { to: "/clients", label: "Servidores", icon: "server" },
   { to: "/devices", label: "Equipamentos de rede", icon: "router" },
+  {
+    label: "MikroTik",
+    icon: "router",
+    children: [
+      { to: "/mikrotik", label: "Hosts", icon: "router" },
+      { to: "/mikrotik/credentials", label: "Usuário de acesso", icon: "key", roles: ["admin", "operator"] },
+    ],
+  },
   { to: "/backups", label: "Backups", icon: "archive" },
   { to: "/accounts", label: "Contas cPanel", icon: "database" },
   {
@@ -51,6 +59,7 @@ const NAV: NavEntry[] = [
       { to: "/help/cpanel", label: "cPanel / WHM", icon: "server" },
       { to: "/help/juniper", label: "Juniper (Junos)", icon: "router" },
       { to: "/help/datacom", label: "Datacom (DmOS)", icon: "router" },
+      { to: "/help/mikrotik", label: "MikroTik (RouterOS)", icon: "router" },
       { to: "/help/unm2000", label: "UNM2000 (Fiberhome)", icon: "router" },
     ],
   },

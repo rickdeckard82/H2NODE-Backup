@@ -1,15 +1,18 @@
-export type Vendor = "datacom" | "huawei" | "juniper" | "fiberhome" | "generic";
+export type Vendor = "datacom" | "huawei" | "juniper" | "fiberhome" | "mikrotik" | "generic";
+/** Fabricantes que ENVIAM a configuração (FTP/TFTP). O MikroTik é coletado por SSH (menu próprio). */
+export type PushVendor = Exclude<Vendor, "mikrotik">;
 
 export const VENDOR_LABEL: Record<Vendor, string> = {
   datacom: "Datacom (DmOS)",
   huawei: "Huawei (VRP)",
   juniper: "Juniper (Junos)",
   fiberhome: "Fiberhome (OLT / UNM2000)",
+  mikrotik: "MikroTik (RouterOS)",
   generic: "Genérico",
 };
 
 /** Protocolo usual de cada fabricante (sugestão no cadastro). */
-export const VENDOR_PROTOCOL: Record<Vendor, "ftp" | "tftp"> = {
+export const VENDOR_PROTOCOL: Record<PushVendor, "ftp" | "tftp"> = {
   datacom: "tftp",
   huawei: "ftp",
   juniper: "ftp",
@@ -31,7 +34,14 @@ export interface Client {
   vendor: Vendor | null;
   mgmt_ip: string | null;
   manager_ip: string | null;
-  protocol: "ftp" | "tftp" | null;
+  protocol: "ftp" | "tftp" | "ssh" | null;
+  /** MikroTik: credencial de acesso, porta (null = a da credencial) e estado da coleta. */
+  pull_credential_id: number | null;
+  pull_port: number | null;
+  pull_host_key_fingerprint: string | null;
+  pull_next_at: string | null;
+  pull_last_at: string | null;
+  pull_error: string | null;
   ssh_public_key: string | null;
   ssh_key_fingerprint: string | null;
   expected_interval_hours: number;
@@ -174,6 +184,17 @@ export interface AccountVersion {
   verify_status: string | null;
   verify_message: string | null;
   file_name: string | null;
+}
+
+export interface DeviceCredential {
+  id: number;
+  name: string;
+  username: string;
+  port: number;
+  description: string | null;
+  device_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface FtpAccount {

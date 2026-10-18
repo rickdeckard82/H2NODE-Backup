@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -22,15 +22,30 @@ class Client(Base, TimestampMixin):
     kind: Mapped[str] = mapped_column(String(16), default="server", server_default="server", index=True)
 
     # ---- Só para equipamentos de rede ----
-    # datacom | huawei | juniper | fiberhome | generic — define as instruções e a validação.
+    # datacom | huawei | juniper | fiberhome | mikrotik | generic — define as instruções e a validação.
     vendor: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # IP de origem com que o equipamento chega ao servidor (identifica o upload).
+    # MikroTik (ssh): o IP onde o coletor conecta.
     mgmt_ip: Mapped[str | None] = mapped_column(String(45), nullable=True, unique=True)
-    # ftp | tftp
+    # ftp | tftp (o equipamento envia) | ssh (o coletor busca: MikroTik)
     protocol: Mapped[str | None] = mapped_column(String(8), nullable=True)
     # Só OLT Fiberhome: IP da UNM2000 que gerencia o FTP (apaga/renomeia o arquivo que a OLT
     # enviou). Esse IP também pode usar o FTP, em modo de compatibilidade (ver receivers/ftp.py).
     manager_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+
+    # ---- Só para equipamentos coletados por SSH (MikroTik) ----
+    pull_credential_id: Mapped[int | None] = mapped_column(
+        ForeignKey("device_credential.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    # Porta SSH; vazio = a da credencial.
+    pull_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Chave de host SSH fixada na 1ª conexão ("<tipo> <base64>"). Se mudar, a coleta
+    # para até alguém aceitar a nova chave no painel.
+    pull_host_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Próxima coleta (vazio = já). "Coletar agora" no painel zera.
+    pull_next_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    pull_last_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    pull_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Chave pública SSH do agente. Vira uma linha do authorized_keys do container
     # sshd, presa (rrsync -wo) à pasta incoming/<slug>/.

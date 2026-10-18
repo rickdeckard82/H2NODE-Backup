@@ -8,7 +8,7 @@ import { api, ApiError } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { useFmtDate } from "../../lib/datetime";
 import { fmtAgo, fmtBytes } from "../../lib/format";
-import { VENDOR_LABEL, VENDOR_PROTOCOL, type Client, type Vendor } from "../../lib/types";
+import { VENDOR_LABEL, VENDOR_PROTOCOL, type Client, type PushVendor } from "../../lib/types";
 import { CopyBlock } from "../clients/ClientsPage";
 
 type Protocol = "ftp" | "tftp";
@@ -19,7 +19,7 @@ interface FormState {
   name: string;
   description: string;
   is_active: boolean;
-  vendor: Vendor;
+  vendor: PushVendor;
   mgmt_ip: string;
   manager_ip: string;
   protocol: Protocol;
@@ -86,7 +86,7 @@ function DeviceConfigModal({ device, onClose }: { device: Client | null; onClose
       ) : (
         <div className="space-y-4 text-sm">
           <p className="text-slate-500 dark:text-slate-400">
-            Comandos para o {VENDOR_LABEL[cfg.vendor as Vendor] ?? cfg.vendor} enviar a configuração para{" "}
+            Comandos para o {VENDOR_LABEL[cfg.vendor as PushVendor] ?? cfg.vendor} enviar a configuração para{" "}
             <span className="font-mono">{cfg.server_host}</span> via{" "}
             <b className="uppercase">{cfg.protocol}</b>.
           </p>
@@ -129,6 +129,8 @@ export default function DevicesPage() {
   const list = useQuery({
     queryKey: ["clients", "network", q],
     queryFn: () => api.get<Client[]>("/clients", { q, kind: "network" }),
+    // MikroTik (coletado por SSH) tem menu próprio
+    select: (rows) => rows.filter((c) => c.protocol !== "ssh"),
   });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["clients"] });
 
@@ -267,10 +269,10 @@ export default function DevicesPage() {
                               name: c.name,
                               description: c.description ?? "",
                               is_active: c.is_active,
-                              vendor: c.vendor ?? "generic",
+                              vendor: (c.vendor ?? "generic") as PushVendor,
                               mgmt_ip: c.mgmt_ip ?? "",
                               manager_ip: c.manager_ip ?? "",
-                              protocol: c.protocol ?? "ftp",
+                              protocol: (c.protocol ?? "ftp") as Protocol,
                               expected_interval_hours: c.expected_interval_hours,
                               retention_days: c.retention_days,
                               retention_min_keep: c.retention_min_keep,
@@ -340,11 +342,11 @@ export default function DevicesPage() {
                   className="input"
                   value={form.vendor}
                   onChange={(e) => {
-                    const vendor = e.target.value as Vendor;
+                    const vendor = e.target.value as PushVendor;
                     setForm({ ...form, vendor, protocol: form.id ? form.protocol : VENDOR_PROTOCOL[vendor] });
                   }}
                 >
-                  {(Object.keys(VENDOR_LABEL) as Vendor[]).map((v) => (
+                  {(Object.keys(VENDOR_PROTOCOL) as PushVendor[]).map((v) => (
                     <option key={v} value={v}>
                       {VENDOR_LABEL[v]}
                     </option>

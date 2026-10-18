@@ -38,7 +38,8 @@ class NoPublicKey(RuntimeError):
     pass
 
 
-def _encrypt(src: Path, dest: Path) -> None:
+def _encrypt(data: bytes, dest: Path) -> None:
+    """Cifra `data` (em memória, via stdin do gpg) para a chave pública em `dest`."""
     pub = settings.backup_public_key_path
     if not Path(pub).is_file():
         raise NoPublicKey("chave pública GPG ausente")
@@ -46,8 +47,8 @@ def _encrypt(src: Path, dest: Path) -> None:
         r = subprocess.run(
             ["gpg", "--homedir", home, "--batch", "--quiet", "--no-tty", "--yes",
              "--trust-model", "always", "--compress-algo", "none", "--cipher-algo", "AES256",
-             "--recipient-file", pub, "--output", str(dest), "--encrypt", str(src)],
-            capture_output=True, timeout=300, check=False,
+             "--recipient-file", pub, "--output", str(dest), "--encrypt"],
+            input=data, capture_output=True, timeout=300, check=False,
         )
     if r.returncode != 0:
         dest.unlink(missing_ok=True)
@@ -67,57 +68,75 @@ def name_key(name: str) -> str:
     return _DATE_SUFFIX.sub("", name)
 
 
-def _previous_plain_sha(db: Session, client: Client, name: str) -> str | None:
+def _previous_content_sha(db: Session, client: Client, name: str) -> str | None:
     key = name_key(name)
     rows = db.execute(
-        select(BackupComponent.name, BackupComponent.plain_sha256)
+        select(BackupComponent.name, BackupComponent.plain_sha256, Backup.manifest)
         .join(Backup, Backup.id == BackupComponent.backup_id)
         .where(Backup.client_id == client.id, BackupComponent.kind == "config")
         .order_by(Backup.received_at.desc())
         .limit(500)
     ).all()
-    for n, sha in rows:
+    for n, sha, manifest in rows:
         if name_key(n) == key:
-            return sha
+            # content_sha256 desde a 0.7.0; antes era sempre o hash do arquivo inteiro
+            return (manifest or {}).get("content_sha256") or sha
     return None
 
 
 def ingest_file(db: Session, client: Client, data_path: Path, meta: dict) -> Backup:
-    raw = data_path.read_bytes()
-    plain_sha = hashlib.sha256(raw).hexdigest()
-    res = netconfig.check(raw, client.vendor)
-    original = data_path.name.split("__", 1)[-1]
-    same = res.ok and _previous_plain_sha(db, client, original) == plain_sha
-
     received = meta.get("received_at")
     try:
         when = datetime.fromisoformat(received).astimezone(UTC).replace(tzinfo=None) if received else utcnow()
     except ValueError:
         when = utcnow()
+    proto = str(meta.get("protocol", "?"))
+    return store_config(
+        db, client, data_path.read_bytes(), data_path.name.split("__", 1)[-1], when=when,
+        protocol=proto, source_ip=meta.get("source_ip"), remote_path=meta.get("remote_path"),
+        agent_version=f"{proto.lower()}-receiver",
+    )
+
+
+def store_config(
+    db: Session, client: Client, raw: bytes, original: str, *, when: datetime, protocol: str,
+    source_ip: str | None, remote_path: str | None, agent_version: str,
+) -> Backup:
+    """Valida, cifra e registra uma configuração de equipamento (recebida por FTP/TFTP
+    ou coletada por SSH). `raw` só existe em memória; no disco fica só o .gpg."""
+    plain_sha = hashlib.sha256(raw).hexdigest()
+    content_sha = netconfig.content_sha256(raw, client.vendor)
+    res = netconfig.check(raw, client.vendor)
+    same = res.ok and _previous_content_sha(db, client, original) == content_sha
+
     run_name = f"{when.strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(3)}"
     dest_dir = storage.safe_child(storage.store(), client.slug, run_name)
     dest_dir.mkdir(parents=True, mode=0o700)
     enc_name = f"01-config-{receivers.safe_filename(original)}.gpg"
     enc_path = dest_dir / enc_name
     try:
-        _encrypt(data_path, enc_path)
+        _encrypt(raw, enc_path)
     except BaseException:
         shutil.rmtree(dest_dir, ignore_errors=True)
         raise
 
-    proto = str(meta.get("protocol", "?")).upper()
-    origin = f"recebido via {proto} de {meta.get('source_ip', '?')} ({meta.get('remote_path', original)})"
+    proto = protocol.upper()
+    if protocol == "ssh":
+        origin = f"coletado via SSH de {source_ip or '?'} ({remote_path or original})"
+    else:
+        origin = f"recebido via {proto} de {source_ip or '?'} ({remote_path or original})"
     message = f"{origin} — {res.message}" + (" — idêntica ao backup anterior" if same else "")
     status = BackupStatus.ok if res.ok else BackupStatus.failed
     manifest = {
         "format": "pulse-backup/net-1",
         "client_id": client.slug,
         "run_name": run_name,
-        "protocol": meta.get("protocol"),
-        "source_ip": meta.get("source_ip"),
-        "remote_path": meta.get("remote_path"),
+        "protocol": protocol,
+        "source_ip": source_ip,
+        "remote_path": remote_path,
         "status": "success" if res.ok else "failed",
         "unchanged": same,
+        "content_sha256": content_sha,
         "errors": [] if res.ok else [res.message],
     }
     (dest_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -127,7 +146,7 @@ def ingest_file(db: Session, client: Client, data_path: Path, meta: dict) -> Bac
         agent_status=manifest["status"], started_at=when, finished_at=when, received_at=utcnow(),
         size_bytes=enc_path.stat().st_size, plain_size_bytes=len(raw),
         storage_path=str(dest_dir.relative_to(storage.root())),
-        agent_version=f"{proto.lower()}-receiver", manifest=manifest,
+        agent_version=agent_version, manifest=manifest,
         error_message=None if res.ok else res.message,
         verify_status=VerifyStatus.pending,
     )

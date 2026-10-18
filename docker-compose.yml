@@ -6,6 +6,9 @@ networks:
   internal:
     driver: bridge
     internal: true
+  # Saída para a rede (só o puller): alcançar os MikroTik que ele coleta por SSH.
+  egress:
+    driver: bridge
 
 volumes:
   db_data:
@@ -36,6 +39,8 @@ x-backend-env: &backend-env
   FTP_MASQUERADE_ADDRESS: ${FTP_MASQUERADE_ADDRESS:-}
   TFTP_PORT: ${TFTP_PORT:-69}
   NET_MAX_FILE_MB: ${NET_MAX_FILE_MB:-64}
+  PULL_CONCURRENCY: ${PULL_CONCURRENCY:-4}
+  PULL_TIMEOUT_SECONDS: ${PULL_TIMEOUT_SECONDS:-60}
 
 services:
   # ─────────────────────────── PostgreSQL ───────────────────────────
@@ -140,6 +145,31 @@ services:
       - no-new-privileges:true
     networks:
       - internal   # sem acesso à rede externa
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ───────────── Coletor: busca a configuração dos MikroTik por SSH ─────────────
+  # Precisa de saída para a rede (egress) — por isso NÃO é o worker, que guarda a
+  # chave privada e fica sem saída. Aqui só a chave pública: cifra em memória o que
+  # coleta e grava o .gpg em store/. Não publica porta nenhuma.
+  puller:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    command: ["python", "-m", "app.puller"]
+    environment:
+      <<: *backend-env
+    volumes:
+      - ${BACKUP_STORAGE_PATH:?set BACKUP_STORAGE_PATH}:/data
+      - ${SECRETS_DIR:-./secrets}/backup-key.pub.asc:/keys/backup-key.pub.asc:ro
+    tmpfs:
+      - /tmp:mode=1777
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - internal   # banco
+      - egress     # equipamentos
     depends_on:
       backend:
         condition: service_healthy

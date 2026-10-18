@@ -8,6 +8,9 @@ const LoginPage = lazy(() => import("./features/auth/LoginPage"));
 const DashboardPage = lazy(() => import("./features/dashboard/DashboardPage"));
 const ClientsPage = lazy(() => import("./features/clients/ClientsPage"));
 const DevicesPage = lazy(() => import("./features/devices/DevicesPage"));
+const MikrotikPage = lazy(() => import("./features/mikrotik/MikrotikPage"));
+const MikrotikCredentialsPage = lazy(() => import("./features/mikrotik/MikrotikCredentialsPage"));
+const MikrotikHelpPage = lazy(() => import("./features/help/MikrotikHelpPage"));
 const FtpAccountsPage = lazy(() => import("./features/settings/FtpAccountsPage"));
 const AccountsPage = lazy(() => import("./features/accounts/AccountsPage"));
 const BackupsPage = lazy(() => import("./features/backups/BackupsPage"));
@@ -67,6 +70,15 @@ export const router = createBrowserRouter([
       { index: true, element: <DashboardPage /> },
       { path: "clients", element: <ClientsPage /> },
       { path: "devices", element: <DevicesPage /> },
+      { path: "mikrotik", element: <MikrotikPage /> },
+      {
+        path: "mikrotik/credentials",
+        element: (
+          <Protected roles={["admin", "operator"]}>
+            <MikrotikCredentialsPage />
+          </Protected>
+        ),
+      },
       { path: "backups", element: <BackupsPage /> },
       { path: "accounts", element: <AccountsPage /> },
       {
@@ -100,6 +112,7 @@ export const router = createBrowserRouter([
       { path: "help/unm2000", element: <Unm2000HelpPage /> },
       { path: "help/juniper", element: <JuniperHelpPage /> },
       { path: "help/datacom", element: <DatacomHelpPage /> },
+      { path: "help/mikrotik", element: <MikrotikHelpPage /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },

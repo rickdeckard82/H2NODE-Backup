@@ -10,8 +10,9 @@ SLUG_PATTERN = r"^[a-z0-9][a-z0-9-]{1,46}[a-z0-9]$"
 
 
 Kind = Literal["server", "network"]
-Vendor = Literal["datacom", "huawei", "juniper", "fiberhome", "generic"]
-Protocol = Literal["ftp", "tftp"]
+Vendor = Literal["datacom", "huawei", "juniper", "fiberhome", "mikrotik", "generic"]
+# ssh = o coletor busca (MikroTik); ftp/tftp = o equipamento envia
+Protocol = Literal["ftp", "tftp", "ssh"]
 
 
 def _norm_ip(v: str | None) -> str | None:
@@ -32,6 +33,9 @@ class ClientBase(BaseModel):
     mgmt_ip: str | None = Field(default=None, max_length=45)
     manager_ip: str | None = Field(default=None, max_length=45)
     protocol: Protocol | None = None
+    # MikroTik: credencial de acesso SSH e porta (vazio = a da credencial)
+    pull_credential_id: int | None = None
+    pull_port: int | None = Field(default=None, ge=1, le=65535)
     ssh_public_key: str | None = Field(default=None, max_length=16384)
     # 0 = sob demanda (sem alerta de atraso)
     expected_interval_hours: int = Field(default=24, ge=0, le=24 * 31)
@@ -57,6 +61,9 @@ class ClientUpdate(BaseModel):
     # enviado (inclusive vazio) = grava; ausente = mantém (por isso usa model_fields_set)
     manager_ip: str | None = Field(default=None, max_length=45)
     protocol: Protocol | None = None
+    pull_credential_id: int | None = None
+    # enviado (inclusive null) = grava; ausente = mantém
+    pull_port: int | None = Field(default=None, ge=1, le=65535)
     # "" remove a chave (o cliente deixa de conseguir enviar).
     ssh_public_key: str | None = Field(default=None, max_length=16384)
     expected_interval_hours: int | None = Field(default=None, ge=0, le=24 * 31)
@@ -82,6 +89,12 @@ class ClientOut(BaseModel):
     mgmt_ip: str | None
     manager_ip: str | None
     protocol: str | None
+    pull_credential_id: int | None
+    pull_port: int | None
+    pull_host_key_fingerprint: str | None = None
+    pull_next_at: UtcDatetime | None
+    pull_last_at: UtcDatetime | None
+    pull_error: str | None
     ssh_public_key: str | None
     ssh_key_fingerprint: str | None
     expected_interval_hours: int

@@ -13,6 +13,7 @@ Pulse RADIUS e do Projeto.io.
 | **ftp / tftp** | Recebem a configuração de switches, roteadores e OLTs (Datacom TFTP; Huawei, Juniper e Fiberhome/UNM2000 FTP). Só gravação, só IPs cadastrados; o worker cifra na chegada. Ver [docs/network-devices.md](docs/network-devices.md). |
 | **sshd** | Recebe os uploads. Só chave pública; cada cliente fica preso (`rrsync -wo -no-del`) à própria pasta, **só escrita** — não lê, não lista, não apaga. |
 | **worker** | Recebe os uploads completos, confere tamanho/SHA-256, **decifra em streaming e testa o conteúdo** (tar íntegro, dump completo), aplica retenção, reverifica periodicamente e mede o disco. |
+| **puller** | Coletor: entra por SSH nos **MikroTik**, roda `/export`, cifra em memória com a chave pública e grava o `.gpg`. Único serviço com saída para a rede além do proxy; não tem a chave privada. |
 | **backend** | API do painel: login com senha (Argon2id) + 2FA opcional, papéis, auditoria, clientes, backups, dashboard. |
 | **frontend** | SPA servida por nginx (só em 127.0.0.1), encaminha `/api` ao backend. |
 | **proxy** | Caddy: HTTPS público com certificado **Let's Encrypt automático** para `PUBLIC_DOMAIN`. |
@@ -113,6 +114,17 @@ Nas **OLTs Fiberhome** cada OLT envia direto, do IP dela, e é um equipamento; o
 **IP da UNM2000** libera a UNM2000, que depois apaga/renomeia o arquivo (esses comandos
 respondem sucesso sem alterar nada — o resto continua só de gravação).
 Detalhes em [docs/network-devices.md](docs/network-devices.md).
+
+## MikroTik (coleta por SSH)
+
+O MikroTik não envia: o serviço **puller** busca. Em **MikroTik → Usuário de acesso**
+crie a credencial (usuário/senha/porta; a senha fica cifrada com a `FERNET_KEY`) e
+cole os comandos mostrados em cada MikroTik — um usuário do grupo `ssh,read,sensitive`,
+preso ao IP do servidor. Em **MikroTik → Hosts** cadastre um a um ou importe uma lista
+(`IP[:porta] [nome]` por linha). A cada intervalo o puller roda `/export show-sensitive`
+(`/export` no RouterOS 6), valida, cifra e guarda; a chave SSH do equipamento é fixada
+na primeira coleta. Passo a passo e restauração em **Ajuda → MikroTik** e em
+[docs/network-devices.md](docs/network-devices.md#mikrotik-coleta-por-ssh).
 
 ## Validação dos backups
 

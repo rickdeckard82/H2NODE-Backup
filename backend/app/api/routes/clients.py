@@ -5,9 +5,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import client_ip, enforce_csrf, require_admin, require_auditor, require_operator
 from app.core.config import settings
 from app.core.db import get_db
-from app.models import Backup, Client, FtpAccount, SystemUser
+from app.core.security import utcnow
+from app.models import Backup, Client, DeviceCredential, FtpAccount, SystemUser
 from app.schemas.client import AgentConfigOut, ClientCreate, ClientOut, ClientUpdate, DeviceConfigOut
-from app.services import audit, gpg, receivers, sshkeys, storage
+from app.services import audit, gpg, mikrotik, receivers, sshkeys, storage
 from app.services.health import client_health
 
 router = APIRouter(prefix="/clients", tags=["clients"], dependencies=[Depends(enforce_csrf)])
@@ -21,6 +22,7 @@ def _to_out(db: Session, c: Client) -> ClientOut:
         )
     ).scalar_one()
     out.health = client_health(c)
+    out.pull_host_key_fingerprint = mikrotik.host_key_fingerprint(c.pull_host_key)
     return out
 
 
@@ -58,6 +60,7 @@ def _apply_network(db: Session, c: Client) -> None:
                                 "equipamento de rede precisa de fabricante, IP de origem e protocolo")
         c.ssh_public_key = None
         c.ssh_key_fingerprint = None
+        _apply_pull(db, c)
         if db.execute(select(Client.id).where(Client.mgmt_ip == c.mgmt_ip, Client.id != (c.id or 0))).first():
             # o upload é atribuído pelo IP de origem: precisa ser único
             raise HTTPException(status.HTTP_409_CONFLICT, f"o IP {c.mgmt_ip} já pertence a outro equipamento")
@@ -82,6 +85,24 @@ def _apply_network(db: Session, c: Client) -> None:
                                 f"o IP {c.mgmt_ip} já é usado como IP da UNM2000 em outra OLT")
     else:
         c.vendor = c.mgmt_ip = c.manager_ip = c.protocol = None
+        c.pull_credential_id = c.pull_port = c.pull_host_key = None
+
+
+def _apply_pull(db: Session, c: Client) -> None:
+    """MikroTik é o único coletado por SSH: exige credencial e intervalo; os outros
+    fabricantes não usam nada disso."""
+    if (c.vendor == "mikrotik") != (c.protocol == "ssh"):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            "MikroTik é coletado por SSH (e só ele usa SSH)")
+    if c.protocol != "ssh":
+        c.pull_credential_id = c.pull_port = c.pull_host_key = None
+        c.pull_next_at = c.pull_error = None
+        return
+    if not c.pull_credential_id or db.get(DeviceCredential, c.pull_credential_id) is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "escolha a credencial de acesso")
+    if c.expected_interval_hours < 1:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            "MikroTik precisa de um intervalo de coleta (em horas)")
 
 
 def _sync_all(db: Session) -> None:
@@ -95,10 +116,13 @@ def list_clients(
     _: SystemUser = Depends(require_auditor),
     q: str | None = Query(None, max_length=100),
     kind: str | None = Query(None, pattern="^(server|network)$"),
+    vendor: str | None = Query(None, max_length=16),
 ) -> list[ClientOut]:
     stmt = select(Client)
     if kind:
         stmt = stmt.where(Client.kind == kind)
+    if vendor:
+        stmt = stmt.where(Client.vendor == vendor)
     if q:
         like = f"%{q}%"
         stmt = stmt.where(or_(Client.name.ilike(like), Client.slug.ilike(like),
@@ -126,7 +150,7 @@ def create_client(
     c = Client(
         slug=body.slug, name=body.name, description=body.description, is_active=body.is_active,
         kind=body.kind, vendor=body.vendor, mgmt_ip=body.mgmt_ip, manager_ip=body.manager_ip,
-        protocol=body.protocol,
+        protocol=body.protocol, pull_credential_id=body.pull_credential_id, pull_port=body.pull_port,
         expected_interval_hours=body.expected_interval_hours,
         retention_days=body.retention_days, retention_min_keep=body.retention_min_keep,
     )
@@ -139,7 +163,8 @@ def create_client(
     audit.record(db, action="create", entity_type="client", entity_id=c.id,
                  actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request),
                  after={"slug": c.slug, "name": c.name, "kind": c.kind, "ssh_key": c.ssh_key_fingerprint,
-                        "mgmt_ip": c.mgmt_ip, "manager_ip": c.manager_ip, "protocol": c.protocol})
+                        "mgmt_ip": c.mgmt_ip, "manager_ip": c.manager_ip, "protocol": c.protocol,
+                        "pull_credential_id": c.pull_credential_id, "pull_port": c.pull_port})
     db.commit()
     storage.ensure_client_dirs(c.slug)
     _sync_all(db)
@@ -155,16 +180,21 @@ def update_client(
     if c is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "não encontrado")
     fields = ("name", "description", "is_active", "expected_interval_hours", "retention_days",
-              "retention_min_keep", "vendor", "mgmt_ip", "protocol")
-    before = {f: getattr(c, f) for f in (*fields, "manager_ip") if f != "description"} | {
+              "retention_min_keep", "vendor", "mgmt_ip", "protocol", "pull_credential_id")
+    before = {f: getattr(c, f) for f in (*fields, "manager_ip", "pull_port") if f != "description"} | {
         "ssh_key": c.ssh_key_fingerprint
     }
+    old_ip, old_port = c.mgmt_ip, c.pull_port
     for field in fields:
         v = getattr(body, field)
         if v is not None:
             setattr(c, field, v)
     if "manager_ip" in body.model_fields_set:
         c.manager_ip = body.manager_ip  # None/"" remove
+    if "pull_port" in body.model_fields_set:
+        c.pull_port = body.pull_port
+    if c.protocol == "ssh" and (c.mgmt_ip != old_ip or c.pull_port != old_port):
+        c.pull_host_key = None  # outro endereço = outro equipamento: fixa a chave de novo
     if c.kind == "server":
         _apply_key(c, body.ssh_public_key)
         _check_key_unique(db, c)
@@ -172,7 +202,7 @@ def update_client(
     audit.record(db, action="update", entity_type="client", entity_id=c.id,
                  actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request),
                  before=before,
-                 after={f: getattr(c, f) for f in fields if f != "description"}
+                 after={f: getattr(c, f) for f in (*fields, "manager_ip", "pull_port") if f != "description"}
                  | {"ssh_key": c.ssh_key_fingerprint})
     db.commit()
     _sync_all(db)
@@ -205,6 +235,46 @@ def delete_client(
                  before={"slug": c.slug, "name": c.name, "kind": c.kind})
     db.commit()
     _sync_all(db)
+
+
+def _pull_client(db: Session, client_id: int) -> Client:
+    c = db.get(Client, client_id)
+    if c is None or c.protocol != "ssh":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "equipamento coletado por SSH não encontrado")
+    return c
+
+
+@router.post("/{client_id}/pull-now", response_model=ClientOut)
+def pull_now(
+    client_id: int, request: Request,
+    db: Session = Depends(get_db), actor: SystemUser = Depends(require_operator),
+) -> ClientOut:
+    """Agenda a coleta para o próximo ciclo do puller (alguns segundos)."""
+    c = _pull_client(db, client_id)
+    if not c.is_active:
+        raise HTTPException(status.HTTP_409_CONFLICT, "equipamento inativo")
+    c.pull_next_at = utcnow()
+    audit.record(db, action="pull_now", entity_type="client", entity_id=c.id,
+                 actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request))
+    db.commit()
+    return _to_out(db, c)
+
+
+@router.post("/{client_id}/accept-host-key", response_model=ClientOut)
+def accept_host_key(
+    client_id: int, request: Request,
+    db: Session = Depends(get_db), actor: SystemUser = Depends(require_operator),
+) -> ClientOut:
+    """Esquece a chave de host fixada: a próxima coleta (já agendada) fixa a que vier."""
+    c = _pull_client(db, client_id)
+    before = mikrotik.host_key_fingerprint(c.pull_host_key)
+    c.pull_host_key = None
+    c.pull_next_at = utcnow()
+    audit.record(db, action="accept_host_key", entity_type="client", entity_id=c.id,
+                 actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request),
+                 before={"host_key": before})
+    db.commit()
+    return _to_out(db, c)
 
 
 def render_agent_config(c: Client, fingerprint: str | None) -> str:

@@ -25,6 +25,10 @@ services:
     environment:
       WORKER_POLL_SECONDS: "5"
 
+  puller:
+    environment:
+      WORKER_POLL_SECONDS: "5"
+
   # Sem domínio público em dev: o proxy Let's Encrypt fica desligado.
   proxy:
     profiles: ["tls"]

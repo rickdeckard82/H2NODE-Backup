@@ -17,12 +17,15 @@ const ACTION_TONE: Record<string, Tone> = {
   download: "amber",
   verify: "blue",
   reset_mfa: "amber",
+  pull_now: "blue",
+  accept_host_key: "amber",
 };
 
 const ENTITY_LABEL: Record<string, string> = {
   client: "Cliente",
   backup: "Backup",
   system_user: "Usuário do painel",
+  device_credential: "Credencial MikroTik",
 };
 
 function pretty(json: string | null) {

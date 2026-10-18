@@ -3,23 +3,27 @@
 Usada duas vezes: na recepção (conteúdo ainda em claro, antes de cifrar) e na
 verificação profunda (depois de decifrar). Formatos aceitos:
 
-- texto puro (Datacom DmOS `show running-config`, Huawei .cfg, Fiberhome `config_<IP>_<data>`);
+- texto puro (Datacom DmOS `show running-config`, Huawei .cfg, Fiberhome `config_<IP>_<data>`,
+  MikroTik `/export`);
 - gzip (Juniper archival: `<host>_juniper.conf.gz_AAAAMMDD_HHMMSS`);
 - zip (Huawei pode enviar o `vrpcfg.zip`).
 """
 
 import gzip
+import hashlib
 import io
+import re
 import zipfile
 import zlib
 from dataclasses import dataclass
 
-VENDORS = ("datacom", "huawei", "juniper", "fiberhome", "generic")
+VENDORS = ("datacom", "huawei", "juniper", "fiberhome", "mikrotik", "generic")
 VENDOR_LABEL = {
     "datacom": "Datacom (DmOS)",
     "huawei": "Huawei (VRP)",
     "juniper": "Juniper (Junos)",
     "fiberhome": "Fiberhome (OLT / UNM2000)",
+    "mikrotik": "MikroTik (RouterOS)",
     "generic": "Genérico",
 }
 
@@ -31,6 +35,22 @@ _DMOS_TOP_LEVEL = (
     "license", "ip ", "ipv6", "switchport", "log", "access-list", "system", "config", "!",
     "service-port", "gpon", "dhcp", "mpls", "layer2", "ntp", "banner", "user",
 )
+
+
+# Cabeçalho do /export do RouterOS: "# 2026-10-18 03:00:01 by RouterOS 7.16.1" (v7) ou
+# "# oct/18/2026 03:00:01 by RouterOS 6.49.10" (v6). Muda a cada exportação.
+_ROS_HEADER = re.compile(rb"^#[^\n]* by RouterOS [^\n]*\n", re.MULTILINE)
+# Mensagens do console do RouterOS quando o comando falha (não é uma exportação).
+ROS_ERRORS = ("expected end of command", "bad command name", "syntax error", "not enough permissions",
+              "no such item", "input does not match")
+
+
+def content_sha256(data: bytes, vendor: str | None) -> str:
+    """Hash usado para "idêntica ao backup anterior": ignora o que muda sozinho a cada
+    exportação (no MikroTik, a linha de data do cabeçalho)."""
+    if vendor == "mikrotik":
+        data = _ROS_HEADER.sub(b"", data.replace(b"\r\n", b"\n"), count=1)
+    return hashlib.sha256(data).hexdigest()
 
 
 @dataclass
@@ -108,6 +128,12 @@ def check(data: bytes, vendor: str | None) -> ConfigCheck:
             False, "não parece uma configuração de OLT Fiberhome (cabeçalho \"!WOS\" ou hostname ausente)",
             lines, fmt,
         )
+    elif vendor == "mikrotik":
+        low = text[:400].lower()
+        if any(e in low for e in ROS_ERRORS):
+            return ConfigCheck(False, "o RouterOS respondeu com erro em vez da exportação", lines, fmt)
+        if "by routeros" not in low and not any(ln.startswith("/") for ln in stripped):
+            return ConfigCheck(False, "não parece um /export do RouterOS", lines, fmt)
     elif vendor == "datacom" and not any(ln.startswith(_DMOS_TOP_LEVEL) for ln in stripped):
         return ConfigCheck(False, "não parece um running-config DmOS", lines, fmt)
 
