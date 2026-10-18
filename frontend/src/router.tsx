@@ -21,6 +21,7 @@ const DecryptHelpPage = lazy(() => import("./features/help/DecryptHelpPage"));
 const CpanelHelpPage = lazy(() => import("./features/help/CpanelHelpPage"));
 const Unm2000HelpPage = lazy(() => import("./features/help/Unm2000HelpPage"));
 const LinuxHelpPage = lazy(() => import("./features/help/LinuxHelpPage"));
+const WindowsHelpPage = lazy(() => import("./features/help/WindowsHelpPage"));
 const DatacomHelpPage = lazy(() => import("./features/help/DatacomHelpPage"));
 const JuniperHelpPage = lazy(() => import("./features/help/JuniperHelpPage"));
 
@@ -109,6 +110,7 @@ export const router = createBrowserRouter([
       },
       { path: "help/decrypt", element: <DecryptHelpPage /> },
       { path: "help/linux", element: <LinuxHelpPage /> },
+      { path: "help/windows", element: <WindowsHelpPage /> },
       { path: "help/cpanel", element: <CpanelHelpPage /> },
       { path: "help/unm2000", element: <Unm2000HelpPage /> },
       { path: "help/juniper", element: <JuniperHelpPage /> },

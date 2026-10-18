@@ -12,6 +12,22 @@
 | Backup "verde" que não restaura | Verificação profunda: tar lido até o fim, dump com marcador final, destinatário GPG correto. |
 | Acesso indevido ao painel | Login com Argon2id, bloqueio progressivo após 5 erros, rate-limit, 2FA TOTP com códigos de recuperação, cookies `HttpOnly`/`SameSite=Strict`/`Secure`, CSRF double-submit, refresh token com rotação e detecção de reuso, papéis, trilha de auditoria (inclusive downloads). |
 
+## Envio por HTTPS (cliente Windows)
+
+- `/api/agent/v1` fica no mesmo endereço público do painel (443). Autenticação por token
+  próprio do computador (`Authorization: Bearer pbu_…`, 256 bits); no banco só fica o
+  SHA-256. O token aparece uma vez no painel, pode ser trocado ou revogado na hora e não
+  vale para o painel (nem o cookie do painel vale para a API de envio).
+- **Só grava**, como o `rrsync -wo`: cria execução, acrescenta bytes a arquivos `*.gpg`
+  numa execução aberta e a fecha com o manifesto. Não lista, não lê conteúdo, não apaga,
+  não renomeia; execução fechada não aceita mais nada. Nomes passam por `safe_child`.
+- Limites: pedaços de até 32 MiB, no máximo 5 execuções abertas por cliente, recusa com
+  menos de 2 GiB livres no disco; execução sem manifesto vai para a quarentena após
+  `INCOMING_STALE_HOURS` (como no rsync).
+- O conteúdo chega **já cifrado** no Windows com a chave pública fixada pelo usuário na
+  conexão (conferindo a impressão digital). Se o servidor passar a anunciar outra chave, o
+  cliente para em vez de cifrar para ela. No Windows, o token fica protegido por DPAPI.
+
 ## Equipamentos de rede (FTP/TFTP)
 
 FTP e TFTP não têm criptografia: a configuração e a senha FTP trafegam em claro. O
@@ -66,7 +82,7 @@ seguida, em `MSSQL_BACKUP_DIR` (modo 700).
 
 | Porta | Quem escuta | Exposição |
 |---|---|---|
-| 443 / 80 | proxy Caddy (rede do host) | pública — HTTPS com Let's Encrypt; 80 só redireciona |
+| 443 / 80 | proxy Caddy (rede do host) | pública — HTTPS com Let's Encrypt; 80 só redireciona. Inclui o envio do cliente Windows (`/api/agent/v1`, token por computador) |
 | 2222 | sshd (rede do host) | **só os IPs dos clientes** (ufw) |
 | 21 + 30000-30049 | receptor FTP (rede do host) | **só os IPs dos equipamentos FTP** (ufw) |
 | 69/udp | receptor TFTP (rede do host) | **só os IPs dos equipamentos TFTP** (ufw) |

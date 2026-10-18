@@ -52,6 +52,11 @@ class Client(Base, TimestampMixin):
     ssh_public_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     ssh_key_fingerprint: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
+    # Token do envio por HTTPS (cliente Windows). Só o SHA-256 fica no banco; o token
+    # aparece uma única vez, ao ser gerado. `hint` = final do token, para reconhecê-lo.
+    upload_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
+    upload_token_hint: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
     # Agenda esperada (o crontab do cliente) — base do alerta de backup atrasado.
     # 0 = sob demanda (ex.: Juniper transfer-on-commit): nunca acusa atraso.
     expected_interval_hours: Mapped[int] = mapped_column(Integer, default=24)

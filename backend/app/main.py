@@ -12,6 +12,7 @@ from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.routes import (
+    agent_upload,
     audit,
     auth,
     backups,
@@ -116,5 +117,6 @@ for r in (
     server.router,
     audit.router,
     system_users.router,
+    agent_upload.router,
 ):
     app.include_router(r, prefix=_p)

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { RefreshButton } from "../../components/RefreshButton";
 import { HealthBadge } from "../../components/status";
 import { Badge, Button, Card, Field, Modal, PageHeader, Spinner, useToast } from "../../components/ui";
+import { WindowsTokenModal } from "./WindowsTokenModal";
 import { api, ApiError } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { useFmtDate } from "../../lib/datetime";
@@ -184,6 +185,7 @@ export default function ClientsPage() {
   const [q, setQ] = useState("");
   const [form, setForm] = useState<FormState | null>(null);
   const [agentFor, setAgentFor] = useState<Client | null>(null);
+  const [winFor, setWinFor] = useState<Client | null>(null);
 
   const list = useQuery({
     queryKey: ["clients", "server", q],
@@ -230,7 +232,7 @@ export default function ClientsPage() {
     <div>
       <PageHeader
         title="Servidores"
-        subtitle="Servidores Linux que enviam backups (agente no crontab do root)"
+        subtitle="Servidores Linux (agente no crontab do root) e computadores Windows (cliente com envio por HTTPS)"
         actions={
           <>
             <RefreshButton keys={["clients"]} />
@@ -288,7 +290,8 @@ export default function ClientsPage() {
                 <td className="td">
                   <div className="flex flex-wrap gap-1">
                     <HealthBadge health={c.health} />
-                    {!c.ssh_key_fingerprint && <Badge tone="amber">sem chave SSH</Badge>}
+                    {c.upload_token_hint && <Badge tone="blue">Windows</Badge>}
+                    {!c.ssh_key_fingerprint && !c.upload_token_hint && <Badge tone="amber">sem chave SSH/token</Badge>}
                   </div>
                 </td>
                 <td className="td" title={fmtDate(c.last_backup_at)}>
@@ -321,6 +324,9 @@ export default function ClientsPage() {
                       <>
                         <button className="text-brand-600 hover:underline dark:text-brand-400" onClick={() => setAgentFor(c)}>
                           Agente
+                        </button>
+                        <button className="text-brand-600 hover:underline dark:text-brand-400" onClick={() => setWinFor(c)}>
+                          Windows
                         </button>
                         <button
                           className="text-brand-600 hover:underline dark:text-brand-400"
@@ -467,6 +473,7 @@ export default function ClientsPage() {
       </Modal>
 
       <AgentConfigModal client={agentFor} onClose={() => setAgentFor(null)} />
+      <WindowsTokenModal client={winFor} onClose={() => setWinFor(null)} />
     </div>
   );
 }

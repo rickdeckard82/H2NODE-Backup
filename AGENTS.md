@@ -21,6 +21,7 @@ de `src/index.css`, componentes de `components/ui.tsx`, gráficos SVG próprios 
 - **Nunca grave dado de backup em claro no servidor.** O worker decifra só em pipe (memória) para testar.
 - **A chave privada GPG só vai para o worker** (`secrets/private/`, montada só nele). O backend nunca a recebe.
 - O agente **nunca altera os arquivos de origem** (`BACKUP_FILES`/`BACKUP_PATHS`): só lê, e apaga apenas as cópias cifradas que criou no `WORK_DIR`.
+- O envio HTTPS (`/api/agent/v1`) é só de gravação, como o rrsync: não acrescente rotas que listem, leiam ou apaguem.
 - O receptor FTP é só de gravação. A única exceção é o IP de UNM2000 (`manager_ip` das OLTs Fiberhome): `DELE`/`RNFR`/`RNTO` respondem sucesso **sem fazer nada**. Não amplie isso.
 - O manifesto do agente é **entrada não confiável**: todo nome de arquivo passa por `storage.safe_child`.
 - O `authorized_keys` é **gerado** (`services/sshkeys.py`); toda chave fica presa a `rrsync -wo -no-del` na
@@ -54,6 +55,10 @@ Renomeie o arquivo gerado para `AAAAMMDD_NNNN_descricao.py` com `revision = "NNN
 
 ## Mapa
 
+- `windows-client/` — cliente Windows (Go + Wails v2 + React): `internal/engine` (tar+gzip+OpenPGP e envio),
+  `internal/api` (HTTPS `/api/agent/v1`), `internal/config` (DPAPI, agendamento). `go test ./...` + `wails build`.
+  Mudança no cliente: suba `Version` em `windows-client/main.go` e `productVersion` em `wails.json`.
+- `backend/app/api/routes/agent_upload.py` — envio HTTPS só-gravação do cliente Windows (token por cliente, hash no banco).
 - `agent/` — agente bash + instalador + exemplo de `agent.conf` (`BACKUP_PATHS` tar+gzip; `BACKUP_FILES` arquivos como estão; `@today`/`@latest`).
 - `sshd/` — receptor rsync/SSH (Debian + rrsync).
 - `backend/app/services/` — `ingest.py` (recepção), `verify.py` (análise), `retention.py`, `gpg.py`, `sshkeys.py`.

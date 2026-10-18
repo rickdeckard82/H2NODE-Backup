@@ -97,6 +97,8 @@ class ClientOut(BaseModel):
     pull_error: str | None
     ssh_public_key: str | None
     ssh_key_fingerprint: str | None
+    # final do token de envio HTTPS (cliente Windows); null = sem token
+    upload_token_hint: str | None
     expected_interval_hours: int
     retention_days: int
     retention_min_keep: int
@@ -111,6 +113,15 @@ class ClientOut(BaseModel):
     health: str = "never"
     created_at: UtcDatetime
     updated_at: UtcDatetime
+
+
+class UploadTokenOut(BaseModel):
+    """Token de envio por HTTPS. `token` só existe nesta resposta (não é guardado em claro)."""
+
+    token: str
+    hint: str
+    server_url: str
+    public_key_fingerprint: str | None
 
 
 class AgentConfigOut(BaseModel):

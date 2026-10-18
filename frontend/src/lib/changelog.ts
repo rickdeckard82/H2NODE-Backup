@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.7.3";
+export const APP_VERSION = "0.8.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.8.0",
+    date: "2026-10-18",
+    changes: [
+      "Cliente Windows (windows-client/): aplicativo com interface e ícone na bandeja para escolher pastas e arquivos, agendar (horário fixo, a cada N horas ou manual, com backup perdido ao ligar) e acompanhar o progresso e o histórico. Cifra no próprio computador com a chave pública (pastas em .tar.gz) e envia por HTTPS em pedaços com retomada.",
+      "Envio por HTTPS no servidor (/api/agent/v1): só cria execuções, acrescenta bytes e fecha com o manifesto — não lista, não lê e não apaga. Cai no mesmo caminho do agente Linux (verificação, retenção, alertas).",
+      "Servidores → Windows: gerar, trocar e revogar o token de envio do computador (aparece uma única vez; só o hash fica no banco).",
+      "Ajuda → Windows: instalação, conexão (conferência da impressão digital da chave), agendamento e restauração.",
+    ],
+  },
   {
     version: "0.7.3",
     date: "2026-10-18",

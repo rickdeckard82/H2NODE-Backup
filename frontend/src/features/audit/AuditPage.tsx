@@ -19,6 +19,8 @@ const ACTION_TONE: Record<string, Tone> = {
   reset_mfa: "amber",
   pull_now: "blue",
   accept_host_key: "amber",
+  upload_token: "amber",
+  upload_token_revoke: "red",
 };
 
 const ENTITY_LABEL: Record<string, string> = {

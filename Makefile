@@ -2,7 +2,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 DEV := docker compose -f docker-compose.yml -f docker-compose.dev.yml
 
-.PHONY: help init keys build up dev down clean ps logs migrate seed test-backend test-e2e lint-agent
+.PHONY: help init keys build up dev down clean ps logs migrate seed test-backend test-e2e lint-agent windows-client test-windows-client
 
 help: ## Lista os alvos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n",$$1,$$2}'
@@ -58,6 +58,13 @@ test-backend: ## Suíte pytest + ruff do backend (imagem própria, sem tocar na 
 
 test-e2e: ## Teste ponta a ponta: stack isolada + agente real (MariaDB e PostgreSQL)
 	./scripts/e2e-test.sh
+
+windows-client: ## Gera windows-client/build/bin/PulseBackup.exe (requer Go, Node e o CLI do Wails v2)
+	cd windows-client && wails build -clean -trimpath -platform windows/amd64
+
+test-windows-client: ## Testes do cliente Windows (Go) + tsc/eslint da interface
+	cd windows-client && go vet ./internal/... . && go test ./internal/...
+	cd windows-client/frontend && npm ci && npx tsc --noEmit && npx eslint . --max-warnings 0
 
 lint-agent: ## shellcheck do agente
 	docker run --rm -v $$PWD/agent:/mnt koalaman/shellcheck:stable -S warning /mnt/pulse-backup-agent.sh /mnt/install.sh

@@ -7,7 +7,15 @@ from app.core.config import settings
 from app.core.db import get_db
 from app.core.security import utcnow
 from app.models import Backup, Client, DeviceCredential, FtpAccount, SystemUser
-from app.schemas.client import AgentConfigOut, ClientCreate, ClientOut, ClientUpdate, DeviceConfigOut
+from app.api.routes.agent_upload import new_token
+from app.schemas.client import (
+    AgentConfigOut,
+    ClientCreate,
+    ClientOut,
+    ClientUpdate,
+    DeviceConfigOut,
+    UploadTokenOut,
+)
 from app.services import audit, gpg, mikrotik, receivers, sshkeys, storage
 from app.services.health import client_health
 
@@ -86,6 +94,8 @@ def _apply_network(db: Session, c: Client) -> None:
     else:
         c.vendor = c.mgmt_ip = c.manager_ip = c.protocol = None
         c.pull_credential_id = c.pull_port = c.pull_host_key = None
+    if c.kind == "network":
+        c.upload_token_hash = c.upload_token_hint = None  # só servidores/computadores enviam por HTTPS
 
 
 def _apply_pull(db: Session, c: Client) -> None:
@@ -235,6 +245,47 @@ def delete_client(
                  before={"slug": c.slug, "name": c.name, "kind": c.kind})
     db.commit()
     _sync_all(db)
+
+
+def _server_client(db: Session, client_id: int) -> Client:
+    c = db.get(Client, client_id)
+    if c is None or c.kind != "server":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "servidor não encontrado")
+    return c
+
+
+@router.post("/{client_id}/upload-token", response_model=UploadTokenOut)
+def create_upload_token(
+    client_id: int, request: Request,
+    db: Session = Depends(get_db), actor: SystemUser = Depends(require_operator),
+) -> UploadTokenOut:
+    """Gera (ou troca) o token do envio por HTTPS — o antigo para de funcionar na hora.
+    O token aparece só nesta resposta."""
+    c = _server_client(db, client_id)
+    token, digest, hint = new_token()
+    before = c.upload_token_hint
+    c.upload_token_hash, c.upload_token_hint = digest, hint
+    audit.record(db, action="upload_token", entity_type="client", entity_id=c.id,
+                 actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request),
+                 before={"token_hint": before}, after={"token_hint": hint})
+    db.commit()
+    pub = gpg.public_key_info()
+    return UploadTokenOut(token=token, hint=hint, server_url=settings.frontend_origin.rstrip("/"),
+                          public_key_fingerprint=pub.fingerprint if pub else None)
+
+
+@router.delete("/{client_id}/upload-token", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_upload_token(
+    client_id: int, request: Request,
+    db: Session = Depends(get_db), actor: SystemUser = Depends(require_operator),
+) -> None:
+    c = _server_client(db, client_id)
+    before = c.upload_token_hint
+    c.upload_token_hash = c.upload_token_hint = None
+    audit.record(db, action="upload_token_revoke", entity_type="client", entity_id=c.id,
+                 actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request),
+                 before={"token_hint": before})
+    db.commit()
 
 
 def _pull_client(db: Session, client_id: int) -> Client:

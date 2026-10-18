@@ -44,6 +44,8 @@ export interface Client {
   pull_error: string | null;
   ssh_public_key: string | null;
   ssh_key_fingerprint: string | null;
+  /** final do token de envio HTTPS (cliente Windows); null = sem token */
+  upload_token_hint: string | null;
   expected_interval_hours: number;
   retention_days: number;
   retention_min_keep: number;

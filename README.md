@@ -10,11 +10,12 @@ Pulse RADIUS e do Projeto.io.
 | Parte | O que faz |
 |---|---|
 | **Agente** (`agent/`) | Script bash no crontab do root de cada cliente. Faz tar das pastas e dump dos bancos (MySQL/MariaDB, PostgreSQL, SQL Server), ou cifra **arquivos que já existem** (ex.: backups de conta do cPanel), **cifra cada parte com a chave pública GPG** do servidor, envia por rsync/SSH e **apaga tudo localmente**. |
+| **Cliente Windows** (`windows-client/`) | Aplicativo com interface e ícone na bandeja (Go + Wails): escolhe pastas e arquivos, agenda, **cifra no computador** com a chave pública e envia por **HTTPS** (pedaços com retomada) para `/api/agent/v1`. Ver [windows-client/README.md](windows-client/README.md). |
 | **ftp / tftp** | Recebem a configuração de switches, roteadores e OLTs (Datacom TFTP; Huawei, Juniper e Fiberhome/UNM2000 FTP). Só gravação, só IPs cadastrados; o worker cifra na chegada. Ver [docs/network-devices.md](docs/network-devices.md). |
 | **sshd** | Recebe os uploads. Só chave pública; cada cliente fica preso (`rrsync -wo -no-del`) à própria pasta, **só escrita** — não lê, não lista, não apaga. |
 | **worker** | Recebe os uploads completos, confere tamanho/SHA-256, **decifra em streaming e testa o conteúdo** (tar íntegro, dump completo), aplica retenção, reverifica periodicamente e mede o disco. |
 | **puller** | Coletor: entra por SSH nos **MikroTik**, roda `/export`, cifra em memória com a chave pública e grava o `.gpg`. Único serviço com saída para a rede além do proxy; não tem a chave privada. |
-| **backend** | API do painel: login com senha (Argon2id) + 2FA opcional, papéis, auditoria, clientes, backups, dashboard. |
+| **backend** | API de envio HTTPS do cliente Windows (só grava: cria execução, acrescenta bytes, fecha com o manifesto) e API do painel: login com senha (Argon2id) + 2FA opcional, papéis, auditoria, clientes, backups, dashboard. |
 | **frontend** | SPA servida por nginx (só em 127.0.0.1), encaminha `/api` ao backend. |
 | **proxy** | Caddy: HTTPS público com certificado **Let's Encrypt automático** para `PUBLIC_DOMAIN`. |
 | **db** | PostgreSQL 16 (só na rede interna). |
@@ -105,6 +106,15 @@ muito). O agente confere se todas as contas de `/var/cpanel/users` têm backup n
 e acusa cada uma que faltar (`CPANEL_CHECK_ACCOUNTS`). A verificação confere o gzip até o fim e o SHA-256 do
 conteúdo. Em **Contas cPanel** (menu) há uma linha por conta, com busca, versões e download.
 Planeje o espaço: o `.tar.gz` não comprime nem deduplica (um dia completo pode passar de 400 GB).
+
+## Computadores Windows
+
+Em **Servidores**, cadastre o computador (sem chave SSH) e clique em **Windows → Gerar
+token**. No `PulseBackup.exe` (gerado com `wails build` em `windows-client/`), cole o
+endereço do painel e o token, confira a impressão digital da chave GPG e escolha pastas,
+arquivos e horário. O aplicativo fica na bandeja, abre com o Windows, cifra cada item no
+próprio computador e envia por HTTPS — o worker verifica como qualquer outro backup.
+Passo a passo em **Ajuda → Windows**.
 
 ## Switches, roteadores e OLTs
 
