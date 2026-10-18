@@ -148,6 +148,11 @@ Section "Pulse Backup" SecMain
   WriteRegDWORD HKLM "${UNINST_KEY}" "NoModify" 1
   WriteRegDWORD HKLM "${UNINST_KEY}" "NoRepair" 1
   WriteRegDWORD HKLM "${UNINST_KEY}" "EstimatedSize" 16000
+
+  ; ícone da bandeja já agora (sem esperar o próximo login). O instalador roda elevado:
+  ; quem abre o atalho é o Explorer, como o usuário logado e SEM elevação.
+  CreateShortcut "$INSTDIR\Bandeja.lnk" "$INSTDIR\${EXE}" "--tray"
+  Exec '"$WINDIR\explorer.exe" "$INSTDIR\Bandeja.lnk"'
 SectionEnd
 
 Function un.onInit
@@ -168,6 +173,7 @@ Section "Uninstall"
   Delete "$SMPROGRAMS\${APP}\*.lnk"
   RMDir "$SMPROGRAMS\${APP}"
   Delete "$INSTDIR\${EXE}"
+  Delete "$INSTDIR\Bandeja.lnk"
   Delete "$INSTDIR\Desinstalar.exe"
   RMDir "$INSTDIR"
   DeleteRegKey HKLM "${UNINST_KEY}"

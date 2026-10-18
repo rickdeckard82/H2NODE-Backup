@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -75,9 +76,19 @@ func (a *App) shutdown(context.Context) {
 	if a.trayIcon != nil {
 		stopTray()
 	}
+	if a.adminMode {
+		// fechou a configuração: garante o ícone na bandeja (se já estiver aberto, a
+		// segunda instância com --tray não faz nada)
+		startTrayAsUser()
+	}
 }
 
-func (a *App) onSecondInstance(options.SecondInstanceData) { a.ShowWindow() }
+func (a *App) onSecondInstance(d options.SecondInstanceData) {
+	if slices.Contains(d.Args, "--tray") {
+		return // pedido para garantir a bandeja: ela já está aberta
+	}
+	a.ShowWindow()
+}
 
 func (a *App) ShowWindow() {
 	if a.ctx == nil {

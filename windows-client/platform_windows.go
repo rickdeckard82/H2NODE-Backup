@@ -5,6 +5,8 @@ package main
 import (
 	"errors"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -28,6 +30,21 @@ func runElevated(args ...string) error {
 		return errUACCanceled
 	}
 	return err
+}
+
+// startTrayAsUser abre o ícone da bandeja como o usuário logado, SEM elevação, mesmo
+// chamado de um processo elevado: quem abre o atalho Bandeja.lnk (criado pelo instalador,
+// "PulseBackup.exe --tray") é o Explorer, que roda como o usuário.
+func startTrayAsUser() {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	lnk := filepath.Join(filepath.Dir(exe), "Bandeja.lnk")
+	if _, err := os.Stat(lnk); err != nil {
+		return
+	}
+	_ = exec.Command(filepath.Join(os.Getenv("WINDIR"), "explorer.exe"), lnk).Start()
 }
 
 // osInfo: "Windows 11 Pro 24H2 (build 26100)". O registro diz "Windows 10" também no
