@@ -119,6 +119,53 @@ cd /root/pulse-agent && ./install.sh --cron "30 2 * * *"`}
       </Card>
 
       <Card className="space-y-3 p-5 text-sm">
+        <h2 className="text-base font-bold">Bancos MySQL / MariaDB</h2>
+        <p>
+          Um arquivo por banco (<Code>NN-mysql-&lt;banco&gt;.sql.gz.gpg</Code>), com <Code>mysqldump</Code>/
+          <Code>mariadb-dump --single-transaction</Code> (inclui rotinas, triggers e eventos). No <Code>agent.conf</Code>:
+        </p>
+        <CopyBlock
+          label="agent.conf"
+          text={`MYSQL_ENABLED="yes"
+MYSQL_DATABASES=( "all" )       # todos, menos information_schema/performance_schema/sys; ou ( "radius" "erp" )
+MYSQL_DEFAULTS_FILE=""          # vazio = unix_socket do root
+MYSQL_DUMP_OPTS=""              # ex.: "--no-tablespaces" no MySQL 8 sem o privilégio PROCESS`}
+        />
+        <p>
+          <b>Sem senha (unix_socket):</b> se <Code>mysql -e &apos;SELECT 1&apos;</Code> funciona como root sem pedir senha (padrão
+          do MariaDB no Debian/Ubuntu), deixe <Code>MYSQL_DEFAULTS_FILE</Code> vazio.
+        </p>
+        <p>
+          <b>Com usuário e senha:</b> crie <Code>/etc/pulse-backup/mysql.cnf</Code> e aponte{" "}
+          <Code>MYSQL_DEFAULTS_FILE=&quot;/etc/pulse-backup/mysql.cnf&quot;</Code>. O agente o passa como{" "}
+          <Code>--defaults-extra-file</Code> ao <Code>mysql</Code> e ao dump.
+        </p>
+        <CopyBlock
+          label="/etc/pulse-backup/mysql.cnf"
+          text={`[client]
+user=pulsebackup
+password="SuaSenhaForteAqui"
+host=localhost
+# socket=/var/run/mysqld/mysqld.sock   # só se o socket não estiver no lugar padrão`}
+        />
+        <CopyBlock label="Permissões" text="chown root:root /etc/pulse-backup/mysql.cnf && chmod 600 /etc/pulse-backup/mysql.cnf" />
+        <Note>
+          Coloque a senha entre aspas se ela tiver <Code>#</Code>, <Code>;</Code> ou espaço.
+        </Note>
+        <p>Prefira um usuário só de leitura a usar o root:</p>
+        <CopyBlock
+          label="No MySQL/MariaDB"
+          text={`CREATE USER 'pulsebackup'@'localhost' IDENTIFIED BY 'SuaSenhaForteAqui';
+GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, LOCK TABLES, PROCESS, RELOAD ON *.* TO 'pulsebackup'@'localhost';
+-- MySQL 8.0.20+: para copiar procedures/functions
+-- GRANT SHOW_ROUTINE ON *.* TO 'pulsebackup'@'localhost';`}
+        />
+        <p>
+          O <Code>pulse-backup-agent test</Code> deve mostrar <Code>MySQL/MariaDB: conexão ok (N bancos)</Code>.
+        </p>
+      </Card>
+
+      <Card className="space-y-3 p-5 text-sm">
         <h2 className="text-base font-bold">Se o teste falhar</h2>
         <ul className="list-disc space-y-1.5 pl-5">
           <li>
@@ -140,6 +187,12 @@ cd /root/pulse-agent && ./install.sh --cron "30 2 * * *"`}
           <li>
             <b>Chave GPG / fingerprint</b> — o <Code>GPG_FINGERPRINT</Code> do <Code>agent.conf</Code> precisa ser o da chave
             pública baixada (Configuração → Chaves e servidor).
+          </li>
+          <li>
+            <b>MySQL/MariaDB: sem conexão</b> — veja o erro real com{" "}
+            <Code>mysql --defaults-extra-file=/etc/pulse-backup/mysql.cnf -e &apos;SHOW DATABASES&apos;</Code> (ou só{" "}
+            <Code>mysql -e &apos;SHOW DATABASES&apos;</Code> se usa unix_socket). <i>Access denied</i> = usuário/senha do{" "}
+            <Code>mysql.cnf</Code>; <i>Can&apos;t connect … socket</i> = descomente <Code>socket=</Code> com o caminho certo.
           </li>
         </ul>
       </Card>

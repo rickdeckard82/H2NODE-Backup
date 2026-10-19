@@ -85,6 +85,42 @@ Bancos suportados:
 | PostgreSQL | `pg_dump --create` por banco + `pg_dumpall --globals-only` | peer, como o usuário `postgres` |
 | SQL Server (Linux) | `BACKUP DATABASE … WITH COPY_ONLY, CHECKSUM` + `RESTORE VERIFYONLY` | `sqlcmd`, senha em arquivo 600 |
 
+### MySQL / MariaDB
+
+No `agent.conf`:
+
+```bash
+MYSQL_ENABLED="yes"
+MYSQL_DATABASES=( "all" )       # todos, menos information_schema/performance_schema/sys; ou ( "radius" "erp" )
+MYSQL_DEFAULTS_FILE=""          # vazio = unix_socket do root
+MYSQL_DUMP_OPTS=""              # ex.: "--no-tablespaces" no MySQL 8 sem o privilégio PROCESS
+```
+
+Se `mysql -e 'SELECT 1'` funciona como root sem pedir senha (padrão do MariaDB no Debian/Ubuntu),
+deixe `MYSQL_DEFAULTS_FILE` vazio. Senão, crie `/etc/pulse-backup/mysql.cnf` (root:root, modo 600)
+e aponte `MYSQL_DEFAULTS_FILE="/etc/pulse-backup/mysql.cnf"` — o agente o passa como
+`--defaults-extra-file` ao `mysql` e ao `mysqldump`/`mariadb-dump`:
+
+```ini
+[client]
+user=pulsebackup
+password="SuaSenhaForteAqui"    # entre aspas se tiver # ; ou espaço
+host=localhost
+# socket=/var/run/mysqld/mysqld.sock
+```
+
+Prefira um usuário só de leitura a usar o root (o dump usa `--single-transaction --routines --triggers --events`):
+
+```sql
+CREATE USER 'pulsebackup'@'localhost' IDENTIFIED BY 'SuaSenhaForteAqui';
+GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, LOCK TABLES, PROCESS, RELOAD ON *.* TO 'pulsebackup'@'localhost';
+-- MySQL 8.0.20+: GRANT SHOW_ROUTINE ON *.* TO 'pulsebackup'@'localhost';
+```
+
+`pulse-backup-agent test` deve mostrar `MySQL/MariaDB: conexão ok (N bancos)`. Se mostrar
+`sem conexão`, veja o erro com `mysql --defaults-extra-file=/etc/pulse-backup/mysql.cnf -e 'SHOW DATABASES'`.
+Cada banco vira um arquivo `NN-mysql-<banco>.sql.gz.gpg`.
+
 ## cPanel/WHM e arquivos grandes
 
 Backups que já existem em disco (ex.: um `.tar.gz` por conta do cPanel, dezenas de GB) não
