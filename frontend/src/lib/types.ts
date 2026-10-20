@@ -37,6 +37,9 @@ export interface Client {
   mgmt_ip: string | null;
   manager_ip: string | null;
   protocol: "ftp" | "tftp" | "ssh" | null;
+  /** FTP: conta presa ao cadastro (null = qualquer conta). Obrigatória se outro cadastro FTP usa o mesmo IP. */
+  ftp_account_id: number | null;
+  ftp_user: string | null;
   /** MikroTik: credencial de acesso, porta (null = a da credencial) e estado da coleta. */
   pull_credential_id: number | null;
   pull_port: number | null;

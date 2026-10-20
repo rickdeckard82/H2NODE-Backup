@@ -25,8 +25,14 @@ class Client(Base, TimestampMixin):
     # datacom | huawei | juniper | fiberhome | mikrotik | generic — define as instruções e a validação.
     vendor: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # IP de origem com que o equipamento chega ao servidor (identifica o upload).
-    # MikroTik (ssh): o IP onde o coletor conecta.
-    mgmt_ip: Mapped[str | None] = mapped_column(String(45), nullable=True, unique=True)
+    # MikroTik (ssh): o IP onde o coletor conecta. Pode repetir entre cadastros: no FTP
+    # o login distingue (ftp_account_id); TFTP e o IP da UNM2000 continuam únicos.
+    mgmt_ip: Mapped[str | None] = mapped_column(String(45), nullable=True, index=True)
+    # Conta FTP presa a este cadastro: só ela envia por ele. Obrigatória quando outro
+    # cadastro FTP usa o mesmo IP (é o login que diz de quem é o arquivo).
+    ftp_account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("ftp_account.id", ondelete="SET NULL"), nullable=True
+    )
     # ftp | tftp (o equipamento envia) | ssh (o coletor busca: MikroTik)
     protocol: Mapped[str | None] = mapped_column(String(8), nullable=True)
     # Só OLT Fiberhome: IP da UNM2000 que gerencia o FTP (apaga/renomeia o arquivo que a OLT

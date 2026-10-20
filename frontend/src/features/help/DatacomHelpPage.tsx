@@ -25,8 +25,8 @@ export default function DatacomHelpPage() {
           <p>
             Em <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/devices">FTP/TFTP</Link>: nome,
             fabricante <b>Datacom (DmOS)</b>, protocolo <b>TFTP</b> e o <b>IP de origem</b>, o IP com que o equipamento chega ao
-            servidor. O TFTP não tem usuário nem senha: o que autoriza o envio é esse IP, e cada IP pertence a um único
-            equipamento.
+            servidor. O TFTP não tem usuário nem senha: o que autoriza o envio é esse IP, e cada IP tem um único cadastro
+            TFTP.
           </p>
           <p>
             O botão <b>Comandos</b> da linha do equipamento mostra o <b>identificador</b> (slug) usado na pasta do destino, como{" "}

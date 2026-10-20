@@ -34,7 +34,8 @@ export default function JuniperHelpPage() {
           <p>
             Em <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/devices">FTP/TFTP</Link>: nome,
             fabricante <b>Juniper (Junos)</b>, protocolo <b>FTP</b> e o <b>IP de origem</b>, o IP com que o roteador chega ao
-            servidor. Ele identifica de quem é o arquivo e cada IP pertence a um único equipamento.
+            servidor. Ele identifica de quem é o arquivo (se outro cadastro FTP usar o mesmo IP, escolha uma <b>Conta FTP</b>
+            diferente em cada um).
           </p>
           <Note tone="warn">
             Se o roteador sai por NAT ou por outra interface, o IP que o servidor enxerga não é o da interface de gerência.

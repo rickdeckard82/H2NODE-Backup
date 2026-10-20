@@ -99,6 +99,11 @@ export default function FtpFilesHelpPage() {
             aqui (se sair por NAT, o IP público do NAT). Intervalo esperado: o do agendamento (ex.: <b>24</b> h), para ser alertado
             se o envio parar.
           </p>
+          <Note>
+            Vários serviços no mesmo servidor (mesmo IP)? Crie uma conta FTP para cada um e escolha-a no campo{" "}
+            <b>Conta FTP</b> de cada cadastro: é o login que diz de qual cadastro é o arquivo. O mesmo IP também pode ter um
+            backup pelo agente (Servidores) ou um MikroTik coletado por SSH, sem conflito.
+          </Note>
         </Step>
 
         <Step n={3} title="Libere o IP no firewall do servidor de backup">

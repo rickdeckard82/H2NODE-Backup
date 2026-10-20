@@ -22,6 +22,7 @@ interface FormState {
   vendor: PushVendor;
   mgmt_ip: string;
   manager_ip: string;
+  ftp_account_id: number | null;
   protocol: Protocol;
   expected_interval_hours: number;
   retention_days: number;
@@ -36,6 +37,7 @@ const empty: FormState = {
   vendor: "huawei",
   mgmt_ip: "",
   manager_ip: "",
+  ftp_account_id: null,
   protocol: "ftp",
   // Huawei/Juniper/UNM2000 enviam a cada alteração: sob demanda (sem alerta de atraso)
   expected_interval_hours: 0,
@@ -144,6 +146,11 @@ export default function DevicesPage() {
     // MikroTik (coletado por SSH) tem menu próprio
     select: (rows) => rows.filter((c) => c.protocol !== "ssh"),
   });
+  const ftpAccounts = useQuery({
+    queryKey: ["ftp-account-options"],
+    queryFn: () => api.get<{ id: number; username: string; is_active: boolean }[]>("/clients/ftp-account-options"),
+    enabled: !!form && form.protocol === "ftp",
+  });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["clients"] });
 
   const save = useMutation({
@@ -156,6 +163,7 @@ export default function DevicesPage() {
         mgmt_ip: f.mgmt_ip.trim(),
         // só OLT Fiberhome por FTP tem UNM2000; "" remove (o servidor também limpa nos outros casos)
         manager_ip: f.vendor === "fiberhome" && f.protocol === "ftp" ? f.manager_ip.trim() : "",
+        ftp_account_id: f.protocol === "ftp" ? f.ftp_account_id : null,
         protocol: f.protocol,
         expected_interval_hours: f.expected_interval_hours,
         retention_days: f.retention_days,
@@ -245,6 +253,9 @@ export default function DevicesPage() {
                 <td className="td">
                   <Badge tone="blue">{c.protocol?.toUpperCase()}</Badge>
                   <div className="mt-0.5 font-mono text-xs text-slate-400 dark:text-slate-500">de {c.mgmt_ip}</div>
+                  {c.ftp_user && (
+                    <div className="font-mono text-xs text-slate-400 dark:text-slate-500">conta {c.ftp_user}</div>
+                  )}
                   {c.manager_ip && (
                     <div className="font-mono text-xs text-slate-400 dark:text-slate-500">UNM2000 {c.manager_ip}</div>
                   )}
@@ -284,6 +295,7 @@ export default function DevicesPage() {
                               vendor: (c.vendor ?? "generic") as PushVendor,
                               mgmt_ip: c.mgmt_ip ?? "",
                               manager_ip: c.manager_ip ?? "",
+                              ftp_account_id: c.ftp_account_id,
                               protocol: (c.protocol ?? "ftp") as Protocol,
                               expected_interval_hours: c.expected_interval_hours,
                               retention_days: c.retention_days,
@@ -406,6 +418,26 @@ export default function DevicesPage() {
                   placeholder="IP da UNM2000 (deixe vazio se não houver)"
                   onChange={(e) => setForm({ ...form, manager_ip: e.target.value })}
                 />
+              </Field>
+            )}
+            {form.protocol === "ftp" && (
+              <Field
+                label="Conta FTP"
+                hint="Qualquer conta = aceita o login de qualquer conta ativa. Para dividir o IP com outro cadastro FTP (ex.: dois serviços no mesmo servidor), escolha uma conta diferente em cada um: é o login que diz de quem é o arquivo."
+              >
+                <select
+                  className="input"
+                  value={form.ftp_account_id ?? ""}
+                  onChange={(e) => setForm({ ...form, ftp_account_id: e.target.value ? Number(e.target.value) : null })}
+                >
+                  <option value="">Qualquer conta</option>
+                  {ftpAccounts.data?.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.username}
+                      {a.is_active ? "" : " (inativa)"}
+                    </option>
+                  ))}
+                </select>
               </Field>
             )}
             <Field label="Descrição">

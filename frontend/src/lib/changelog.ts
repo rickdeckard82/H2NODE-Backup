@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.8";
+export const APP_VERSION = "0.9.9";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.9",
+    date: "2026-10-19",
+    changes: [
+      "FTP/TFTP: o mesmo IP pode ter mais de um cadastro. No FTP, cada cadastro do IP escolhe a sua Conta FTP (novo campo) e o login diz de quem é o arquivo; TFTP continua com um cadastro por IP; MikroTik (SSH) não disputa o IP.",
+      "FTP/TFTP: o erro de IP repetido diz qual cadastro já usa o IP.",
+    ],
+  },
   {
     version: "0.9.8",
     date: "2026-10-19",

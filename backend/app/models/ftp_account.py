@@ -10,7 +10,8 @@ class FtpAccount(Base, TimestampMixin):
     """Conta do receptor FTP usada pelos equipamentos (ex.: "juniper").
 
     Só funciona a partir do IP de um equipamento de rede ativo com protocolo
-    FTP; o upload é atribuído ao equipamento pelo IP de origem. A conta só grava
+    FTP; o upload é atribuído ao equipamento pelo IP de origem (e, se o IP tiver mais de um
+    cadastro FTP, pela conta presa a cada um — Client.ftp_account_id). A conta só grava
     (não lê, não apaga). Senha guardada como hash Argon2id.
     """
 

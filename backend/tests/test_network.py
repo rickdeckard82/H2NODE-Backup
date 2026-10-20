@@ -317,9 +317,9 @@ def test_api_network_device_and_ftp_accounts(auth_client, isolated_paths):
     assert r.status_code == 201, r.text
     dev = r.json()
     assert dev["kind"] == "network" and dev["ssh_public_key"] is None
-    dup = body | {"slug": "sw-2", "vendor": "datacom", "protocol": "tftp"}
+    dup = body | {"slug": "sw-2"}
     r = auth_client.post("/api/clients", json=dup)
-    assert r.status_code == 409  # IP repetido
+    assert r.status_code == 409  # mesmo IP no FTP sem conta presa: não daria para saber de quem é
     assert auth_client.post("/api/clients", json={"slug": "sw-3", "name": "x", "kind": "network",
                                                   "vendor": "datacom", "protocol": "tftp",
                                                   "mgmt_ip": "999.1.1.1"}).status_code == 422
@@ -330,7 +330,7 @@ def test_api_network_device_and_ftp_accounts(auth_client, isolated_paths):
     assert r.status_code == 201
 
     allow = json.loads((isolated_paths / "netcfg" / receivers.ALLOWLIST_FILE).read_text())
-    expected = {"slug": "sw-core", "ip": "192.0.2.15", "protocol": "ftp", "vendor": "huawei"}
+    expected = {"slug": "sw-core", "ip": "192.0.2.15", "protocol": "ftp", "vendor": "huawei", "ftp_user": None}
     assert allow["devices"] == [expected]
     assert allow["ftp_accounts"][0]["username"] == "huawei"
     assert "Senha-forte-1" not in json.dumps(allow)
@@ -579,3 +579,85 @@ def test_api_files_vendor_ftp_only(auth_client, isolated_paths):
     cfg = auth_client.get(f"/api/clients/{r.json()['id']}/device-config").json()
     assert "curl" in cfg["commands"] and "netrc" in cfg["commands"]
     assert any("NET_FILES_MAX_MB" in n for n in cfg["notes"])
+
+
+# ---------------------------------------------------- IP compartilhado (FTP) --
+
+
+def test_allowlist_shared_ip_ftp_account_picks_the_device():
+    allow = write_allowlist([
+        {"slug": "svc-a", "ip": "10.0.0.5", "protocol": "ftp", "vendor": "files", "ftp_user": "conta-a"},
+        {"slug": "svc-b", "ip": "10.0.0.5", "protocol": "ftp", "vendor": "files", "ftp_user": "conta-b"},
+        {"slug": "sw", "ip": "10.0.0.6", "protocol": "ftp", "vendor": "huawei", "ftp_user": None},
+        {"slug": "sw-preso", "ip": "10.0.0.7", "protocol": "ftp", "vendor": "huawei", "ftp_user": "conta-a"},
+    ])
+    assert allow.device("10.0.0.5", "ftp") is not None  # antes do login: só aceita a conexão
+    assert allow.device("10.0.0.5", "ftp", "conta-a").slug == "svc-a"
+    assert allow.device("10.0.0.5", "ftp", "conta-b").slug == "svc-b"
+    assert allow.device("10.0.0.5", "ftp", "outra") is None  # IP dividido: conta precisa ser de um deles
+    assert allow.device("10.0.0.6", "ftp", "qualquer").slug == "sw"  # sem conta presa: qualquer conta
+    assert allow.device("10.0.0.7", "ftp", "conta-b") is None  # conta presa: só ela
+    assert allow.device("10.0.0.5", "tftp") is None
+
+
+def test_ftp_shared_ip_upload_goes_to_the_account_device():
+    allow = write_allowlist(
+        [{"slug": "svc-a", "ip": "127.0.0.1", "protocol": "ftp", "vendor": "files", "ftp_user": "conta-a"},
+         {"slug": "svc-b", "ip": "127.0.0.1", "protocol": "ftp", "vendor": "files", "ftp_user": FTP_USER}],
+        {FTP_USER: hash_password(FTP_PASS), "conta-a": hash_password("Senha-da-conta-a")},
+    )
+    srv = ftp_recv.build_server("127.0.0.1", 0, allow)
+    t = threading.Thread(target=srv.serve_forever, kwargs={"timeout": 0.2, "handle_exit": False}, daemon=True)
+    t.start()
+    try:
+        f = ftp_connect(srv)
+        f.login(FTP_USER, FTP_PASS)
+        f.storbinary("STOR app.sql", io.BytesIO(MYSQL_DUMP))
+        f.quit()
+        assert len(wait_ready("svc-b")) == 1
+        assert not ready_files("svc-a")
+    finally:
+        srv.close_all()
+
+
+def test_api_shared_ip_rules(auth_client, isolated_paths):
+    acc = [auth_client.post("/api/ftp-accounts", json={"username": u, "password": "Senha-forte-1"})
+           .json()["id"] for u in ("conta-a", "conta-b")]
+    opts = auth_client.get("/api/clients/ftp-account-options").json()
+    assert [o["username"] for o in opts] == ["conta-a", "conta-b"]
+    base = {"kind": "network", "vendor": "files", "protocol": "ftp", "mgmt_ip": "10.0.0.5"}
+    r = auth_client.post("/api/clients", json={**base, "slug": "svc-a", "name": "Serviço A"})
+    assert r.status_code == 201, r.text
+    a_id = r.json()["id"]
+
+    # mesmo IP por FTP: recusado enquanto os dois não tiverem conta, e o erro diz quem tem o IP
+    svc_b = {**base, "slug": "svc-b", "name": "Serviço B"}
+    r = auth_client.post("/api/clients", json={**svc_b, "ftp_account_id": acc[1]})
+    assert r.status_code == 409 and "'Serviço A'" in r.json()["detail"]
+    r = auth_client.patch(f"/api/clients/{a_id}", json={"ftp_account_id": acc[0]})
+    assert r.json()["ftp_user"] == "conta-a"
+    assert auth_client.post("/api/clients", json={**svc_b, "ftp_account_id": acc[0]}).status_code == 409
+    r = auth_client.post("/api/clients", json={**svc_b, "ftp_account_id": acc[1]})
+    assert r.status_code == 201, r.text
+    cfg = auth_client.get(f"/api/clients/{r.json()['id']}/device-config").json()
+    assert cfg["ftp_accounts"] == ["conta-b"] and "user conta-b" not in cfg["commands"]
+    assert "login conta-b" in cfg["commands"]
+
+    # MikroTik coletado por SSH no mesmo IP: sem conflito
+    cred = auth_client.post("/api/device-credentials",
+                            json={"name": "bkp", "username": "bkp", "password": "Senha-forte-1"})
+    assert cred.status_code == 201, cred.text
+    r = auth_client.post("/api/clients", json={"kind": "network", "vendor": "mikrotik", "protocol": "ssh",
+                                               "mgmt_ip": "10.0.0.5", "slug": "rb-svc", "name": "RB",
+                                               "pull_credential_id": cred.json()["id"],
+                                               "expected_interval_hours": 24})
+    assert r.status_code == 201, r.text
+
+    # TFTP não tem login: um cadastro TFTP por IP
+    t = {"kind": "network", "vendor": "datacom", "protocol": "tftp", "mgmt_ip": "10.0.0.9"}
+    assert auth_client.post("/api/clients", json={**t, "slug": "dm1", "name": "DM1"}).status_code == 201
+    assert auth_client.post("/api/clients", json={**t, "slug": "dm2", "name": "DM2"}).status_code == 409
+
+    allow = json.loads((isolated_paths / "netcfg" / receivers.ALLOWLIST_FILE).read_text())
+    by_slug = {d["slug"]: d for d in allow["devices"]}
+    assert by_slug["svc-a"]["ftp_user"] == "conta-a" and by_slug["svc-b"]["ftp_user"] == "conta-b"

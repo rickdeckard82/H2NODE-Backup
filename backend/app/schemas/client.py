@@ -33,6 +33,8 @@ class ClientBase(BaseModel):
     mgmt_ip: str | None = Field(default=None, max_length=45)
     manager_ip: str | None = Field(default=None, max_length=45)
     protocol: Protocol | None = None
+    # FTP: conta presa ao cadastro (obrigatória se outro cadastro FTP usa o mesmo IP)
+    ftp_account_id: int | None = None
     # MikroTik: credencial de acesso SSH e porta (vazio = a da credencial)
     pull_credential_id: int | None = None
     pull_port: int | None = Field(default=None, ge=1, le=65535)
@@ -61,6 +63,8 @@ class ClientUpdate(BaseModel):
     # enviado (inclusive vazio) = grava; ausente = mantém (por isso usa model_fields_set)
     manager_ip: str | None = Field(default=None, max_length=45)
     protocol: Protocol | None = None
+    # enviado (inclusive null) = grava; ausente = mantém
+    ftp_account_id: int | None = None
     pull_credential_id: int | None = None
     # enviado (inclusive null) = grava; ausente = mantém
     pull_port: int | None = Field(default=None, ge=1, le=65535)
@@ -89,6 +93,8 @@ class ClientOut(BaseModel):
     mgmt_ip: str | None
     manager_ip: str | None
     protocol: str | None
+    ftp_account_id: int | None
+    ftp_user: str | None = None
     pull_credential_id: int | None
     pull_port: int | None
     pull_host_key_fingerprint: str | None = None
@@ -113,6 +119,12 @@ class ClientOut(BaseModel):
     health: str = "never"
     created_at: UtcDatetime
     updated_at: UtcDatetime
+
+
+class FtpAccountOption(BaseModel):
+    id: int
+    username: str
+    is_active: bool
 
 
 class UploadTokenOut(BaseModel):

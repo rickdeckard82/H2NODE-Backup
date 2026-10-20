@@ -21,7 +21,11 @@ retenção, verificação e alertas iguais aos dos servidores Linux).
    Senha de 8 a 64 caracteres, sem espaço, `@`, `:` ou `/`.
 2. **FTP/TFTP → Novo cadastro**: nome, tipo (fabricante), protocolo e o
    **IP de origem** — o IP com que o equipamento chega ao servidor. É ele que
-   identifica de quem é o arquivo (cada IP pertence a um único equipamento).
+   identifica de quem é o arquivo. O mesmo IP pode ter mais de um cadastro:
+   - **FTP**: cada cadastro do IP precisa da sua **Conta FTP** (campo do cadastro) — o
+     login diz de quem é o arquivo; com um cadastro só, "Qualquer conta" basta;
+   - **TFTP** (sem login): um cadastro TFTP por IP;
+   - **SSH** (MikroTik): o coletor é quem conecta, não disputa o IP.
 3. **Comandos**: o painel mostra o que colar no equipamento.
 4. Libere o IP no firewall: `sudo ./scripts/ufw-setup.sh device <IP> ftp|tftp`.
 

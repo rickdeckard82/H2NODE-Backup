@@ -2,7 +2,8 @@
 sem acesso ao banco).
 
 O painel/worker grava `receivers.json` no volume compartilhado com:
-  - equipamentos ATIVOS (slug, IP de origem, protocolo);
+  - equipamentos ATIVOS (slug, IP de origem, protocolo e, no FTP, a conta presa ao
+    cadastro — um IP pode ter vários cadastros FTP, um por conta);
   - contas FTP ATIVAS (usuário + hash Argon2id da senha).
 Os receptores recarregam o arquivo quando ele muda.
 
@@ -43,8 +44,10 @@ def netin() -> Path:
 def render(db: Session) -> dict:
     from app.models import Client, FtpAccount
 
+    users = {a.id: a.username for a in db.execute(select(FtpAccount)).scalars()}
     devices = [
-        {"slug": c.slug, "ip": c.mgmt_ip, "protocol": c.protocol, "vendor": c.vendor}
+        {"slug": c.slug, "ip": c.mgmt_ip, "protocol": c.protocol, "vendor": c.vendor,
+         "ftp_user": users.get(c.ftp_account_id) if c.ftp_account_id else None}
         for c in db.execute(
             select(Client).where(Client.kind == "network", Client.is_active.is_(True))
         ).scalars()
@@ -103,6 +106,8 @@ class Device:
     ip: str
     protocol: str
     vendor: str | None
+    # FTP: só esta conta envia por este cadastro (None = qualquer conta)
+    ftp_user: str | None = None
 
 
 class Allowlist:
@@ -111,7 +116,7 @@ class Allowlist:
     def __init__(self, path: Path | None = None) -> None:
         self.path = path or (shared_dir() / ALLOWLIST_FILE)
         self._mtime: float | None = None
-        self.by_ip: dict[str, Device] = {}
+        self.by_ip: dict[str, list[Device]] = {}
         self.managers: set[str] = set()
         self.accounts: dict[str, str] = {}
 
@@ -128,25 +133,37 @@ class Allowlist:
         except (OSError, ValueError) as exc:
             logger.error("receivers_allowlist_unreadable", error=str(exc))
             return
-        self.by_ip = {
-            d["ip"]: Device(d["slug"], d["ip"], d["protocol"], d.get("vendor"))
-            for d in data.get("devices", [])
-        }
+        by_ip: dict[str, list[Device]] = {}
+        for d in data.get("devices", []):
+            by_ip.setdefault(d["ip"], []).append(
+                Device(d["slug"], d["ip"], d["protocol"], d.get("vendor"), d.get("ftp_user"))
+            )
+        self.by_ip = by_ip
         self.accounts = {a["username"]: a["password_hash"] for a in data.get("ftp_accounts", [])}
         self.managers = {m for m in data.get("managers", []) if isinstance(m, str)}
         self._mtime = mtime
         logger.info("receivers_allowlist_loaded", devices=len(self.by_ip), accounts=len(self.accounts),
                     managers=len(self.managers))
 
-    def device(self, ip: str, protocol: str) -> Device | None:
+    def device(self, ip: str, protocol: str, username: str | None = None) -> Device | None:
+        """Cadastro que recebe o envio deste IP. Sem `username` (antes do login FTP), qualquer
+        cadastro do IP serve só para aceitar a conexão. No login FTP, a conta escolhe entre os
+        cadastros do IP: o preso a ela ou, se for o único do IP, o sem conta presa."""
         self.refresh()
         # IPv4 mapeado em IPv6 (::ffff:10.0.0.1) quando o socket é dual-stack
         if ip.startswith("::ffff:"):
             ip = ip[7:]
-        d = self.by_ip.get(ip)
-        if d is None and protocol == "ftp" and ip in self.managers:
+        cands = [d for d in self.by_ip.get(ip, []) if d.protocol == protocol]
+        if protocol == "ftp" and username is not None:
+            bound = [d for d in cands if d.ftp_user == username]
+            if bound:
+                return bound[0]
+            cands = cands if len(cands) == 1 and cands[0].ftp_user is None else []
+        if cands:
+            return cands[0]
+        if protocol == "ftp" and ip in self.managers:
             return Device(MANAGER_SLUG, ip, "ftp", MANAGER_VENDOR)
-        return d if d and d.protocol == protocol else None
+        return None
 
 
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")

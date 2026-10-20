@@ -50,7 +50,8 @@ class AllowlistAuthorizer(DummyAuthorizer):
         self._homes: dict[str, str] = {}
 
     def validate_authentication(self, username, password, handler):  # noqa: ANN001
-        device = self.allowlist.device(handler.remote_ip, "ftp")
+        # a conta escolhe o cadastro quando o IP tem mais de um (ex.: serviços no mesmo servidor)
+        device = self.allowlist.device(handler.remote_ip, "ftp", username)
         stored = self.allowlist.accounts.get(username)
         # verify_password roda mesmo com usuário inexistente (tempo constante)
         ok = verify_password(password, stored or receivers_dummy_hash())

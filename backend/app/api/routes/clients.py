@@ -14,6 +14,7 @@ from app.schemas.client import (
     ClientOut,
     ClientUpdate,
     DeviceConfigOut,
+    FtpAccountOption,
     UploadTokenOut,
 )
 from app.services import audit, gpg, mikrotik, receivers, sshkeys, storage
@@ -31,6 +32,9 @@ def _to_out(db: Session, c: Client) -> ClientOut:
     ).scalar_one()
     out.health = client_health(c)
     out.pull_host_key_fingerprint = mikrotik.host_key_fingerprint(c.pull_host_key)
+    if c.ftp_account_id:
+        acc = db.get(FtpAccount, c.ftp_account_id)
+        out.ftp_user = acc.username if acc else None
     return out
 
 
@@ -72,16 +76,16 @@ def _apply_network(db: Session, c: Client) -> None:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                                 "arquivos e bancos são enviados por FTP")
         _apply_pull(db, c)
-        if db.execute(select(Client.id).where(Client.mgmt_ip == c.mgmt_ip, Client.id != (c.id or 0))).first():
-            # o upload é atribuído pelo IP de origem: precisa ser único
-            raise HTTPException(status.HTTP_409_CONFLICT, f"o IP {c.mgmt_ip} já pertence a outro equipamento")
+        _check_shared_ip(db, c)
         if c.vendor != "fiberhome" or c.protocol != "ftp":
             c.manager_ip = None  # só OLT Fiberhome por FTP tem UNM2000
         if c.manager_ip:
             if c.manager_ip == c.mgmt_ip:
                 raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                                     "o IP da UNM2000 não pode ser o da própria OLT")
-            owner = db.execute(select(Client.name).where(Client.mgmt_ip == c.manager_ip)).scalar_one_or_none()
+            owner = db.execute(
+                select(Client.name).where(Client.mgmt_ip == c.manager_ip, Client.protocol == "ftp")
+            ).scalars().first()
             if owner:
                 # um IP não pode ser equipamento e gerenciador ao mesmo tempo
                 raise HTTPException(
@@ -89,16 +93,52 @@ def _apply_network(db: Session, c: Client) -> None:
                     f"o IP {c.manager_ip} já está cadastrado como equipamento ('{owner}'): exclua esse "
                     "cadastro — o IP da UNM2000 é informado em cada OLT",
                 )
-        elif c.mgmt_ip and db.execute(
+        elif c.protocol == "ftp" and db.execute(
             select(Client.name).where(Client.manager_ip == c.mgmt_ip, Client.id != (c.id or 0))
         ).first():
             raise HTTPException(status.HTTP_409_CONFLICT,
                                 f"o IP {c.mgmt_ip} já é usado como IP da UNM2000 em outra OLT")
     else:
-        c.vendor = c.mgmt_ip = c.manager_ip = c.protocol = None
+        c.vendor = c.mgmt_ip = c.manager_ip = c.protocol = c.ftp_account_id = None
         c.pull_credential_id = c.pull_port = c.pull_host_key = None
     if c.kind == "network":
         c.upload_token_hash = c.upload_token_hint = None  # só servidores/computadores enviam por HTTPS
+
+
+def _check_shared_ip(db: Session, c: Client) -> None:
+    """O mesmo IP pode ter vários cadastros, desde que o receptor saiba de quem é cada envio:
+    - SSH (MikroTik): o coletor é quem conecta — não disputa o IP com ninguém;
+    - TFTP: não tem login — um cadastro TFTP por IP;
+    - FTP: o login distingue — com mais de um cadastro FTP no IP, cada um precisa da sua conta."""
+    if c.protocol != "ftp":
+        c.ftp_account_id = None
+    elif c.ftp_account_id is not None:
+        acc = db.get(FtpAccount, c.ftp_account_id)
+        if acc is None:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "conta FTP não encontrada")
+    if c.protocol == "ssh":
+        return
+    others = db.execute(
+        select(Client).where(Client.mgmt_ip == c.mgmt_ip, Client.id != (c.id or 0),
+                             Client.protocol == c.protocol)
+    ).scalars().all()
+    if not others:
+        return
+    names = ", ".join(f"'{o.name}'" for o in others)
+    if c.protocol == "tftp":
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            f"o IP {c.mgmt_ip} já envia por TFTP em {names} — TFTP não tem login, então "
+                            "é um cadastro TFTP por IP")
+    if c.ftp_account_id is None or any(o.ftp_account_id is None for o in others):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"o IP {c.mgmt_ip} já envia por FTP em {names}: para dividir o IP, escolha uma conta FTP "
+            "diferente em cada cadastro (é o login que diz de quem é o arquivo)",
+        )
+    clash = [o.name for o in others if o.ftp_account_id == c.ftp_account_id]
+    if clash:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            f"a conta FTP escolhida já é usada com o IP {c.mgmt_ip} em '{clash[0]}'")
 
 
 def _apply_pull(db: Session, c: Client) -> None:
@@ -143,6 +183,15 @@ def list_clients(
     return [_to_out(db, c) for c in db.execute(stmt.order_by(Client.name)).scalars()]
 
 
+@router.get("/ftp-account-options", response_model=list[FtpAccountOption])
+def ftp_account_options(
+    db: Session = Depends(get_db), _: SystemUser = Depends(require_operator)
+) -> list[FtpAccountOption]:
+    """Contas FTP para o cadastro (só id e usuário: a gestão das contas é do admin)."""
+    return [FtpAccountOption(id=a.id, username=a.username, is_active=a.is_active)
+            for a in db.execute(select(FtpAccount).order_by(FtpAccount.username)).scalars()]
+
+
 @router.get("/{client_id}", response_model=ClientOut)
 def get_client(
     client_id: int, db: Session = Depends(get_db), _: SystemUser = Depends(require_auditor)
@@ -163,7 +212,8 @@ def create_client(
     c = Client(
         slug=body.slug, name=body.name, description=body.description, is_active=body.is_active,
         kind=body.kind, vendor=body.vendor, mgmt_ip=body.mgmt_ip, manager_ip=body.manager_ip,
-        protocol=body.protocol, pull_credential_id=body.pull_credential_id, pull_port=body.pull_port,
+        protocol=body.protocol, ftp_account_id=body.ftp_account_id,
+        pull_credential_id=body.pull_credential_id, pull_port=body.pull_port,
         expected_interval_hours=body.expected_interval_hours,
         retention_days=body.retention_days, retention_min_keep=body.retention_min_keep,
     )
@@ -177,6 +227,7 @@ def create_client(
                  actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request),
                  after={"slug": c.slug, "name": c.name, "kind": c.kind, "ssh_key": c.ssh_key_fingerprint,
                         "mgmt_ip": c.mgmt_ip, "manager_ip": c.manager_ip, "protocol": c.protocol,
+                        "ftp_account_id": c.ftp_account_id,
                         "pull_credential_id": c.pull_credential_id, "pull_port": c.pull_port})
     db.commit()
     storage.ensure_client_dirs(c.slug)
@@ -194,7 +245,8 @@ def update_client(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "não encontrado")
     fields = ("name", "description", "is_active", "expected_interval_hours", "retention_days",
               "retention_min_keep", "vendor", "mgmt_ip", "protocol", "pull_credential_id")
-    before = {f: getattr(c, f) for f in (*fields, "manager_ip", "pull_port") if f != "description"} | {
+    before = {f: getattr(c, f) for f in (*fields, "manager_ip", "pull_port", "ftp_account_id")
+              if f != "description"} | {
         "ssh_key": c.ssh_key_fingerprint
     }
     old_ip, old_port = c.mgmt_ip, c.pull_port
@@ -206,6 +258,8 @@ def update_client(
         c.manager_ip = body.manager_ip  # None/"" remove
     if "pull_port" in body.model_fields_set:
         c.pull_port = body.pull_port
+    if "ftp_account_id" in body.model_fields_set:
+        c.ftp_account_id = body.ftp_account_id  # null = qualquer conta
     if c.protocol == "ssh" and (c.mgmt_ip != old_ip or c.pull_port != old_port):
         c.pull_host_key = None  # outro endereço = outro equipamento: fixa a chave de novo
     if c.kind == "server":
@@ -215,7 +269,8 @@ def update_client(
     audit.record(db, action="update", entity_type="client", entity_id=c.id,
                  actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request),
                  before=before,
-                 after={f: getattr(c, f) for f in (*fields, "manager_ip", "pull_port") if f != "description"}
+                 after={f: getattr(c, f) for f in (*fields, "manager_ip", "pull_port", "ftp_account_id")
+                        if f != "description"}
                  | {"ssh_key": c.ssh_key_fingerprint})
     db.commit()
     _sync_all(db)
@@ -508,13 +563,19 @@ def device_config(
     c = db.get(Client, client_id)
     if c is None or c.kind != "network":
         raise HTTPException(status.HTTP_404_NOT_FOUND, "equipamento não encontrado")
-    accounts = [a.username for a in db.execute(
-        select(FtpAccount).where(FtpAccount.is_active.is_(True)).order_by(FtpAccount.username)
-    ).scalars()]
+    bound = db.get(FtpAccount, c.ftp_account_id) if c.ftp_account_id else None
+    accounts = [bound.username] if bound and bound.is_active else [] if bound else [
+        a.username for a in db.execute(
+            select(FtpAccount).where(FtpAccount.is_active.is_(True)).order_by(FtpAccount.username)
+        ).scalars()
+    ]
     user = ftp_user if ftp_user in accounts else (accounts[0] if accounts else None)
     cmds, notes = render_device_commands(c, settings.net_host, user or "<usuario-ftp>")
     if c.protocol == "ftp" and not accounts:
-        notes.insert(0, "Nenhuma conta FTP ativa — crie uma em Configuração → Contas FTP.")
+        notes.insert(0, f"A conta FTP '{bound.username}' deste cadastro está inativa." if bound else
+                     "Nenhuma conta FTP ativa — crie uma em Configuração → Contas FTP.")
+    elif bound:
+        notes.append(f"Só a conta FTP '{bound.username}' envia por este cadastro.")
     return DeviceConfigOut(vendor=c.vendor or "generic", protocol=c.protocol or "",
                            server_host=settings.net_host, ftp_user=user, ftp_accounts=accounts,
                            commands=cmds, notes=notes)
