@@ -105,6 +105,9 @@ def check(data: bytes, vendor: str | None) -> ConfigCheck:
         text_bytes, fmt = _unpack(data)
     except (ValueError, zipfile.BadZipFile, zlib.error, gzip.BadGzipFile, EOFError) as exc:
         return ConfigCheck(False, f"arquivo compactado inválido: {exc}")
+    # O VRP (Huawei) grava o vrpcfg.cfg com um \x00 depois do "return" final: enchimento
+    # no fim não conta como binário. \x00 no meio do arquivo continua reprovando.
+    text_bytes = text_bytes.rstrip(b"\x00")
     if not looks_textual(text_bytes):
         return ConfigCheck(False, "conteúdo não parece texto de configuração", format=fmt)
     text = text_bytes.decode("utf-8", errors="replace")

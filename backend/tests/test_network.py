@@ -49,6 +49,14 @@ def test_netconfig_vendor_checks():
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("vrpcfg.cfg", HUAWEI_CFG)
     assert netconfig.check(buf.getvalue(), "huawei").ok
+    # vrpcfg.cfg real do VRP: CRLF e "return " seguido de \x00, dentro do .zip do backup-to-server
+    vrp = b"\r\n" + HUAWEI_CFG.replace(b"\n", b"\r\n").replace(b"return\r\n", b"return \x00")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("vrpcfg.cfg", vrp)
+    assert netconfig.check(vrp, "huawei").ok
+    assert netconfig.check(buf.getvalue(), "huawei").ok
+    assert not netconfig.check(HUAWEI_CFG.replace(b"#\ninterface", b"#\x00\ninterface"), "huawei").ok
     assert not netconfig.check(b"", "generic").ok
     assert not netconfig.check(b"\x00\x01\x02" * 100, "generic").ok
 

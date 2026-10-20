@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.10";
+export const APP_VERSION = "0.9.11";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,13 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.11",
+    date: "2026-10-20",
+    changes: [
+      "Huawei (VRP): o vrpcfg.cfg (solto ou no .zip do backup-to-server) deixa de ser reprovado com \"conteúdo não parece texto de configuração\". O VRP grava um byte nulo depois do \"return\" final, e agora esse enchimento no fim do arquivo é ignorado. Use \"Verificar novamente\" nos backups já recebidos.",
+    ],
+  },
   {
     version: "0.9.10",
     date: "2026-10-19",
