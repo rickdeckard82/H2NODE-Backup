@@ -32,7 +32,7 @@ export default function JuniperHelpPage() {
 
         <Step n={2} title="Cadastre o equipamento">
           <p>
-            Em <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/devices">Equipamentos de rede</Link>: nome,
+            Em <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/devices">FTP/TFTP</Link>: nome,
             fabricante <b>Juniper (Junos)</b>, protocolo <b>FTP</b> e o <b>IP de origem</b>, o IP com que o roteador chega ao
             servidor. Ele identifica de quem é o arquivo e cada IP pertence a um único equipamento.
           </p>

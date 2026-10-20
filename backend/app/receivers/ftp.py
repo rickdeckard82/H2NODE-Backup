@@ -167,8 +167,11 @@ class DeviceHandler(FTPHandler):
     def on_file_received(self, file):  # noqa: ANN001
         path = Path(file)
         size = path.stat().st_size
-        if size > settings.net_max_file_mb * 1024 * 1024:
-            logger.warning("ftp_file_too_large", ip=self.remote_ip, size=size)
+        # tipo "Arquivos e bancos" (dumps, .zip) tem limite próprio, maior que o de configuração
+        files = getattr(self.device, "vendor", None) == receivers.FILES_VENDOR
+        limit_mb = settings.net_files_max_mb if files else settings.net_max_file_mb
+        if size > limit_mb * 1024 * 1024:
+            logger.warning("ftp_file_too_large", ip=self.remote_ip, size=size, limit_mb=limit_mb)
             path.unlink(missing_ok=True)
             return
         rel = os.path.relpath(file, self.session_home) if self.session_home else path.name

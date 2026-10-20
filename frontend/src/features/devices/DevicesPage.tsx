@@ -86,9 +86,12 @@ function DeviceConfigModal({ device, onClose }: { device: Client | null; onClose
       ) : (
         <div className="space-y-4 text-sm">
           <p className="text-slate-500 dark:text-slate-400">
-            Comandos para o {VENDOR_LABEL[cfg.vendor as PushVendor] ?? cfg.vendor} enviar a configuração para{" "}
-            <span className="font-mono">{cfg.server_host}</span> via{" "}
-            <b className="uppercase">{cfg.protocol}</b>.
+            {cfg.vendor === "files" ? (
+              <>Exemplos para o servidor enviar os arquivos para </>
+            ) : (
+              <>Comandos para o {VENDOR_LABEL[cfg.vendor as PushVendor] ?? cfg.vendor} enviar a configuração para </>
+            )}
+            <span className="font-mono">{cfg.server_host}</span> via <b className="uppercase">{cfg.protocol}</b>.
           </p>
           {cfg.protocol === "ftp" && cfg.ftp_accounts.length > 1 && (
             <Field label="Conta FTP">
@@ -102,14 +105,23 @@ function DeviceConfigModal({ device, onClose }: { device: Client | null; onClose
             </Field>
           )}
           <CopyBlock label="Comandos" text={cfg.commands} />
+          {cfg.vendor === "files" && (
+            <p>
+              Passo a passo, com script de exemplo para o cron:{" "}
+              <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/help/ftp-files">
+                Ajuda → Arquivos e bancos (FTP)
+              </Link>
+              .
+            </p>
+          )}
           <ul className="list-disc space-y-1 pl-5 text-slate-600 dark:text-slate-300">
             {cfg.notes.map((n) => (
               <li key={n}>{n}</li>
             ))}
           </ul>
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
-            FTP e TFTP trafegam em claro (inclusive a senha FTP). Use a rede de gerência ou uma VPN entre o
-            equipamento e o servidor. Ao chegar, a configuração é cifrada com a chave GPG e o original é apagado.
+            FTP e TFTP trafegam em claro (inclusive a senha FTP). Use a rede de gerência ou uma VPN entre a
+            origem e o servidor. Ao chegar, o arquivo é cifrado com a chave GPG e o original é apagado.
           </div>
         </div>
       )}
@@ -154,7 +166,7 @@ export default function DevicesPage() {
         : api.post<Client>("/clients", { ...body, slug: f.slug, kind: "network" });
     },
     onSuccess: (c, f) => {
-      toast("ok", f.id ? "Equipamento salvo" : "Equipamento cadastrado");
+      toast("ok", f.id ? "Cadastro salvo" : "Cadastro criado");
       setForm(null);
       invalidate();
       if (!f.id) setCfgFor(c);
@@ -165,7 +177,7 @@ export default function DevicesPage() {
   const remove = useMutation({
     mutationFn: (c: Client) => api.del(`/clients/${c.id}`),
     onSuccess: () => {
-      toast("ok", "Equipamento removido");
+      toast("ok", "Cadastro removido");
       invalidate();
     },
     onError: (e) => toast("err", e instanceof ApiError ? e.detail : "Erro ao remover"),
@@ -176,12 +188,12 @@ export default function DevicesPage() {
   return (
     <div>
       <PageHeader
-        title="Equipamentos de rede"
-        subtitle="Switches e roteadores que enviam a configuração por FTP ou TFTP"
+        title="FTP/TFTP"
+        subtitle="Switches, roteadores e serviços que enviam a configuração por FTP ou TFTP"
         actions={
           <>
             <RefreshButton keys={["clients"]} />
-            {canEdit && <Button onClick={() => setForm({ ...empty })}>Novo equipamento</Button>}
+            {canEdit && <Button onClick={() => setForm({ ...empty })}>Novo cadastro</Button>}
           </>
         }
       />
@@ -199,11 +211,11 @@ export default function DevicesPage() {
         <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
           <thead className="bg-slate-50 dark:bg-slate-800/50">
             <tr>
-              <th className="th">Equipamento</th>
-              <th className="th">Fabricante</th>
+              <th className="th">Nome</th>
+              <th className="th">Tipo</th>
               <th className="th">Envio</th>
               <th className="th">Situação</th>
-              <th className="th">Última configuração</th>
+              <th className="th">Último envio</th>
               <th className="th">Guardado</th>
               <th className="th" />
             </tr>
@@ -219,7 +231,7 @@ export default function DevicesPage() {
             {list.data?.length === 0 && (
               <tr>
                 <td className="td text-slate-400 dark:text-slate-500" colSpan={7}>
-                  Nenhum equipamento cadastrado.
+                  Nenhum cadastro.
                 </td>
               </tr>
             )}
@@ -287,7 +299,7 @@ export default function DevicesPage() {
                       <button
                         className="text-rose-600 hover:underline dark:text-rose-400"
                         onClick={() => {
-                          if (confirm(`Remover o equipamento ${c.name}? O IP dele deixa de poder enviar na hora.`))
+                          if (confirm(`Remover ${c.name}? O IP deixa de poder enviar na hora.`))
                             remove.mutate(c);
                         }}
                       >
@@ -302,7 +314,7 @@ export default function DevicesPage() {
         </table>
       </Card>
 
-      <Modal open={!!form} onClose={() => setForm(null)} title={form?.id ? "Editar equipamento" : "Novo equipamento"} wide>
+      <Modal open={!!form} onClose={() => setForm(null)} title={form?.id ? "Editar cadastro" : "Novo cadastro"} wide>
         {form && (
           <form
             className="space-y-3"
@@ -337,13 +349,21 @@ export default function DevicesPage() {
               </Field>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
-              <Field label="Fabricante" hint="Define os comandos e a validação">
+              <Field label="Tipo" hint="Fabricante do equipamento, ou arquivos e bancos de um servidor">
                 <select
                   className="input"
                   value={form.vendor}
                   onChange={(e) => {
                     const vendor = e.target.value as PushVendor;
-                    setForm({ ...form, vendor, protocol: form.id ? form.protocol : VENDOR_PROTOCOL[vendor] });
+                    const files = vendor === "files";
+                    setForm({
+                      ...form,
+                      vendor,
+                      // arquivos e bancos só por FTP; costumam vir de um agendamento diário
+                      protocol: files ? "ftp" : form.id ? form.protocol : VENDOR_PROTOCOL[vendor],
+                      expected_interval_hours:
+                        !form.id && files && form.expected_interval_hours === 0 ? 24 : form.expected_interval_hours,
+                    });
                   }}
                 >
                   {(Object.keys(VENDOR_PROTOCOL) as PushVendor[]).map((v) => (
@@ -360,10 +380,12 @@ export default function DevicesPage() {
                   onChange={(e) => setForm({ ...form, protocol: e.target.value as Protocol })}
                 >
                   <option value="ftp">FTP</option>
-                  <option value="tftp">TFTP</option>
+                  <option value="tftp" disabled={form.vendor === "files"}>
+                    TFTP
+                  </option>
                 </select>
               </Field>
-              <Field label="IP de origem" hint="IP com que o equipamento chega aqui">
+              <Field label="IP de origem" hint="IP com que o equipamento ou servidor chega aqui">
                 <input
                   className="input font-mono"
                   value={form.mgmt_ip}

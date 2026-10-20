@@ -402,3 +402,122 @@ def test_api_manager_ip_on_fiberhome_olt(auth_client, isolated_paths):
     assert out["manager_ip"] is None
     allow = json.loads((isolated_paths / "netcfg" / receivers.ALLOWLIST_FILE).read_text())
     assert allow["managers"] == []
+
+
+# ------------------------------------------------- tipo "Arquivos e bancos" --
+
+MYSQL_DUMP = (b"-- MySQL dump 10.13  Distrib 8.0.39\n--\n-- Host: localhost    Database: erp\n"
+              b"CREATE DATABASE `erp`;\nUSE `erp`;\nINSERT INTO t VALUES (1);\n"
+              b"-- Dump completed on 2026-10-19  2:30:01\n")
+PG_DUMP = (b"--\n-- PostgreSQL database dump\n--\n\nCREATE TABLE t (id int);\n"
+           b"--\n-- PostgreSQL database dump complete\n--\n")
+
+
+def _zip(files: dict[str, bytes]) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, data in files.items():
+            zf.writestr(name, data)
+    return buf.getvalue()
+
+
+def test_filecheck_by_extension(tmp_path):
+    from app.services.filecheck import check_file
+
+    def chk(name: str, data: bytes):
+        p = tmp_path / "f"
+        p.write_bytes(data)
+        return check_file(p, name)
+
+    r = chk("erp.sql", MYSQL_DUMP)
+    assert (r.status, r.kind) == ("ok", "mysql")
+    assert chk("erp.sql.gz", gzip.compress(MYSQL_DUMP)).kind == "mysql"
+    assert (chk("app.sql", PG_DUMP).status, chk("app.sql", PG_DUMP).kind) == ("ok", "postgresql")
+    r = chk("erp.sql", MYSQL_DUMP.rsplit(b"-- Dump completed", 1)[0])  # interrompido
+    assert r.status == "failed" and "incompleto" in r.message
+    assert chk("erp.sql.gz", gzip.compress(MYSQL_DUMP)[:-12]).status == "failed"  # gzip truncado
+    r = chk("x.sql", b"INSERT INTO t VALUES (1);\n")  # sem cabeçalho: não dá para saber se terminou
+    assert (r.status, r.kind) == ("warning", "file")
+
+    z = _zip({"rel.pdf": b"%PDF-1.7\n...\n%%EOF\n", "dados.csv": b"a;b\n1;2\n"})
+    r = chk("docs.zip", z)
+    assert r.status == "ok" and r.items == 2
+    bad = bytearray(z)
+    bad[40] ^= 0xFF  # corrompe o conteúdo comprimido
+    assert chk("docs.zip", bytes(bad)).status == "failed"
+    assert chk("docs.zip", b"PK\x03\x04lixo").status == "failed"
+
+    assert chk("rel.pdf", b"%PDF-1.7\nobj\n%%EOF\n").status == "ok"
+    assert chk("rel.pdf", b"%PDF-1.7\nobj cortado").status == "failed"
+    assert chk("nginx.conf", b"server {\n listen 80;\n}\n").status == "ok"
+    assert chk("dados.csv", b"\x00\x01\x02" * 50).status == "failed"
+    assert chk("imagem.bin", b"\x00\x01\x02").status == "ok"  # formato sem teste: só guarda
+    assert chk("vazio.txt", b"").status == "failed"
+
+
+@pytest.fixture
+def srv_files(db):
+    c = Client(slug="erp-db", name="ERP banco", kind="network", vendor="files",
+               mgmt_ip="192.0.2.30", protocol="ftp", expected_interval_hours=24)
+    db.add(c)
+    db.commit()
+    return c
+
+
+def test_netingest_files_dump_and_zip_verified(db, srv_files, keyring, keys):  # noqa: F811
+    drop_upload("erp-db", "dumps/erp.sql", MYSQL_DUMP)
+    drop_upload("erp-db", "docs.zip", _zip({"a.txt": b"oi\n" * 1000}))
+    assert netingest.scan(db) == 2
+    assert not any(receivers.netin().joinpath("erp-db").iterdir())  # originais em claro apagados
+    backups = db.query(Backup).order_by(Backup.id).all()
+    kinds = sorted(b.components[0].kind for b in backups)
+    assert kinds == ["file", "mysql"]
+    for b in backups:
+        assert b.status == BackupStatus.ok, b.error_message
+        comp = b.components[0]
+        stored = Path(settings.storage_path) / b.storage_path / comp.file_name
+        assert b"Dump completed" not in stored.read_bytes()  # cifrado
+        verify.verify_backup(db, b, keyring)
+        assert b.verify_status == VerifyStatus.ok, b.verify_message
+
+    drop_upload("erp-db", "dumps/erp.sql", MYSQL_DUMP)
+    netingest.scan(db)
+    latest = db.query(Backup).order_by(Backup.id.desc()).first()
+    assert "idêntico" in latest.components[0].message
+
+
+def test_netingest_files_truncated_dump_failed(db, srv_files, keyring, keys):  # noqa: F811
+    drop_upload("erp-db", "erp.sql", MYSQL_DUMP[:60])
+    netingest.scan(db)
+    b = db.query(Backup).one()
+    assert b.status == BackupStatus.failed and "incompleto" in b.error_message
+    assert srv_files.last_status == "failed"
+
+
+def test_ftp_files_vendor_has_own_size_limit(monkeypatch):
+    monkeypatch.setattr(settings, "net_max_file_mb", 0)  # configuração: qualquer arquivo é grande demais
+    allow = write_allowlist(
+        [{"slug": "erp-db", "ip": "127.0.0.1", "protocol": "ftp", "vendor": "files"}],
+        {FTP_USER: hash_password(FTP_PASS)},
+    )
+    srv = ftp_recv.build_server("127.0.0.1", 0, allow)
+    t = threading.Thread(target=srv.serve_forever, kwargs={"timeout": 0.2, "handle_exit": False}, daemon=True)
+    t.start()
+    try:
+        f = ftp_connect(srv)
+        f.login(FTP_USER, FTP_PASS)
+        f.storbinary("STOR erp.sql", io.BytesIO(MYSQL_DUMP))
+        f.quit()
+        assert len(wait_ready("erp-db")) == 1
+    finally:
+        srv.close_all()
+
+
+def test_api_files_vendor_ftp_only(auth_client, isolated_paths):
+    base = {"slug": "erp-db", "name": "ERP", "kind": "network", "vendor": "files", "mgmt_ip": "192.0.2.30"}
+    assert auth_client.post("/api/clients", json={**base, "protocol": "tftp"}).status_code == 422
+    r = auth_client.post("/api/clients", json={**base, "protocol": "ftp"})
+    assert r.status_code == 201, r.text
+    cfg = auth_client.get(f"/api/clients/{r.json()['id']}/device-config").json()
+    assert "curl" in cfg["commands"] and "netrc" in cfg["commands"]
+    assert any("NET_FILES_MAX_MB" in n for n in cfg["notes"])

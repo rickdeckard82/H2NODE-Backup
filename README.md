@@ -166,7 +166,7 @@ Passo a passo em **Ajuda → Windows**.
 
 ## Switches, roteadores e OLTs
 
-Cadastre em **Equipamentos de rede** (fabricante, protocolo, IP de origem) e, para
+Cadastre em **FTP/TFTP** (fabricante, protocolo, IP de origem) e, para
 FTP, as contas em **Configuração → Contas FTP**. O painel mostra os comandos de cada
 fabricante (Datacom DmOS via TFTP; Huawei VRP, Juniper Junos e Fiberhome via FTP). Cada
 configuração recebida é validada, cifrada com a chave GPG e guardada como uma versão.
@@ -174,6 +174,12 @@ Nas **OLTs Fiberhome** cada OLT envia direto, do IP dela, e é um equipamento; o
 **IP da UNM2000** libera a UNM2000, que depois apaga/renomeia o arquivo (esses comandos
 respondem sucesso sem alterar nada — o resto continua só de gravação).
 Detalhes em [docs/network-devices.md](docs/network-devices.md).
+
+Servidores e serviços sem o agente também podem enviar **dumps `.sql`, configurações
+(`.conf`, `.txt`, `.csv`) e arquivos `.zip`/`.pdf`** por FTP: tipo **Arquivos e bancos
+(FTP)** no mesmo cadastro. Cada arquivo é testado pela extensão (dump com o marcador de
+fim, CRC do zip…), cifrado e guardado como uma versão; limite de `NET_FILES_MAX_MB`
+(4096) por arquivo. Passo a passo em **Ajuda → Arquivos e bancos (FTP)**.
 
 ## MikroTik (coleta por SSH)
 

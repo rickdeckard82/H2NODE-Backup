@@ -68,6 +68,9 @@ def _apply_network(db: Session, c: Client) -> None:
                                 "equipamento de rede precisa de fabricante, IP de origem e protocolo")
         c.ssh_public_key = None
         c.ssh_key_fingerprint = None
+        if c.vendor == receivers.FILES_VENDOR and c.protocol != "ftp":
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                                "arquivos e bancos são enviados por FTP")
         _apply_pull(db, c)
         if db.execute(select(Client.id).where(Client.mgmt_ip == c.mgmt_ip, Client.id != (c.id or 0))).first():
             # o upload é atribuído pelo IP de origem: precisa ser único
@@ -465,6 +468,26 @@ def render_device_commands(c: Client, host: str, ftp_user: str) -> tuple[str, li
             notes.append("Informe o IP da UNM2000 no cadastro: sem ele a UNM2000 é recusada ao tentar "
                          "apagar/renomear o arquivo e acusa falha de conexão.")
         notes.append("O intervalo esperado segue a tarefa de exportação da UNM2000 (ex.: 24 h).")
+    elif c.vendor == receivers.FILES_VENDOR:
+        cmds = (
+            "# ~/.netrc (modo 600) — a senha fora da linha de comando e do script:\n"
+            f"machine {host} login {ftp_user} password <SENHA-FTP>\n"
+            "\n"
+            "# um arquivo (curl):\n"
+            f"curl -sS --fail --ftp-pasv --netrc -T /backup/banco.sql ftp://{host}/\n"
+            "\n"
+            "# vários de uma vez (lftp):\n"
+            f'lftp -e "mput /backup/*.zip; bye" {host}'
+        )
+        notes.append("Cada arquivo vira uma versão. É testado pela extensão: .sql/.sql.gz (dump do mysqldump/"
+                     "pg_dump com o marcador de fim), .zip (CRC de tudo), .tar.gz/.gz, .pdf e texto (.conf, "
+                     ".txt, .csv…); outros formatos só são guardados.")
+        notes.append("Gere o dump SEM --skip-comments: é o comentário final que prova que ele terminou. "
+                     "SQL sem o cabeçalho do mysqldump/pg_dump fica com aviso.")
+        notes.append(f"Limite por arquivo: {settings.net_files_max_mb} MB (NET_FILES_MAX_MB). Envie só "
+                     "depois que o arquivo estiver pronto (dump terminado, zip fechado).")
+        notes.append("Ajuste o intervalo esperado à frequência do agendamento (ex.: 24 h) para ser alertado "
+                     "se o envio parar.")
     elif c.protocol == "tftp":
         cmds = f"# envie o arquivo de configuração por TFTP (modo octet) para\ntftp://{host}/{c.slug}/config.txt"
     else:

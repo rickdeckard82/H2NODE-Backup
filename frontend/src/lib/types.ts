@@ -1,4 +1,4 @@
-export type Vendor = "datacom" | "huawei" | "juniper" | "fiberhome" | "mikrotik" | "generic";
+export type Vendor = "datacom" | "huawei" | "juniper" | "fiberhome" | "mikrotik" | "generic" | "files";
 /** Fabricantes que ENVIAM a configuração (FTP/TFTP). O MikroTik é coletado por SSH (menu próprio). */
 export type PushVendor = Exclude<Vendor, "mikrotik">;
 
@@ -9,6 +9,7 @@ export const VENDOR_LABEL: Record<Vendor, string> = {
   fiberhome: "Fiberhome (OLT / UNM2000)",
   mikrotik: "MikroTik (RouterOS)",
   generic: "Genérico",
+  files: "Arquivos e bancos (FTP)",
 };
 
 /** Protocolo usual de cada fabricante (sugestão no cadastro). */
@@ -18,6 +19,7 @@ export const VENDOR_PROTOCOL: Record<PushVendor, "ftp" | "tftp"> = {
   juniper: "ftp",
   fiberhome: "ftp",
   generic: "ftp",
+  files: "ftp",
 };
 
 export type Health = "ok" | "warning" | "failed" | "overdue" | "never" | "inactive";
@@ -146,6 +148,7 @@ export interface ServerInfo {
   net_host: string;
   ftp_port: number;
   ftp_passive_ports: string;
+  net_files_max_mb: number;
   tftp_port: number;
   storage_path: string;
   disk_total_bytes: number;

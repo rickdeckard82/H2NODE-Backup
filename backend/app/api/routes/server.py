@@ -29,6 +29,7 @@ def server_info(db=Depends(get_db), _: SystemUser = Depends(require_auditor)) ->
         net_host=settings.net_host,
         ftp_port=settings.ftp_port,
         ftp_passive_ports=settings.ftp_passive_ports,
+        net_files_max_mb=settings.net_files_max_mb,
         tftp_port=settings.tftp_port,
         storage_path=settings.storage_path,
         disk_total_bytes=disk.total,

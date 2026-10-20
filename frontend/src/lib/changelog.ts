@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.6";
+export const APP_VERSION = "0.9.7";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.7",
+    date: "2026-10-19",
+    changes: [
+      "Menu: \"Equipamentos de rede\" passa a se chamar \"FTP/TFTP\" (switches, roteadores e serviços que enviam a configuração por FTP ou TFTP).",
+      "FTP/TFTP: novo tipo \"Arquivos e bancos (FTP)\" para servidores e serviços que enviam dumps .sql, configurações (.conf, .txt, .csv) e arquivos .zip/.pdf. Cada arquivo é testado pela extensão (dump completo, CRC do zip…), cifrado e guardado como uma versão; limite próprio de 4 GB por arquivo (NET_FILES_MAX_MB).",
+      "Ajuda: nova página \"Arquivos e bancos (FTP)\", com script de exemplo para o cron.",
+    ],
+  },
   {
     version: "0.9.6",
     date: "2026-10-18",

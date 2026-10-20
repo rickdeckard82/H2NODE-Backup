@@ -17,7 +17,7 @@ import zipfile
 import zlib
 from dataclasses import dataclass
 
-VENDORS = ("datacom", "huawei", "juniper", "fiberhome", "mikrotik", "generic")
+VENDORS = ("datacom", "huawei", "juniper", "fiberhome", "mikrotik", "generic", "files")
 VENDOR_LABEL = {
     "datacom": "Datacom (DmOS)",
     "huawei": "Huawei (VRP)",
@@ -25,6 +25,7 @@ VENDOR_LABEL = {
     "fiberhome": "Fiberhome (OLT / UNM2000)",
     "mikrotik": "MikroTik (RouterOS)",
     "generic": "Genérico",
+    "files": "Arquivos e bancos (FTP)",
 }
 
 _MAX_UNPACKED = 256 * 1024 * 1024  # proteção contra "zip bomb"
@@ -86,7 +87,7 @@ def _unpack(data: bytes) -> tuple[bytes, str]:
     return data, "text"
 
 
-def _looks_textual(b: bytes) -> bool:
+def looks_textual(b: bytes) -> bool:
     sample = b[:65536]
     if not sample:
         return False
@@ -104,7 +105,7 @@ def check(data: bytes, vendor: str | None) -> ConfigCheck:
         text_bytes, fmt = _unpack(data)
     except (ValueError, zipfile.BadZipFile, zlib.error, gzip.BadGzipFile, EOFError) as exc:
         return ConfigCheck(False, f"arquivo compactado inválido: {exc}")
-    if not _looks_textual(text_bytes):
+    if not looks_textual(text_bytes):
         return ConfigCheck(False, "conteúdo não parece texto de configuração", format=fmt)
     text = text_bytes.decode("utf-8", errors="replace")
     lines = text.count("\n") + (0 if text.endswith("\n") else 1)

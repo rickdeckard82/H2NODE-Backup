@@ -89,6 +89,9 @@ def sync(db: Session) -> bool:
 # ---------------------------------------------------------------- receptores --
 
 
+# Tipo "Arquivos e bancos": servidor/serviço que envia dumps e arquivos (limite NET_FILES_MAX_MB).
+FILES_VENDOR = "files"
+
 # Fabricante interno dado ao IP da UNM2000 (não é selecionável no cadastro).
 MANAGER_VENDOR = "unm2000"
 MANAGER_SLUG = "unm2000"

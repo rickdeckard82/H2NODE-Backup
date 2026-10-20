@@ -10,7 +10,7 @@ SLUG_PATTERN = r"^[a-z0-9][a-z0-9-]{1,46}[a-z0-9]$"
 
 
 Kind = Literal["server", "network"]
-Vendor = Literal["datacom", "huawei", "juniper", "fiberhome", "mikrotik", "generic"]
+Vendor = Literal["datacom", "huawei", "juniper", "fiberhome", "mikrotik", "generic", "files"]
 # ssh = o coletor busca (MikroTik); ftp/tftp = o equipamento envia
 Protocol = Literal["ftp", "tftp", "ssh"]
 

@@ -22,6 +22,7 @@ const AuditPage = lazy(() => import("./features/audit/AuditPage"));
 const DecryptHelpPage = lazy(() => import("./features/help/DecryptHelpPage"));
 const CpanelHelpPage = lazy(() => import("./features/help/CpanelHelpPage"));
 const Unm2000HelpPage = lazy(() => import("./features/help/Unm2000HelpPage"));
+const FtpFilesHelpPage = lazy(() => import("./features/help/FtpFilesHelpPage"));
 const LinuxHelpPage = lazy(() => import("./features/help/LinuxHelpPage"));
 const WindowsHelpPage = lazy(() => import("./features/help/WindowsHelpPage"));
 const DatacomHelpPage = lazy(() => import("./features/help/DatacomHelpPage"));
@@ -118,6 +119,7 @@ export const router = createBrowserRouter([
       { path: "help/windows", element: <WindowsHelpPage /> },
       { path: "help/cpanel", element: <CpanelHelpPage /> },
       { path: "help/unm2000", element: <Unm2000HelpPage /> },
+      { path: "help/ftp-files", element: <FtpFilesHelpPage /> },
       { path: "help/juniper", element: <JuniperHelpPage /> },
       { path: "help/datacom", element: <DatacomHelpPage /> },
       { path: "help/mikrotik", element: <MikrotikHelpPage /> },

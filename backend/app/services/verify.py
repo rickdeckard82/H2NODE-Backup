@@ -8,8 +8,8 @@ Dois níveis, por componente (cada arquivo .gpg):
 - **profunda** (com a chave privada no worker): decifra em streaming, sem gravar
   nada em disco, e testa o conteúdo:
     * pasta (.tar.gz): gzip íntegro (CRC) e tar legível até o fim; conta entradas;
-    * MySQL/MariaDB/PostgreSQL (.sql.gz): gzip íntegro e o marcador de fim de
-      dump presente (dump truncado não tem);
+    * MySQL/MariaDB/PostgreSQL (.sql.gz, ou .sql puro enviado por FTP): gzip
+      íntegro e o marcador de fim de dump presente (dump truncado não tem);
     * SQL Server (.bak.gz): gzip íntegro e cabeçalho MTF ("TAPE") do .bak;
     * SHA-256/tamanho do conteúdo decifrado batem com o que o agente calculou.
 """
@@ -90,11 +90,31 @@ def _check_tar(reader: _HashingReader) -> int:
     return count
 
 
+class _Prefixed:
+    """Devolve primeiro os bytes já lidos do fluxo (para espiar o início sem perdê-los)."""
+
+    def __init__(self, head: bytes, raw: _HashingReader) -> None:
+        self.head = head
+        self.raw = raw
+
+    def read(self, size: int = -1) -> bytes:
+        if not self.head:
+            return self.raw.read(size)
+        if size is None or size < 0:
+            out, self.head = self.head, b""
+            return out + self.raw.read(size)
+        out, self.head = self.head[:size], self.head[size:]
+        return out
+
+
 def _check_sql(reader: _HashingReader, kind: str) -> None:
-    gz = gzip.GzipFile(fileobj=reader, mode="rb")
+    # o agente envia .sql.gz; pelo FTP ("Arquivos e bancos") pode chegar .sql puro
+    head = reader.read(2)
+    src = _Prefixed(head, reader)
+    stream = gzip.GzipFile(fileobj=src, mode="rb") if head == b"\x1f\x8b" else src
     tail = b""
     total = 0
-    while chunk := gz.read(_CHUNK):
+    while chunk := stream.read(_CHUNK):
         total += len(chunk)
         tail = (tail + chunk)[-_TAIL:]
     if total == 0:

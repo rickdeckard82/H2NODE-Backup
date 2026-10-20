@@ -13,6 +13,7 @@ class ServerInfoOut(BaseModel):
     net_host: str
     ftp_port: int
     ftp_passive_ports: str
+    net_files_max_mb: int
     tftp_port: int
     storage_path: str
     disk_total_bytes: int

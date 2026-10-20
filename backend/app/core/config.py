@@ -87,6 +87,9 @@ class Settings(BaseSettings):
     tftp_port: int = Field(default=69, alias="TFTP_PORT")
     # Tamanho máximo de um arquivo de configuração recebido.
     net_max_file_mb: int = Field(default=64, alias="NET_MAX_FILE_MB")
+    # Tamanho máximo de um arquivo do tipo "Arquivos e bancos" (dumps .sql, .zip…) recebido por FTP.
+    # Enquanto chega, o arquivo fica em claro no disco do servidor (até o worker cifrá-lo).
+    net_files_max_mb: int = Field(default=4096, alias="NET_FILES_MAX_MB")
 
     # ---- Downloads (página do painel) ----
     # Pasta agent/ do repositório montada só-leitura: o .tar.gz do agente Linux é montado

@@ -19,7 +19,7 @@ retenção, verificação e alertas iguais aos dos servidores Linux).
 1. **Configuração → Contas FTP** (só para FTP): crie as contas que os equipamentos
    usam, ex. `huawei` e `juniper`. Uma conta pode servir a vários equipamentos.
    Senha de 8 a 64 caracteres, sem espaço, `@`, `:` ou `/`.
-2. **Equipamentos de rede → Novo equipamento**: nome, fabricante, protocolo e o
+2. **FTP/TFTP → Novo cadastro**: nome, tipo (fabricante), protocolo e o
    **IP de origem** — o IP com que o equipamento chega ao servidor. É ele que
    identifica de quem é o arquivo (cada IP pertence a um único equipamento).
 3. **Comandos**: o painel mostra o que colar no equipamento.
@@ -84,6 +84,26 @@ cá: o receptor é só de gravação.
 Arquivo vazio, truncado ou binário vira backup **com falha** (aparece no painel).
 Configuração idêntica à anterior é marcada como "idêntica ao backup anterior".
 
+## Arquivos e bancos (FTP)
+
+Tipo **Arquivos e bancos (FTP)**: um servidor ou serviço que não usa o agente envia
+dumps e arquivos por FTP (ex.: `curl --netrc -T erp.sql ftp://<servidor>/` no cron).
+Cada arquivo vira uma versão; é testado **pela extensão** e cifrado direto do disco, em
+streaming (`services/filecheck.py`):
+
+| Arquivo | Teste na recepção |
+|---|---|
+| `.sql`, `.sql.gz` | dump do mysqldump/mariadb-dump ou pg_dump com o marcador de fim (componente MySQL/PostgreSQL; a verificação profunda confere o marcador de novo). SQL sem o cabeçalho dessas ferramentas: **aviso** |
+| `.zip` | CRC de todos os arquivos de dentro (zip com senha: aviso) |
+| `.tar.gz`, `.tgz`, `.gz` | gzip íntegro até o fim; tar legível |
+| `.pdf` | `%PDF` no início e `%%EOF` no fim |
+| `.conf`, `.txt`, `.csv`, `.cfg`, `.ini`, `.json`… | texto, sem bytes binários |
+| outros | só guardados |
+
+A verificação profunda confere o SHA-256 do conteúdo decifrado contra o da recepção.
+Limite por arquivo: `NET_FILES_MAX_MB` (o arquivo fica em claro no disco só até o worker
+cifrá-lo). Passo a passo com script de exemplo em **Ajuda → Arquivos e bancos (FTP)**.
+
 ## Segurança
 
 - **FTP e TFTP trafegam em claro**, inclusive a senha FTP. Use a rede de gerência
@@ -109,7 +129,8 @@ Configuração idêntica à anterior é marcada como "idêntica ao backup anteri
 | `FTP_MASQUERADE_ADDRESS` | — | IP anunciado no PASV se houver NAT |
 | `TFTP_PORT` | 69/udp | |
 | `NET_PUBLIC_HOST` | `SSH_PUBLIC_HOST` | endereço nos comandos de exemplo |
-| `NET_MAX_FILE_MB` | 64 | tamanho máximo de um arquivo recebido |
+| `NET_MAX_FILE_MB` | 64 | tamanho máximo de um arquivo de configuração recebido |
+| `NET_FILES_MAX_MB` | 4096 | tamanho máximo de um arquivo do tipo "Arquivos e bancos" |
 
 ## Problemas comuns
 

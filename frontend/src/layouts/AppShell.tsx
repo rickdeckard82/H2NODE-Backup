@@ -31,7 +31,7 @@ const isGroup = (e: NavEntry): e is NavGroup => "children" in e;
 const NAV: NavEntry[] = [
   { to: "/", label: "Painel", icon: "home" },
   { to: "/clients", label: "Servidores", icon: "server" },
-  { to: "/devices", label: "Equipamentos de rede", icon: "router" },
+  { to: "/devices", label: "FTP/TFTP", icon: "router" },
   { to: "/backups", label: "Backups", icon: "archive" },
   { to: "/accounts", label: "Contas cPanel", icon: "database" },
   { to: "/downloads", label: "Downloads", icon: "download" },
@@ -62,6 +62,7 @@ const NAV: NavEntry[] = [
       { to: "/help/linux", label: "Servidor Linux", icon: "server" },
       { to: "/help/windows", label: "Windows", icon: "server" },
       { to: "/help/cpanel", label: "cPanel / WHM", icon: "server" },
+      { to: "/help/ftp-files", label: "Arquivos e bancos (FTP)", icon: "database" },
       { to: "/help/juniper", label: "Juniper (Junos)", icon: "router" },
       { to: "/help/datacom", label: "Datacom (DmOS)", icon: "router" },
       { to: "/help/mikrotik", label: "MikroTik (RouterOS)", icon: "router" },

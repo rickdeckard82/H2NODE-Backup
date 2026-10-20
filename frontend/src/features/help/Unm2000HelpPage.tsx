@@ -59,7 +59,7 @@ export default function Unm2000HelpPage() {
 
         <Step n={2} title="Cadastre cada OLT (com o IP da UNM2000)">
           <p>
-            Em <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/devices">Equipamentos de rede</Link>, um
+            Em <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/devices">FTP/TFTP</Link>, um
             cadastro por OLT: nome (ex.: o <Code>hostname</Code>, como <Code>OLT-Centro</Code>), fabricante{" "}
             <b>Fiberhome (OLT / UNM2000)</b>, protocolo <b>FTP</b> e o <b>IP de origem</b> igual ao <b>IP da OLT</b> (o mesmo do nome{" "}
             <Code>config_&lt;IP&gt;_…</Code>). Ao escolher Fiberhome aparece o campo <b>IP da UNM2000 (gerenciador)</b>: preencha com o

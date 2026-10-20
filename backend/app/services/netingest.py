@@ -1,7 +1,8 @@
 """Recepção das configurações de equipamentos de rede (fila netin/ dos receptores).
 
 Para cada arquivo pronto (`<nome>` + `<nome>.meta.json`):
-  1. valida o conteúdo conforme o fabricante (netconfig.check);
+  1. valida o conteúdo conforme o fabricante (netconfig.check) — ou, no tipo
+     "Arquivos e bancos", conforme a extensão (filecheck.check_file);
   2. CIFRA com a chave pública GPG (os receptores FTP/TFTP recebem em claro —
      limitação dos protocolos) e grava em store/<equipamento>/<execução>/;
   3. apaga o original em claro e registra um Backup com um componente "config";
@@ -27,7 +28,7 @@ from app.core.config import settings
 from app.core.logging import logger
 from app.core.security import utcnow
 from app.models import Backup, BackupComponent, BackupStatus, Client, VerifyStatus
-from app.services import netconfig, receivers, storage
+from app.services import filecheck, netconfig, receivers, storage
 from app.services.ingest import refresh_client_stats, sha256_file
 
 _SESSION_STALE_SECONDS = 24 * 3600
@@ -38,17 +39,19 @@ class NoPublicKey(RuntimeError):
     pass
 
 
-def _encrypt(data: bytes, dest: Path) -> None:
-    """Cifra `data` (em memória, via stdin do gpg) para a chave pública em `dest`."""
+def _encrypt(data: bytes | Path, dest: Path) -> None:
+    """Cifra `data` para a chave pública em `dest`: bytes vão em memória (stdin do gpg);
+    um Path é lido pelo próprio gpg em streaming (arquivos de GB)."""
     pub = settings.backup_public_key_path
     if not Path(pub).is_file():
         raise NoPublicKey("chave pública GPG ausente")
+    src = data if isinstance(data, Path) else None
     with tempfile.TemporaryDirectory(prefix="pb-enc-") as home:
         r = subprocess.run(
             ["gpg", "--homedir", home, "--batch", "--quiet", "--no-tty", "--yes",
              "--trust-model", "always", "--compress-algo", "none", "--cipher-algo", "AES256",
-             "--recipient-file", pub, "--output", str(dest), "--encrypt"],
-            input=data, capture_output=True, timeout=300, check=False,
+             "--recipient-file", pub, "--output", str(dest), "--encrypt", *([str(src)] if src else [])],
+            input=None if src else data, capture_output=True, timeout=6 * 3600 if src else 300, check=False,
         )
     if r.returncode != 0:
         dest.unlink(missing_ok=True)
@@ -68,12 +71,13 @@ def name_key(name: str) -> str:
     return _DATE_SUFFIX.sub("", name)
 
 
-def _previous_content_sha(db: Session, client: Client, name: str) -> str | None:
+def _previous_content_sha(db: Session, client: Client, name: str,
+                          kinds: tuple[str, ...] = ("config",)) -> str | None:
     key = name_key(name)
     rows = db.execute(
         select(BackupComponent.name, BackupComponent.plain_sha256, Backup.manifest)
         .join(Backup, Backup.id == BackupComponent.backup_id)
-        .where(Backup.client_id == client.id, BackupComponent.kind == "config")
+        .where(Backup.client_id == client.id, BackupComponent.kind.in_(kinds))
         .order_by(Backup.received_at.desc())
         .limit(500)
     ).all()
@@ -91,11 +95,12 @@ def ingest_file(db: Session, client: Client, data_path: Path, meta: dict) -> Bac
     except ValueError:
         when = utcnow()
     proto = str(meta.get("protocol", "?"))
-    return store_config(
-        db, client, data_path.read_bytes(), data_path.name.split("__", 1)[-1], when=when,
-        protocol=proto, source_ip=meta.get("source_ip"), remote_path=meta.get("remote_path"),
-        agent_version=f"{proto.lower()}-receiver",
-    )
+    original = data_path.name.split("__", 1)[-1]
+    common = {"when": when, "protocol": proto, "source_ip": meta.get("source_ip"),
+              "remote_path": meta.get("remote_path"), "agent_version": f"{proto.lower()}-receiver"}
+    if client.vendor == FILES_VENDOR:
+        return store_upload(db, client, data_path, original, **common)
+    return store_config(db, client, data_path.read_bytes(), original, **common)
 
 
 def store_config(
@@ -104,18 +109,51 @@ def store_config(
 ) -> Backup:
     """Valida, cifra e registra uma configuração de equipamento (recebida por FTP/TFTP
     ou coletada por SSH). `raw` só existe em memória; no disco fica só o .gpg."""
-    plain_sha = hashlib.sha256(raw).hexdigest()
     content_sha = netconfig.content_sha256(raw, client.vendor)
     res = netconfig.check(raw, client.vendor)
     same = res.ok and _previous_content_sha(db, client, original) == content_sha
+    return _store(
+        db, client, raw, original, kind="config", status="ok" if res.ok else "failed",
+        check_message=res.message, items=res.lines, plain_size=len(raw),
+        plain_sha=hashlib.sha256(raw).hexdigest(), content_sha=content_sha, same=same, when=when,
+        protocol=protocol, source_ip=source_ip, remote_path=remote_path, agent_version=agent_version,
+    )
 
+
+# Tipo "Arquivos e bancos": dumps .sql, .zip, .conf… enviados por FTP por um servidor/serviço.
+FILES_VENDOR = receivers.FILES_VENDOR
+FILE_KINDS = ("file", "mysql", "postgresql")
+
+
+def store_upload(
+    db: Session, client: Client, path: Path, original: str, *, when: datetime, protocol: str,
+    source_ip: str | None, remote_path: str | None, agent_version: str,
+) -> Backup:
+    """Testa, cifra e registra um arquivo do tipo "Arquivos e bancos". Pode ter GB: é testado
+    e cifrado direto do disco, em streaming (quem apaga o original em claro é o scan)."""
+    res = filecheck.check_file(path, original)
+    plain_sha = sha256_file(path)
+    same = res.ok and _previous_content_sha(db, client, original, FILE_KINDS) == plain_sha
+    return _store(
+        db, client, path, original, kind=res.kind, status=res.status, check_message=res.message,
+        items=res.items, plain_size=path.stat().st_size, plain_sha=plain_sha, content_sha=plain_sha,
+        same=same, when=when, protocol=protocol, source_ip=source_ip, remote_path=remote_path,
+        agent_version=agent_version,
+    )
+
+
+def _store(
+    db: Session, client: Client, src: bytes | Path, original: str, *, kind: str, status: str,
+    check_message: str, items: int | None, plain_size: int, plain_sha: str, content_sha: str, same: bool,
+    when: datetime, protocol: str, source_ip: str | None, remote_path: str | None, agent_version: str,
+) -> Backup:
     run_name = f"{when.strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(3)}"
     dest_dir = storage.safe_child(storage.store(), client.slug, run_name)
     dest_dir.mkdir(parents=True, mode=0o700)
-    enc_name = f"01-config-{receivers.safe_filename(original)}.gpg"
+    enc_name = f"01-{kind}-{receivers.safe_filename(original)}.gpg"
     enc_path = dest_dir / enc_name
     try:
-        _encrypt(raw, enc_path)
+        _encrypt(src, enc_path)
     except BaseException:
         shutil.rmtree(dest_dir, ignore_errors=True)
         raise
@@ -125,8 +163,9 @@ def store_config(
         origin = f"coletado via SSH de {source_ip or '?'} ({remote_path or original})"
     else:
         origin = f"recebido via {proto} de {source_ip or '?'} ({remote_path or original})"
-    message = f"{origin} — {res.message}" + (" — idêntica ao backup anterior" if same else "")
-    status = BackupStatus.ok if res.ok else BackupStatus.failed
+    unchanged = " — idêntica ao backup anterior" if kind == "config" else " — idêntico ao backup anterior"
+    message = f"{origin} — {check_message}" + (unchanged if same else "")
+    failed = status == "failed"
     manifest = {
         "format": "pulse-backup/net-1",
         "client_id": client.slug,
@@ -134,37 +173,37 @@ def store_config(
         "protocol": protocol,
         "source_ip": source_ip,
         "remote_path": remote_path,
-        "status": "success" if res.ok else "failed",
+        "status": "failed" if failed else "success",
         "unchanged": same,
         "content_sha256": content_sha,
-        "errors": [] if res.ok else [res.message],
+        "errors": [] if status == "ok" else [check_message],
     }
     (dest_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
     backup = Backup(
-        client_id=client.id, run_name=run_name, status=status,
+        client_id=client.id, run_name=run_name, status=BackupStatus(status),
         agent_status=manifest["status"], started_at=when, finished_at=when, received_at=utcnow(),
-        size_bytes=enc_path.stat().st_size, plain_size_bytes=len(raw),
+        size_bytes=enc_path.stat().st_size, plain_size_bytes=plain_size,
         storage_path=str(dest_dir.relative_to(storage.root())),
         agent_version=agent_version, manifest=manifest,
-        error_message=None if res.ok else res.message,
+        error_message=None if status == "ok" else check_message,
         verify_status=VerifyStatus.pending,
     )
     backup.components.append(
         BackupComponent(
-            position=0, kind="config", name=original, file_name=enc_name,
+            position=0, kind=kind, name=original, file_name=enc_name,
             size_bytes=enc_path.stat().st_size, sha256=sha256_file(enc_path),
-            plain_size_bytes=len(raw), plain_sha256=plain_sha,
-            status="ok" if res.ok else "failed", message=message[:2000], item_count=res.lines,
+            plain_size_bytes=plain_size, plain_sha256=plain_sha,
+            status=status, message=message[:2000], item_count=items,
         )
     )
     db.add(backup)
     client.last_backup_at = when
-    client.last_status = status.value
+    client.last_status = status
     db.flush()
     refresh_client_stats(db, client)
     db.commit()
-    logger.info("net_ingest_ok", device=client.slug, file=original, ok=res.ok, unchanged=same)
+    logger.info("net_ingest_ok", device=client.slug, file=original, kind=kind, status=status, unchanged=same)
     return backup
 
 

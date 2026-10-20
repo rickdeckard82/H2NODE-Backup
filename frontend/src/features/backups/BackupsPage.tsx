@@ -331,7 +331,7 @@ export default function BackupsPage({ vendor }: { vendor?: "mikrotik" }) {
           {!vendor && (["server", "network"] as const).map((k) => {
             const items = clients.data?.filter((c) => c.kind === k) ?? [];
             return items.length ? (
-              <optgroup key={k} label={k === "server" ? "Servidores" : "Equipamentos de rede"}>
+              <optgroup key={k} label={k === "server" ? "Servidores" : "FTP/TFTP e MikroTik"}>
                 {items.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
