@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.7";
+export const APP_VERSION = "0.9.8";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.8",
+    date: "2026-10-19",
+    changes: [
+      "Arquivos e bancos (FTP): os arquivos enviados na mesma conexão FTP viram UMA execução em Backups, com uma parte por arquivo (ex.: o dump .sql.gz e o .zip juntos), como nos servidores com o agente. A execução fica com o pior resultado entre as partes.",
+      "Arquivos e bancos (FTP): envio como .part com renomeação no fim passa a funcionar (vale o nome final).",
+    ],
+  },
   {
     version: "0.9.7",
     date: "2026-10-19",

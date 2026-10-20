@@ -178,7 +178,8 @@ Detalhes em [docs/network-devices.md](docs/network-devices.md).
 Servidores e serviços sem o agente também podem enviar **dumps `.sql`, configurações
 (`.conf`, `.txt`, `.csv`) e arquivos `.zip`/`.pdf`** por FTP: tipo **Arquivos e bancos
 (FTP)** no mesmo cadastro. Cada arquivo é testado pela extensão (dump com o marcador de
-fim, CRC do zip…), cifrado e guardado como uma versão; limite de `NET_FILES_MAX_MB`
+fim, CRC do zip…) e cifrado; os enviados na mesma conexão FTP viram uma execução com uma
+parte por arquivo. Limite de `NET_FILES_MAX_MB`
 (4096) por arquivo. Passo a passo em **Ajuda → Arquivos e bancos (FTP)**.
 
 ## MikroTik (coleta por SSH)

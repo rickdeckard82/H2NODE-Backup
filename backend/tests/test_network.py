@@ -486,6 +486,34 @@ def test_netingest_files_dump_and_zip_verified(db, srv_files, keyring, keys):  #
     assert "idêntico" in latest.components[0].message
 
 
+def test_netingest_batch_is_one_run_with_parts(db, srv_files, keyring, keys):  # noqa: F811
+    tmp = receivers.netin() / ".tmp"
+    tmp.mkdir(parents=True, exist_ok=True)
+    (tmp / "a").write_bytes(gzip.compress(MYSQL_DUMP))
+    (tmp / "b").write_bytes(_zip({"oficio.pdf": b"%PDF-1.7\n%%EOF\n"}))
+    dev = receivers.Device("erp-db", "192.0.2.30", "ftp", "files")
+    receivers.finalize_batch([(tmp / "a", "bk/erp.sql.gz"), (tmp / "b", "bk/docs.zip")], dev, protocol="ftp")
+    assert netingest.scan(db) == 1
+    assert not any(receivers.netin().joinpath("erp-db").iterdir())  # lote em claro apagado
+    b = db.query(Backup).one()
+    assert b.status == BackupStatus.ok, b.error_message
+    assert [(c.position, c.kind, c.name) for c in b.components] == [
+        (0, "mysql", "bk_erp.sql.gz"), (1, "file", "bk_docs.zip")]
+    assert b.size_bytes == sum(c.size_bytes for c in b.components)
+    verify.verify_backup(db, b, keyring)
+    assert b.verify_status == VerifyStatus.ok, b.verify_message
+
+    # uma parte com problema: a execução fica com o pior resultado e diz qual arquivo
+    (tmp / "c").write_bytes(MYSQL_DUMP[:60])
+    (tmp / "d").write_bytes(b"texto\n")
+    receivers.finalize_batch([(tmp / "c", "erp.sql"), (tmp / "d", "notas.txt")], dev, protocol="ftp")
+    netingest.scan(db)
+    last = db.query(Backup).order_by(Backup.id.desc()).first()
+    assert last.status == BackupStatus.failed
+    assert last.error_message.startswith("erp.sql: dump incompleto")
+    assert [c.status for c in last.components] == ["failed", "ok"]
+
+
 def test_netingest_files_truncated_dump_failed(db, srv_files, keyring, keys):  # noqa: F811
     drop_upload("erp-db", "erp.sql", MYSQL_DUMP[:60])
     netingest.scan(db)
@@ -508,7 +536,37 @@ def test_ftp_files_vendor_has_own_size_limit(monkeypatch):
         f.login(FTP_USER, FTP_PASS)
         f.storbinary("STOR erp.sql", io.BytesIO(MYSQL_DUMP))
         f.quit()
-        assert len(wait_ready("erp-db")) == 1
+        [batch] = wait_ready("erp-db")
+        assert [p.name for p in batch.iterdir()] == ["erp.sql"]
+    finally:
+        srv.close_all()
+
+
+def test_ftp_files_session_becomes_one_batch_even_with_part_and_rename():
+    # como o arquivos-erp sem a opção "só de gravação": .part, SIZE, DELE (recusado) e renomear
+    allow = write_allowlist(
+        [{"slug": "erp-db", "ip": "127.0.0.1", "protocol": "ftp", "vendor": "files"}],
+        {FTP_USER: hash_password(FTP_PASS)},
+    )
+    srv = ftp_recv.build_server("127.0.0.1", 0, allow)
+    t = threading.Thread(target=srv.serve_forever, kwargs={"timeout": 0.2, "handle_exit": False}, daemon=True)
+    t.start()
+    try:
+        f = ftp_connect(srv)
+        f.login(FTP_USER, FTP_PASS)
+        f.cwd("/backups/arquivos-erp")
+        f.storbinary("STOR erp.sql.gz.part", io.BytesIO(gzip.compress(MYSQL_DUMP)))
+        assert f.size("erp.sql.gz.part") > 0
+        with pytest.raises(ftplib.error_perm):
+            f.delete("erp.sql.gz")
+        f.rename("erp.sql.gz.part", "erp.sql.gz")
+        f.storbinary("STOR docs.zip", io.BytesIO(_zip({"a.txt": b"oi\n"})))
+        assert not ready_files("erp-db")  # nada vai para a fila antes do fim da sessão
+        f.quit()
+        [batch] = wait_ready("erp-db")
+        meta = json.loads(Path(str(batch) + receivers.META_SUFFIX).read_text())
+        assert [e["remote_path"] for e in meta["files"]] == ["backups/arquivos-erp/erp.sql.gz",
+                                                             "backups/arquivos-erp/docs.zip"]
     finally:
         srv.close_all()
 

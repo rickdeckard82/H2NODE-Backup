@@ -183,6 +183,43 @@ def finalize(src: Path, device: Device, *, protocol: str, remote_path: str, size
     return dest
 
 
+def finalize_batch(files: list[tuple[Path, str]], device: Device, *, protocol: str) -> Path | None:
+    """Move os arquivos completos de UMA sessão (lista de (caminho, caminho remoto)) para
+    netin/<slug>/<carimbo>__lote/ e grava um único .meta.json por último: o worker registra
+    tudo como uma execução com uma parte por arquivo (tipo "Arquivos e bancos")."""
+    if not files:
+        return None
+    now = datetime.now(UTC)
+    dest_dir = netin() / device.slug
+    dest_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    base = f"{now.strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(3)}__lote"
+    batch = dest_dir / base
+    batch.mkdir(mode=0o700)
+    entries, used = [], set()
+    for i, (src, remote_path) in enumerate(files, 1):
+        name = safe_filename(remote_path)
+        if name in used:
+            name = f"{i:02d}_{name}"
+        used.add(name)
+        size = src.stat().st_size
+        os.replace(src, batch / name)
+        entries.append({"name": name, "remote_path": remote_path[:500], "size": size})
+    meta = {
+        "device": device.slug,
+        "source_ip": device.ip,
+        "protocol": protocol,
+        "files": entries,
+        "received_at": now.isoformat(),
+    }
+    fd, tmp = tempfile.mkstemp(dir=dest_dir, prefix=".meta.")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(meta, f)
+    os.replace(tmp, dest_dir / (base + META_SUFFIX))
+    logger.info("net_upload_batch_received", device=device.slug, protocol=protocol,
+                files=[e["remote_path"] for e in entries], size=sum(e["size"] for e in entries))
+    return batch
+
+
 def drop_privileges(uid: int = 10001, gid: int = 10001) -> None:
     """Depois de abrir as portas < 1024, roda como o usuário sem privilégio."""
     if os.getuid() != 0:

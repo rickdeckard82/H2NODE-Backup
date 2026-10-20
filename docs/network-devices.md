@@ -88,8 +88,10 @@ Configuração idêntica à anterior é marcada como "idêntica ao backup anteri
 
 Tipo **Arquivos e bancos (FTP)**: um servidor ou serviço que não usa o agente envia
 dumps e arquivos por FTP (ex.: `curl --netrc -T erp.sql ftp://<servidor>/` no cron).
-Cada arquivo vira uma versão; é testado **pela extensão** e cifrado direto do disco, em
-streaming (`services/filecheck.py`):
+Cada **conexão FTP** vira uma execução, com uma parte por arquivo: os arquivos ficam na
+pasta da sessão até a desconexão e vão juntos para a fila (se o cliente envia como `.part` e
+renomeia, vale o nome final). Cada parte é testada **pela extensão** e cifrada direto do
+disco, em streaming (`services/filecheck.py`); a execução fica com o pior resultado:
 
 | Arquivo | Teste na recepção |
 |---|---|

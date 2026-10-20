@@ -24,13 +24,14 @@ export default function FtpFilesHelpPage() {
         <h2 className="text-base font-bold">Como funciona</h2>
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            Use quando não dá para instalar o agente (ou o serviço já gera os próprios arquivos): o servidor envia por FTP e cada
-            arquivo vira uma <b>versão</b> em Backups. O servidor é identificado pelo <b>IP de origem</b>, como os equipamentos de
-            rede.
+            Use quando não dá para instalar o agente (ou o serviço já gera os próprios arquivos): o servidor envia por FTP e{" "}
+            <b>cada conexão vira uma execução</b> em Backups, com <b>uma parte por arquivo</b> (ex.: o dump e o .zip enviados
+            juntos). Envie tudo na mesma conexão FTP; conexões separadas viram execuções separadas. O servidor é identificado
+            pelo <b>IP de origem</b>, como os equipamentos de rede.
           </li>
           <li>
-            Ao chegar, o arquivo é <b>testado pela extensão</b>, <b>cifrado</b> com a chave pública GPG e o original em claro é
-            apagado. Arquivo igual ao anterior (mesmo nome) aparece como &quot;idêntico ao backup anterior&quot;.
+            Quando a conexão termina, cada arquivo é <b>testado pela extensão</b>, <b>cifrado</b> com a chave pública GPG e o
+            original em claro é apagado. A execução fica com o pior resultado entre as partes. Arquivo igual ao anterior (mesmo nome) aparece como &quot;idêntico ao backup anterior&quot;.
           </li>
           <li>
             Limite por arquivo: <b>{maxMb} MB</b> (<Code>NET_FILES_MAX_MB</Code> no <Code>.env</Code> do servidor de backup).
@@ -131,9 +132,8 @@ sudo -u postgres pg_dump app > app.sql
 zip -q -r documentos.zip /srv/documentos
 cp /etc/nginx/nginx.conf nginx.conf
 
-for f in erp.sql app.sql documentos.zip nginx.conf; do
-  curl -sS --fail --ftp-pasv --netrc -T "$f" ftp://${host}/
-done
+# uma chamada só = uma conexão = uma execução no painel, com uma parte por arquivo
+curl -sS --fail --ftp-pasv --netrc -T "{erp.sql,app.sql,documentos.zip,nginx.conf}" ftp://${host}/
 rm -f erp.sql app.sql documentos.zip nginx.conf`}
           />
           <CopyBlock

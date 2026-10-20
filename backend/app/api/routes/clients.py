@@ -473,15 +473,17 @@ def render_device_commands(c: Client, host: str, ftp_user: str) -> tuple[str, li
             "# ~/.netrc (modo 600) — a senha fora da linha de comando e do script:\n"
             f"machine {host} login {ftp_user} password <SENHA-FTP>\n"
             "\n"
-            "# um arquivo (curl):\n"
-            f"curl -sS --fail --ftp-pasv --netrc -T /backup/banco.sql ftp://{host}/\n"
+            "# vários arquivos na mesma conexão = uma execução com uma parte por arquivo (curl):\n"
+            f'curl -sS --fail --ftp-pasv --netrc -T "{{/backup/banco.sql,/backup/docs.zip}}" ftp://{host}/\n'
             "\n"
             "# vários de uma vez (lftp):\n"
             f'lftp -e "mput /backup/*.zip; bye" {host}'
         )
-        notes.append("Cada arquivo vira uma versão. É testado pela extensão: .sql/.sql.gz (dump do mysqldump/"
-                     "pg_dump com o marcador de fim), .zip (CRC de tudo), .tar.gz/.gz, .pdf e texto (.conf, "
-                     ".txt, .csv…); outros formatos só são guardados.")
+        notes.append("Cada conexão FTP vira uma execução, com uma parte por arquivo: envie o dump e os "
+                     "arquivos na mesma conexão (curl -T \"{a,b}\" ou lftp mput). Cada parte é testada pela "
+                     "extensão: .sql/.sql.gz (dump do mysqldump/pg_dump com o marcador de fim), .zip (CRC de "
+                     "tudo), .tar.gz/.gz, .pdf e texto (.conf, .txt, .csv…); outros formatos só são "
+                     "guardados.")
         notes.append("Gere o dump SEM --skip-comments: é o comentário final que prova que ele terminou. "
                      "SQL sem o cabeçalho do mysqldump/pg_dump fica com aviso.")
         notes.append(f"Limite por arquivo: {settings.net_files_max_mb} MB (NET_FILES_MAX_MB). Envie só "

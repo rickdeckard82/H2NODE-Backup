@@ -7,7 +7,9 @@ Regras:
 - Cada sessão grava numa pasta própria e vazia. Permissões: entrar/criar pasta,
   listar o que a própria sessão enviou, gravar e renomear — nunca ler (RETR)
   nem apagar. Pastas pedidas no caminho (ex.: "./192.0.2.15") são criadas.
-- Arquivo completo vai para a fila do worker, atribuído ao equipamento pelo IP.
+- Arquivo completo vai para a fila do worker, atribuído ao equipamento pelo IP. No tipo
+  "Arquivos e bancos" os arquivos ficam na pasta da sessão até o fim da conexão e vão juntos,
+  como uma execução com uma parte por arquivo.
 
 Uso: python -m app.receivers.ftp   (precisa de root só para abrir a porta 21)
 """
@@ -174,6 +176,8 @@ class DeviceHandler(FTPHandler):
             logger.warning("ftp_file_too_large", ip=self.remote_ip, size=size, limit_mb=limit_mb)
             path.unlink(missing_ok=True)
             return
+        if files:
+            return  # fica na pasta da sessão: vai em lote no on_disconnect (uma execução, N partes)
         rel = os.path.relpath(file, self.session_home) if self.session_home else path.name
         receivers.finalize(path, self.device, protocol="ftp", remote_path=rel, size=size)
 
@@ -182,7 +186,20 @@ class DeviceHandler(FTPHandler):
 
     def on_disconnect(self):
         home = getattr(self, "session_home", None)
-        if home is not None:
+        if home is None:
+            return
+        try:
+            if getattr(self.device, "vendor", None) == receivers.FILES_VENDOR:
+                # O pyftpdlib já descartou o upload interrompido (on_incomplete_file_received é
+                # chamado antes): o que sobrou são os arquivos completos, com o nome final se o
+                # cliente renomeou (ex.: envio como .part + RNFR/RNTO).
+                files = sorted((p for p in home.rglob("*") if p.is_file() and not p.is_symlink()),
+                               key=lambda p: p.stat().st_mtime)
+                receivers.finalize_batch([(p, os.path.relpath(p, home)) for p in files], self.device,
+                                         protocol="ftp")
+        except Exception as exc:  # noqa: BLE001
+            logger.error("ftp_batch_failed", device=self.device.slug, error=str(exc))
+        finally:
             shutil.rmtree(home, ignore_errors=True)
 
 

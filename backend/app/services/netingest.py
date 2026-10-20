@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -88,19 +89,55 @@ def _previous_content_sha(db: Session, client: Client, name: str,
     return None
 
 
-def ingest_file(db: Session, client: Client, data_path: Path, meta: dict) -> Backup:
+def _received_at(meta: dict) -> datetime:
     received = meta.get("received_at")
     try:
-        when = datetime.fromisoformat(received).astimezone(UTC).replace(tzinfo=None) if received else utcnow()
+        return datetime.fromisoformat(received).astimezone(UTC).replace(tzinfo=None) if received else utcnow()
     except ValueError:
-        when = utcnow()
+        return utcnow()
+
+
+def ingest_file(db: Session, client: Client, data_path: Path, meta: dict) -> Backup:
     proto = str(meta.get("protocol", "?"))
     original = data_path.name.split("__", 1)[-1]
-    common = {"when": when, "protocol": proto, "source_ip": meta.get("source_ip"),
-              "remote_path": meta.get("remote_path"), "agent_version": f"{proto.lower()}-receiver"}
+    common = {"when": _received_at(meta), "protocol": proto, "source_ip": meta.get("source_ip"),
+              "agent_version": f"{proto.lower()}-receiver"}
     if client.vendor == FILES_VENDOR:
-        return store_upload(db, client, data_path, original, **common)
-    return store_config(db, client, data_path.read_bytes(), original, **common)
+        return store_uploads(db, client, [(data_path, original, meta.get("remote_path"))], **common)
+    return store_config(db, client, data_path.read_bytes(), original, remote_path=meta.get("remote_path"),
+                        **common)
+
+
+def ingest_batch(db: Session, client: Client, batch_dir: Path, meta: dict) -> Backup:
+    """Arquivos enviados na MESMA sessão FTP (tipo "Arquivos e bancos"): uma execução, N partes."""
+    files = []
+    for entry in meta.get("files") or []:
+        path = storage.safe_child(batch_dir, str(entry.get("name", "")))
+        if path.is_symlink() or not path.is_file():
+            raise FileNotFoundError(f"arquivo do lote ausente: {entry.get('name')}")
+        files.append((path, path.name, entry.get("remote_path")))
+    if not files:
+        raise FileNotFoundError("lote vazio")
+    proto = str(meta.get("protocol", "?"))
+    return store_uploads(db, client, files, when=_received_at(meta), protocol=proto,
+                         source_ip=meta.get("source_ip"), agent_version=f"{proto.lower()}-receiver")
+
+
+@dataclass
+class _Part:
+    """Uma parte de uma execução: conteúdo (bytes em memória ou arquivo no disco) e o resultado do teste."""
+
+    src: bytes | Path
+    original: str
+    remote_path: str | None
+    kind: str
+    status: str  # ok | warning | failed
+    check_message: str
+    items: int | None
+    plain_size: int
+    plain_sha: str
+    content_sha: str
+    same: bool
 
 
 def store_config(
@@ -112,12 +149,10 @@ def store_config(
     content_sha = netconfig.content_sha256(raw, client.vendor)
     res = netconfig.check(raw, client.vendor)
     same = res.ok and _previous_content_sha(db, client, original) == content_sha
-    return _store(
-        db, client, raw, original, kind="config", status="ok" if res.ok else "failed",
-        check_message=res.message, items=res.lines, plain_size=len(raw),
-        plain_sha=hashlib.sha256(raw).hexdigest(), content_sha=content_sha, same=same, when=when,
-        protocol=protocol, source_ip=source_ip, remote_path=remote_path, agent_version=agent_version,
-    )
+    part = _Part(raw, original, remote_path, "config", "ok" if res.ok else "failed", res.message, res.lines,
+                 len(raw), hashlib.sha256(raw).hexdigest(), content_sha, same)
+    return _store(db, client, [part], when=when, protocol=protocol, source_ip=source_ip,
+                  agent_version=agent_version)
 
 
 # Tipo "Arquivos e bancos": dumps .sql, .zip, .conf… enviados por FTP por um servidor/serviço.
@@ -125,85 +160,95 @@ FILES_VENDOR = receivers.FILES_VENDOR
 FILE_KINDS = ("file", "mysql", "postgresql")
 
 
-def store_upload(
-    db: Session, client: Client, path: Path, original: str, *, when: datetime, protocol: str,
-    source_ip: str | None, remote_path: str | None, agent_version: str,
+def store_uploads(
+    db: Session, client: Client, files: list[tuple[Path, str, str | None]], *, when: datetime,
+    protocol: str, source_ip: str | None, agent_version: str,
 ) -> Backup:
-    """Testa, cifra e registra um arquivo do tipo "Arquivos e bancos". Pode ter GB: é testado
-    e cifrado direto do disco, em streaming (quem apaga o original em claro é o scan)."""
-    res = filecheck.check_file(path, original)
-    plain_sha = sha256_file(path)
-    same = res.ok and _previous_content_sha(db, client, original, FILE_KINDS) == plain_sha
-    return _store(
-        db, client, path, original, kind=res.kind, status=res.status, check_message=res.message,
-        items=res.items, plain_size=path.stat().st_size, plain_sha=plain_sha, content_sha=plain_sha,
-        same=same, when=when, protocol=protocol, source_ip=source_ip, remote_path=remote_path,
-        agent_version=agent_version,
-    )
+    """Testa, cifra e registra arquivos do tipo "Arquivos e bancos" como UMA execução (uma parte
+    por arquivo). Podem ter GB: testados e cifrados direto do disco, em streaming (quem apaga os
+    originais em claro é o scan)."""
+    parts = []
+    for path, original, remote_path in files:
+        res = filecheck.check_file(path, original)
+        plain_sha = sha256_file(path)
+        same = res.ok and _previous_content_sha(db, client, original, FILE_KINDS) == plain_sha
+        parts.append(_Part(path, original, remote_path, res.kind, res.status, res.message, res.items,
+                           path.stat().st_size, plain_sha, plain_sha, same))
+    return _store(db, client, parts, when=when, protocol=protocol, source_ip=source_ip,
+                  agent_version=agent_version)
+
+
+_SEVERITY = {"ok": 0, "warning": 1, "failed": 2}
 
 
 def _store(
-    db: Session, client: Client, src: bytes | Path, original: str, *, kind: str, status: str,
-    check_message: str, items: int | None, plain_size: int, plain_sha: str, content_sha: str, same: bool,
-    when: datetime, protocol: str, source_ip: str | None, remote_path: str | None, agent_version: str,
+    db: Session, client: Client, parts: list[_Part], *, when: datetime, protocol: str,
+    source_ip: str | None, agent_version: str,
 ) -> Backup:
     run_name = f"{when.strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(3)}"
     dest_dir = storage.safe_child(storage.store(), client.slug, run_name)
     dest_dir.mkdir(parents=True, mode=0o700)
-    enc_name = f"01-{kind}-{receivers.safe_filename(original)}.gpg"
-    enc_path = dest_dir / enc_name
+    enc_paths: list[Path] = []
     try:
-        _encrypt(src, enc_path)
+        for pos, part in enumerate(parts, 1):
+            enc_path = dest_dir / f"{pos:02d}-{part.kind}-{receivers.safe_filename(part.original)}.gpg"
+            _encrypt(part.src, enc_path)
+            enc_paths.append(enc_path)
     except BaseException:
         shutil.rmtree(dest_dir, ignore_errors=True)
         raise
 
-    proto = protocol.upper()
-    if protocol == "ssh":
-        origin = f"coletado via SSH de {source_ip or '?'} ({remote_path or original})"
-    else:
-        origin = f"recebido via {proto} de {source_ip or '?'} ({remote_path or original})"
-    unchanged = " — idêntica ao backup anterior" if kind == "config" else " — idêntico ao backup anterior"
-    message = f"{origin} — {check_message}" + (unchanged if same else "")
-    failed = status == "failed"
+    status = max((p.status for p in parts), key=_SEVERITY.__getitem__)
+    problems = [p.check_message if len(parts) == 1 else f"{p.original}: {p.check_message}"
+                for p in parts if p.status != "ok"]
     manifest = {
         "format": "pulse-backup/net-1",
         "client_id": client.slug,
         "run_name": run_name,
         "protocol": protocol,
         "source_ip": source_ip,
-        "remote_path": remote_path,
-        "status": "failed" if failed else "success",
-        "unchanged": same,
-        "content_sha256": content_sha,
-        "errors": [] if status == "ok" else [check_message],
+        "remote_path": parts[0].remote_path if len(parts) == 1 else None,
+        "files": [p.remote_path or p.original for p in parts],
+        "status": "failed" if status == "failed" else "success",
+        "unchanged": all(p.same for p in parts),
+        "errors": problems,
     }
+    if len(parts) == 1:
+        manifest["content_sha256"] = parts[0].content_sha  # "idêntica ao backup anterior"
     (dest_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
     backup = Backup(
         client_id=client.id, run_name=run_name, status=BackupStatus(status),
         agent_status=manifest["status"], started_at=when, finished_at=when, received_at=utcnow(),
-        size_bytes=enc_path.stat().st_size, plain_size_bytes=plain_size,
+        size_bytes=sum(p.stat().st_size for p in enc_paths),
+        plain_size_bytes=sum(p.plain_size for p in parts),
         storage_path=str(dest_dir.relative_to(storage.root())),
         agent_version=agent_version, manifest=manifest,
-        error_message=None if status == "ok" else check_message,
+        error_message="; ".join(problems)[:4000] or None,
         verify_status=VerifyStatus.pending,
     )
-    backup.components.append(
-        BackupComponent(
-            position=0, kind=kind, name=original, file_name=enc_name,
-            size_bytes=enc_path.stat().st_size, sha256=sha256_file(enc_path),
-            plain_size_bytes=plain_size, plain_sha256=plain_sha,
-            status=status, message=message[:2000], item_count=items,
+    via = "coletado via SSH de" if protocol == "ssh" else f"recebido via {protocol.upper()} de"
+    for pos, (part, enc_path) in enumerate(zip(parts, enc_paths, strict=True)):
+        unchanged = (" — idêntica ao backup anterior" if part.kind == "config"
+                     else " — idêntico ao backup anterior")
+        message = (f"{via} {source_ip or '?'} ({part.remote_path or part.original}) — {part.check_message}"
+                   + (unchanged if part.same else ""))
+        backup.components.append(
+            BackupComponent(
+                position=pos, kind=part.kind, name=part.original, file_name=enc_path.name,
+                size_bytes=enc_path.stat().st_size, sha256=sha256_file(enc_path),
+                plain_size_bytes=part.plain_size, plain_sha256=part.plain_sha,
+                status=part.status, message=message[:2000], item_count=part.items,
+            )
         )
-    )
     db.add(backup)
     client.last_backup_at = when
     client.last_status = status
     db.flush()
     refresh_client_stats(db, client)
     db.commit()
-    logger.info("net_ingest_ok", device=client.slug, file=original, kind=kind, status=status, unchanged=same)
+    logger.info("net_ingest_ok", device=client.slug, files=[p.original for p in parts], status=status,
+                unchanged=manifest["unchanged"])
     return backup
 
 
@@ -225,9 +270,14 @@ def scan(db: Session) -> int:
                 if client is None:
                     raise LookupError(f"equipamento '{dev_dir.name}' não cadastrado")
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
-                if data_path.is_symlink() or not data_path.is_file():
-                    raise FileNotFoundError("arquivo de dados ausente")
-                ingest_file(db, client, data_path, meta)
+                if "files" in meta:  # lote: vários arquivos da mesma sessão FTP
+                    if data_path.is_symlink() or not data_path.is_dir():
+                        raise FileNotFoundError("pasta do lote ausente")
+                    ingest_batch(db, client, data_path, meta)
+                else:
+                    if data_path.is_symlink() or not data_path.is_file():
+                        raise FileNotFoundError("arquivo de dados ausente")
+                    ingest_file(db, client, data_path, meta)
                 n += 1
             except NoPublicKey:
                 logger.error("net_ingest_no_public_key", device=dev_dir.name)
@@ -236,7 +286,10 @@ def scan(db: Session) -> int:
                 db.rollback()
                 logger.error("net_ingest_error", device=dev_dir.name, file=data_path.name, error=str(exc))
             # o original em claro nunca fica: processado ou descartado
-            data_path.unlink(missing_ok=True)
+            if data_path.is_dir() and not data_path.is_symlink():
+                shutil.rmtree(data_path, ignore_errors=True)
+            else:
+                data_path.unlink(missing_ok=True)
             meta_path.unlink(missing_ok=True)
     return n
 
