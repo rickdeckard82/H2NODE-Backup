@@ -91,7 +91,7 @@ No `agent.conf`:
 
 ```bash
 MYSQL_ENABLED="yes"
-MYSQL_DATABASES=( "all" )       # todos, menos information_schema/performance_schema/sys; ou ( "radius" "erp" )
+MYSQL_DATABASES=( "all" )       # todos, menos information_schema/performance_schema/sys; ou ( "erp" "site" )
 MYSQL_DEFAULTS_FILE=""          # vazio = unix_socket do root
 MYSQL_DUMP_OPTS=""              # ex.: "--no-tablespaces" no MySQL 8 sem o privilégio PROCESS
 ```

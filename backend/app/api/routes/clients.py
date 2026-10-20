@@ -83,21 +83,29 @@ def _apply_network(db: Session, c: Client) -> None:
             if c.manager_ip == c.mgmt_ip:
                 raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                                     "o IP da UNM2000 não pode ser o da própria OLT")
+            # O IP da UNM2000 pode ser também de um cadastro FTP (ex.: outro servidor atrás do mesmo
+            # NAT) desde que o cadastro tenha conta presa: o login com ela vai para o cadastro e
+            # qualquer outra conta é tratada como a UNM2000.
             owner = db.execute(
-                select(Client.name).where(Client.mgmt_ip == c.manager_ip, Client.protocol == "ftp")
+                select(Client.name).where(Client.mgmt_ip == c.manager_ip, Client.protocol == "ftp",
+                                          Client.ftp_account_id.is_(None))
             ).scalars().first()
             if owner:
-                # um IP não pode ser equipamento e gerenciador ao mesmo tempo
                 raise HTTPException(
                     status.HTTP_409_CONFLICT,
-                    f"o IP {c.manager_ip} já está cadastrado como equipamento ('{owner}'): exclua esse "
-                    "cadastro — o IP da UNM2000 é informado em cada OLT",
+                    f"o IP {c.manager_ip} também envia por FTP em '{owner}': para dividir o IP com a "
+                    f"UNM2000, escolha em '{owner}' uma Conta FTP diferente da que a UNM2000 usa",
                 )
-        elif c.protocol == "ftp" and db.execute(
-            select(Client.name).where(Client.manager_ip == c.mgmt_ip, Client.id != (c.id or 0))
-        ).first():
-            raise HTTPException(status.HTTP_409_CONFLICT,
-                                f"o IP {c.mgmt_ip} já é usado como IP da UNM2000 em outra OLT")
+        elif c.protocol == "ftp" and c.ftp_account_id is None:
+            olt = db.execute(
+                select(Client.name).where(Client.manager_ip == c.mgmt_ip, Client.id != (c.id or 0))
+            ).scalars().first()
+            if olt:
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT,
+                    f"o IP {c.mgmt_ip} é o da UNM2000 (OLT '{olt}'): para dividir o IP, escolha neste "
+                    "cadastro uma Conta FTP diferente da que a UNM2000 usa (é o login que separa os dois)",
+                )
     else:
         c.vendor = c.mgmt_ip = c.manager_ip = c.protocol = c.ftp_account_id = None
         c.pull_credential_id = c.pull_port = c.pull_host_key = None

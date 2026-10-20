@@ -26,7 +26,7 @@ JUNOS_CFG = b"## Last commit: 2026-10-01\nversion 23.4R1;\nsystem {\n    host-na
 DMOS_CFG = b"hostname DM4380MP\naaa user admin\ndot1q\n vlan 10\n!\ninterface l3 mgmt\n"
 
 FIBERHOME_CFG = (b"!WOS system config file----------------------------------------\r\n"
-                 b"!system name:ngpon olt\r\ncli debug off\r\nhostname OLT-Centro\r\nidle-timeout 0\r\n")
+                 b"!system name:ngpon olt\r\ncli debug off\r\nhostname OLT-01\r\nidle-timeout 0\r\n")
 
 FTP_USER, FTP_PASS = "juniper", "Senha-teste-01"
 
@@ -330,7 +330,8 @@ def test_api_network_device_and_ftp_accounts(auth_client, isolated_paths):
     assert r.status_code == 201
 
     allow = json.loads((isolated_paths / "netcfg" / receivers.ALLOWLIST_FILE).read_text())
-    expected = {"slug": "sw-core", "ip": "192.0.2.15", "protocol": "ftp", "vendor": "huawei", "ftp_user": None}
+    expected = {"slug": "sw-core", "ip": "192.0.2.15", "protocol": "ftp", "vendor": "huawei",
+                "ftp_user": None}
     assert allow["devices"] == [expected]
     assert allow["ftp_accounts"][0]["username"] == "huawei"
     assert "Senha-forte-1" not in json.dumps(allow)
@@ -364,6 +365,17 @@ def test_allowlist_manager_ip_only_for_ftp(tmp_path):
     assert allow.device("203.0.113.27", "ftp") is None
 
 
+def test_allowlist_manager_ip_shared_with_bound_device():
+    # servidor atrás do mesmo NAT da UNM2000: a conta presa vai para o cadastro; as outras são a UNM2000
+    allow = write_allowlist(
+        [{"slug": "svc-nat", "ip": "203.0.113.26", "protocol": "ftp", "vendor": "files",
+          "ftp_user": "svc-nat"}],
+        managers=["203.0.113.26"],
+    )
+    assert allow.device("203.0.113.26", "ftp", "svc-nat").slug == "svc-nat"
+    assert allow.device("203.0.113.26", "ftp", "fiberhome").vendor == receivers.MANAGER_VENDOR
+
+
 def test_api_manager_ip_on_fiberhome_olt(auth_client, isolated_paths):
     base = {"kind": "network", "vendor": "fiberhome", "protocol": "ftp", "expected_interval_hours": 24}
     r = auth_client.post("/api/clients", json={**base, "slug": "olt-a", "name": "OLT A",
@@ -387,10 +399,23 @@ def test_api_manager_ip_on_fiberhome_olt(auth_client, isolated_paths):
     r3 = auth_client.post("/api/clients", json={**base, "slug": "olt-d", "name": "OLT D",
                                                 "mgmt_ip": "198.51.100.165", "manager_ip": "198.51.100.165"})
     assert r3.status_code == 422
-    # e um equipamento novo não pode usar o IP já dado a uma UNM2000
+    # e um equipamento novo não pode usar o IP já dado a uma UNM2000 sem conta presa
     r4 = auth_client.post("/api/clients", json={**base, "slug": "olt-e", "name": "OLT E",
                                                 "mgmt_ip": "203.0.113.26"})
-    assert r4.status_code == 409
+    assert r4.status_code == 409 and "Conta FTP" in r4.json()["detail"]
+    # ...mas pode com conta presa (ex.: outro servidor atrás do mesmo NAT da UNM2000)
+    acc = auth_client.post("/api/ftp-accounts",
+                           json={"username": "svc-nat", "password": "Senha-forte-1"}).json()
+    files = {"kind": "network", "vendor": "files", "protocol": "ftp", "mgmt_ip": "203.0.113.26"}
+    r5 = auth_client.post("/api/clients", json={**files, "slug": "svc-nat-web", "name": "Serviço NAT",
+                                                "ftp_account_id": acc["id"]})
+    assert r5.status_code == 201, r5.text
+    # e a OLT continua podendo apontar a UNM2000 para esse IP
+    r6 = auth_client.post("/api/clients", json={**base, "slug": "olt-f", "name": "OLT F",
+                                                "mgmt_ip": "198.51.100.166", "manager_ip": "203.0.113.26"})
+    assert r6.status_code == 201, r6.text
+    auth_client.delete(f"/api/clients/{r6.json()['id']}")
+    auth_client.delete(f"/api/clients/{r5.json()['id']}")
 
     # remover: manager_ip vazio limpa; outro fabricante também limpa
     cid = auth_client.get("/api/clients", params={"kind": "network"}).json()
@@ -543,7 +568,7 @@ def test_ftp_files_vendor_has_own_size_limit(monkeypatch):
 
 
 def test_ftp_files_session_becomes_one_batch_even_with_part_and_rename():
-    # como o arquivos-erp sem a opção "só de gravação": .part, SIZE, DELE (recusado) e renomear
+    # cliente que envia como .part: .part, SIZE, DELE (recusado) e renomear
     allow = write_allowlist(
         [{"slug": "erp-db", "ip": "127.0.0.1", "protocol": "ftp", "vendor": "files"}],
         {FTP_USER: hash_password(FTP_PASS)},
@@ -554,7 +579,7 @@ def test_ftp_files_session_becomes_one_batch_even_with_part_and_rename():
     try:
         f = ftp_connect(srv)
         f.login(FTP_USER, FTP_PASS)
-        f.cwd("/backups/arquivos-erp")
+        f.cwd("/backups/app")
         f.storbinary("STOR erp.sql.gz.part", io.BytesIO(gzip.compress(MYSQL_DUMP)))
         assert f.size("erp.sql.gz.part") > 0
         with pytest.raises(ftplib.error_perm):
@@ -565,8 +590,8 @@ def test_ftp_files_session_becomes_one_batch_even_with_part_and_rename():
         f.quit()
         [batch] = wait_ready("erp-db")
         meta = json.loads(Path(str(batch) + receivers.META_SUFFIX).read_text())
-        assert [e["remote_path"] for e in meta["files"]] == ["backups/arquivos-erp/erp.sql.gz",
-                                                             "backups/arquivos-erp/docs.zip"]
+        assert [e["remote_path"] for e in meta["files"]] == ["backups/app/erp.sql.gz",
+                                                             "backups/app/docs.zip"]
     finally:
         srv.close_all()
 

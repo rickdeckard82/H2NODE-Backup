@@ -357,7 +357,7 @@ def test_accounts_search_and_history(auth_client, seeded, keys, tmp_path):
     assert by_name["abc.tar.gz"]["versions"] == 1
     assert [a["name"] for a in accts["items"]] == ["abc.tar.gz", "cliente1.tar.gz"]  # ordem alfabética
 
-    found = auth_client.get("/api/backups/accounts", params={"q": "CLI"}).json()
+    found = auth_client.get("/api/backups/accounts", params={"q": "CLIENTE"}).json()
     assert [a["name"] for a in found["items"]] == ["cliente1.tar.gz"]
 
     # ordenação pelas colunas

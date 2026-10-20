@@ -67,7 +67,9 @@ direto ao servidor, do IP dela**, um arquivo `<ID>_<MMDD>` por dia (texto, `!WOS
    no FTP para apagar o arquivo antigo e **renomear** o novo. O servidor responde sucesso a
    `DELE`/`RNFR`/`RNTO` desse IP **sem alterar nada** (o arquivo já foi guardado e cifrado); sem isso
    a UNM2000 acusa "XFTP server connection failed" e repete a tarefa. O IP da UNM2000 **não** é
-   cadastrado como equipamento (o sistema recusa o mesmo IP nas duas funções).
+   cadastrado como equipamento. Se outro servidor sai pelo mesmo IP (ex.: NAT), ele pode ter um
+   cadastro FTP nesse IP **com Conta FTP presa** (diferente da usada pela UNM2000): o login com
+   essa conta vai para o cadastro; qualquer outra conta é tratada como a UNM2000.
 4. Libere os IPs no ufw (`ufw-setup.sh device <IP> ftp`; pode ser a faixa das OLTs) e aponte o
    cadastro de FTP de backup da UNM2000 para este servidor (porta 21, modo passivo).
 5. Intervalo esperado: o da tarefa de exportação (ex. 24 h).

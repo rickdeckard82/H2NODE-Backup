@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.9";
+export const APP_VERSION = "0.9.10";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,13 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.10",
+    date: "2026-10-19",
+    changes: [
+      "FTP/TFTP: um servidor atrás do mesmo NAT da UNM2000 pode ter cadastro FTP no IP dela, com Conta FTP própria: o login com essa conta vai para o cadastro e qualquer outra conta continua sendo tratada como a UNM2000.",
+    ],
+  },
   {
     version: "0.9.9",
     date: "2026-10-19",

@@ -193,7 +193,7 @@ JIP="$(ipof juniper)"; HIP="$(ipof huawei)"; DIP="$(ipof datacom)"
 echo "IPs: juniper=$JIP huawei=$HIP datacom=$DIP"
 
 api POST /ftp-accounts '{"username":"juniper","password":"Senha-teste-01"}' >/dev/null || fail "conta ftp juniper"
-api POST /ftp-accounts '{"username":"huawei","password":"Hw-backup-01"}' >/dev/null || fail "conta ftp huawei"
+api POST /ftp-accounts '{"username":"huawei","password":"Senha-teste-02"}' >/dev/null || fail "conta ftp huawei"
 newdev() { api POST /clients "$(printf '{"slug":"%s","name":"%s","kind":"network","vendor":"%s","protocol":"%s","mgmt_ip":"%s","expected_interval_hours":0}' "$1" "$2" "$3" "$4" "$5")" \
     | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])'; }
 J_ID="$(newdev mx-core 'MX core' juniper ftp "$JIP")" || fail "cadastro juniper"
@@ -206,7 +206,7 @@ docker exec "$P-juniper" sh -c 'printf "## Last commit: 2026-10-01\nversion 23.4
   curl -sS -T /tmp/c.gz "ftp://juniper:Senha-teste-01@host.docker.internal:12121/mx-core_juniper.conf.gz_20261001_120000"' \
     || fail "upload FTP juniper"
 docker exec "$P-huawei" sh -c 'printf "#\n sysname SW-HUAWEI-SEGREDO\n#\ninterface Vlanif10\n ip address 192.0.2.15 255.255.255.0\n#\nreturn\n" > /tmp/vrpcfg.cfg &&
-  curl -sS -P - --ftp-create-dirs -T /tmp/vrpcfg.cfg "ftp://huawei:Hw-backup-01@host.docker.internal:12121/192.0.2.15/vrpcfg.cfg"' \
+  curl -sS -P - --ftp-create-dirs -T /tmp/vrpcfg.cfg "ftp://huawei:Senha-teste-02@host.docker.internal:12121/192.0.2.15/vrpcfg.cfg"' \
     || fail "upload FTP huawei (modo ativo)"
 docker exec "$P-datacom" sh -c 'printf "hostname DM4380MP\naaa user admin\ndot1q\n vlan 10\n!\ninterface l3 mgmt\n" > /tmp/config.txt &&
   tftp -m binary host.docker.internal 16969 -c put /tmp/config.txt DM4380MP/config.txt' \

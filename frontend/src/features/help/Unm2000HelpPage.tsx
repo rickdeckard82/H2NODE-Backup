@@ -60,7 +60,7 @@ export default function Unm2000HelpPage() {
         <Step n={2} title="Cadastre cada OLT (com o IP da UNM2000)">
           <p>
             Em <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/devices">FTP/TFTP</Link>, um
-            cadastro por OLT: nome (ex.: o <Code>hostname</Code>, como <Code>OLT-Centro</Code>), fabricante{" "}
+            cadastro por OLT: nome (ex.: o <Code>hostname</Code>, como <Code>OLT-01</Code>), fabricante{" "}
             <b>Fiberhome (OLT / UNM2000)</b>, protocolo <b>FTP</b> e o <b>IP de origem</b> igual ao <b>IP da OLT</b> (o mesmo do nome{" "}
             <Code>config_&lt;IP&gt;_…</Code>). Ao escolher Fiberhome aparece o campo <b>IP da UNM2000 (gerenciador)</b>: preencha com o
             IP com que a UNM2000 chega ao servidor (o mesmo em todas as OLTs; no log do <Code>ftp</Code> aparece como{" "}
@@ -71,7 +71,9 @@ export default function Unm2000HelpPage() {
           </p>
           <Note>
             O IP da UNM2000 <b>não</b> é cadastrado como equipamento: se já existir um equipamento com esse IP (por exemplo{" "}
-            <Code>unm2000</Code>), exclua-o antes — o sistema recusa o mesmo IP como equipamento e como gerenciador.
+            <Code>unm2000</Code>), exclua-o antes. Se outro servidor sai pelo mesmo IP (ex.: atrás do mesmo NAT), ele pode ter
+            um cadastro FTP nesse IP desde que escolha uma <b>Conta FTP</b> própria, diferente da que a UNM2000 usa: o login
+            com essa conta vai para o cadastro e qualquer outra conta é tratada como a UNM2000.
           </Note>
         </Step>
 
