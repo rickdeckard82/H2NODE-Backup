@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.11";
+export const APP_VERSION = "0.9.12";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.12",
+    date: "2026-10-20",
+    changes: [
+      "Agente 1.4.0: novo token @yesterday em BACKUP_FILES/BACKUP_PATHS, para rodar o agente no dia seguinte ao backup do WHM quando ele demora (ex.: WHM seg/qua/sex e agente ter/qui/sáb). Se a pasta de ontem não existir, a execução acusa falha.",
+      "Ajuda cPanel/WHM: como agendar o agente no dia seguinte e ajustar o intervalo esperado.",
+    ],
+  },
   {
     version: "0.9.11",
     date: "2026-10-20",

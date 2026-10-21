@@ -432,6 +432,8 @@ BACKUP_FILES=(
   # só a pasta de HOJE (2026-10-16): se o backup de hoje não existir, o agente acusa falha
   # "/backup/cpanel/@today/accounts/*.tar.gz"
 )
+# "@yesterday" = a pasta de ONTEM: para rodar o agente no dia seguinte ao backup do WHM (backup
+# demorado), com o cron nos dias seguintes (WHM seg/qua/sex -> agente ter/qui/sáb: "0 22 * * 2,4,6").
 # "@latest" no lugar de "@today" pega a pasta datada mais recente (reenvia a de ontem se a de hoje falhar).
 # Arquivo alterado há menos de FILES_MIN_AGE_MINUTES (padrão 10) ainda está em gravação: não é enviado.
 # Servidor cPanel: o agente confere se TODAS as contas (/var/cpanel/users) têm backup na pasta

@@ -135,7 +135,9 @@ BACKUP_PATHS=( "/etc" "/backup/cpanel/@today/system" )       # a pasta system, p
 ```
 
 `@today` vira a data do servidor (`2026-10-16`) e **falha se a pasta de hoje não existir**
-(não reenvia a de ontem); `@latest` pega a pasta datada mais recente. Arquivo alterado há menos
+(não reenvia a de ontem); `@yesterday` pega a pasta de ontem (backup do WHM demorado: o agente
+roda no dia seguinte, ex. WHM seg/qua/sex e agente `0 22 * * 2,4,6`); `@latest` pega a pasta
+datada mais recente. Arquivo alterado há menos
 de `FILES_MIN_AGE_MINUTES` (10) ainda está sendo gravado e não é enviado — agende o agente
 depois que o backup do cPanel termina (à noite, ex. 22:00: a duração do backup do WHM varia
 muito). O agente confere se todas as contas de `/var/cpanel/users` têm backup na pasta do dia

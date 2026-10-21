@@ -32,7 +32,7 @@ umask 077
 # devolver variáveis). Funciona porque o script não tem controle de jobs.
 shopt -s lastpipe
 
-AGENT_VERSION="1.3.0"
+AGENT_VERSION="1.4.0"
 CONF_DIR="/etc/pulse-backup"
 CONF_FILE="${PULSE_BACKUP_CONF:-$CONF_DIR/agent.conf}"
 LOCK_FILE="/run/pulse-backup-agent.lock"
@@ -172,6 +172,7 @@ CPANEL_DIRS=()
 CPANEL_USERS_DIR="/var/cpanel/users"
 CPANEL_BACKUP_CONFIG="/var/cpanel/backups/config"
 CPANEL_EXT=".tar.gz"
+CPANEL_NEW_SECS=86400   # conta criada há menos que isso não é cobrada (48 h com "@yesterday")
 
 # encrypt_stream <arquivo-saida.gpg>  — lê stdin, calcula SHA-256/tamanho do que
 # entra (conteúdo comprimido, antes da cifra) e grava o .gpg.
@@ -237,12 +238,16 @@ resolve_latest_path() {
     printf '%s%s\n' "$newest" "${post#/}"
 }
 
-# expand_date_tokens <caminho> — troca "@today" pela data de hoje (AAAA-MM-DD, relógio do servidor)
-# e "@latest" pela pasta datada mais recente. Sem token, devolve o caminho como está.
+# expand_date_tokens <caminho> — troca "@today" pela data de hoje (AAAA-MM-DD, relógio do servidor),
+# "@yesterday" pela de ontem e "@latest" pela pasta datada mais recente. Sem token, devolve o
+# caminho como está.
 expand_date_tokens() {
     local pat="$1"
     if [[ "$pat" == *"@today"* ]]; then
         printf '%s\n' "${pat//@today/$(date +%F)}"
+    elif [[ "$pat" == *"@yesterday"* ]]; then
+        # "12:00 yesterday": o meio-dia não cai dois dias atrás na virada do horário de verão
+        printf '%s\n' "${pat//@yesterday/$(date -d '12:00 yesterday' +%F)}"
     elif [[ "$pat" == *"@latest"* ]]; then
         resolve_latest_path "$pat"
     else
@@ -268,6 +273,8 @@ backup_paths() {
         if [ ! -e "$p" ]; then
             if [[ "$orig" == *"@today"* ]]; then
                 add_component files "$p" "" failed "a pasta de hoje não existe (o backup de hoje já terminou?)" 0
+            elif [[ "$orig" == *"@yesterday"* ]]; then
+                add_component files "$p" "" failed "a pasta de ontem não existe (o backup do WHM rodou ontem?)" 0
             else
                 add_component files "$p" "" failed "caminho não existe" 0
             fi
@@ -307,7 +314,8 @@ backup_paths() {
 # ---- Arquivos como estão (BACKUP_FILES)
 
 # resolve_file_pattern <padrão>  — imprime os arquivos que casam, um por linha.
-# "@today" no caminho vira a data de hoje (2026-10-16); "@latest", a pasta datada mais recente.
+# "@today" no caminho vira a data de hoje (2026-10-16); "@yesterday", a de ontem; "@latest", a
+# pasta datada mais recente.
 # Ex. do cPanel (só a pasta do dia): /backup/cpanel/@today/accounts/*.tar.gz
 resolve_file_pattern() {
     local pat
@@ -351,10 +359,17 @@ cpanel_note_files() {
     CPANEL_DIRS+=("$(dirname "$1")")
 }
 
+# cpanel_note_pattern <padrão> — com "@yesterday" a pasta tem um dia a mais: conta criada
+# ontem depois do início do backup do WHM não está nela.
+cpanel_note_pattern() {
+    [[ "$1" == *"@yesterday"* ]] && CPANEL_NEW_SECS=172800
+    return 0
+}
+
 # cpanel_expected_accounts — contas que o WHM deve copiar, uma por linha. Respeita a
 # configuração do WHM: backup de contas desligado, conta com backup desligado (BACKUP=0)
 # e contas suspensas quando "Backup Suspended Accounts" está desligado. Ignora contas
-# criadas nas últimas 24 h (podem ter nascido depois do backup começar).
+# criadas nas últimas 24 h (48 h com "@yesterday"): podem ter nascido depois do backup começar.
 cpanel_expected_accounts() {
     local cfg="$CPANEL_BACKUP_CONFIG" f u start skip_susp=0 now
     grep -qE "^BACKUPACCTS: *'?(no|0)'?\s*$" "$cfg" 2>/dev/null && return 0
@@ -367,7 +382,7 @@ cpanel_expected_accounts() {
         grep -q '^BACKUP=0' "$f" && continue
         [ "$skip_susp" -eq 1 ] && grep -q '^SUSPENDED=1' "$f" && continue
         start="$(sed -n 's/^STARTDATE=\([0-9][0-9]*\).*/\1/p' "$f" | head -n 1)"
-        [ -n "$start" ] && [ $((now - start)) -lt 86400 ] && continue
+        [ -n "$start" ] && [ $((now - start)) -lt "$CPANEL_NEW_SECS" ] && continue
         printf '%s\n' "$u"
     done
 }
@@ -399,10 +414,10 @@ backup_files() {
         local list=()
         mapfile -t list < <(resolve_file_pattern "$pat")
         if [ "${#list[@]}" -eq 0 ]; then
-            add_component file "$pat" "" failed "nenhum arquivo encontrado para o padrão (para @today: o backup de hoje já terminou?)" 0
+            add_component file "$pat" "" failed "nenhum arquivo encontrado para o padrão (com @today/@yesterday: o backup do WHM desse dia rodou e terminou?)" 0
             continue
         fi
-        cpanel_check_on "$pat" && cpanel_note_files "${list[@]}"
+        cpanel_check_on "$pat" && cpanel_note_pattern "$pat" && cpanel_note_files "${list[@]}"
         for f in "${list[@]}"; do
             [ -f "$f" ] && [ ! -L "$f" ] || continue
             # nunca processa o que está na pasta de trabalho do próprio agente
@@ -835,7 +850,7 @@ cmd_test() {
             [ "$size" -gt "$biggest" ] && biggest="$size"
         done
         echo "• Arquivos $pat: $nfiles encontrado(s)"
-        cpanel_check_on "$pat" && cpanel_note_files "${list[@]}"
+        cpanel_check_on "$pat" && cpanel_note_pattern "$pat" && cpanel_note_files "${list[@]}"
     done
     if [ "${#CPANEL_DIRS[@]}" -gt 0 ]; then
         local missing=()

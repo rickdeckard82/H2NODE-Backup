@@ -66,6 +66,16 @@ export default function CpanelHelpPage() {
             no <b>mesmo dia</b> em que o backup do WHM começou.
           </p>
           <p>
+            <b>Backup do WHM que entra pela noite?</b> Rode o agente no <b>dia seguinte</b> e use <Code>@yesterday</Code> no
+            lugar de <Code>@today</Code> (agente 1.4.0 ou mais novo). O cron acompanha os dias do WHM com um dia a mais. Por
+            exemplo, WHM na segunda, quarta e sexta, e agente na terça, quinta e sábado:
+          </p>
+          <CopyBlock label="Comando" text={`cd /root/pulse-agent && ./install.sh --cron "0 22 * * 2,4,6"`} />
+          <p>
+            Ajuste o <b>intervalo esperado</b> do servidor no painel ao maior espaço entre dois envios (no exemplo, 72 h, de
+            sábado para terça). Assim ele não fica &quot;atrasado&quot; nos dias sem backup.
+          </p>
+          <p>
             Arquivos alterados há menos de 10 minutos (<Code>FILES_MIN_AGE_MINUTES</Code>) ainda estão sendo gravados e não são
             enviados. O horário do WHM fica em WHM → Server Configuration → <i>Configure cPanel Cron Jobs</i> (comando{" "}
             <Code>/usr/local/cpanel/bin/backup</Code>); os dias, em Backup Configuration.
@@ -105,8 +115,9 @@ BWLIMIT=""`}
           />
           <Note>
             O que está em <Code>BACKUP_FILES</Code> não passa pelo tar: cada arquivo é cifrado como está. Pastas inteiras vão em{" "}
-            <Code>BACKUP_PATHS</Code>. Use <Code>@latest</Code> no lugar de <Code>@today</Code> só se quiser a pasta datada mais
-            recente, qualquer que seja a data.
+            <Code>BACKUP_PATHS</Code>. Com o agente no dia seguinte ao WHM, troque <Code>@today</Code> por{" "}
+            <Code>@yesterday</Code> nas duas listas. Use <Code>@latest</Code> no lugar de <Code>@today</Code> só se quiser a pasta
+            datada mais recente, qualquer que seja a data.
           </Note>
         </Step>
 
