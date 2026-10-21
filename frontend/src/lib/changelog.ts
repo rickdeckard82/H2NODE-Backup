@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.12";
+export const APP_VERSION = "0.9.13";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,13 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.13",
+    date: "2026-10-21",
+    changes: [
+      "Ajuda: nova página \"Huawei (VRP)\" com o backup por FTP (backup-to-server, ftp client-source) e a restauração da configuração.",
+    ],
+  },
   {
     version: "0.9.12",
     date: "2026-10-20",

@@ -27,6 +27,7 @@ const LinuxHelpPage = lazy(() => import("./features/help/LinuxHelpPage"));
 const WindowsHelpPage = lazy(() => import("./features/help/WindowsHelpPage"));
 const DatacomHelpPage = lazy(() => import("./features/help/DatacomHelpPage"));
 const JuniperHelpPage = lazy(() => import("./features/help/JuniperHelpPage"));
+const HuaweiHelpPage = lazy(() => import("./features/help/HuaweiHelpPage"));
 
 function Loader() {
   return (
@@ -121,6 +122,7 @@ export const router = createBrowserRouter([
       { path: "help/unm2000", element: <Unm2000HelpPage /> },
       { path: "help/ftp-files", element: <FtpFilesHelpPage /> },
       { path: "help/juniper", element: <JuniperHelpPage /> },
+      { path: "help/huawei", element: <HuaweiHelpPage /> },
       { path: "help/datacom", element: <DatacomHelpPage /> },
       { path: "help/mikrotik", element: <MikrotikHelpPage /> },
       { path: "*", element: <Navigate to="/" replace /> },
