@@ -41,6 +41,23 @@ def test_netconfig_vendor_checks():
     assert netconfig.check(gzip.compress(JUNOS_CFG), "juniper").format == "gzip"
     assert not netconfig.check(gzip.compress(JUNOS_CFG)[:-10], "juniper").ok  # gzip truncado
     assert not netconfig.check(JUNOS_CFG.replace(b"}\ninterfaces", b"\ninterfaces"), "juniper").ok
+
+
+def test_a10_system_backup_targz():
+    import tarfile
+
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w") as tf:
+        info = tarfile.TarInfo("startup-config/default")
+        data = b"!version 4.1.4-GR1-P11\nhostname A10\n" * 50
+        info.size = len(data)
+        tf.addfile(info, io.BytesIO(data))
+    tgz = gzip.compress(buf.getvalue())
+    res = netconfig.check(tgz, "a10")
+    assert res.ok and res.format == "gzip"
+    assert not netconfig.check(tgz[:-40], "a10").ok  # truncado
+    assert not netconfig.check(gzip.compress(b"nao e um tar" * 100), "a10").ok
+    assert netconfig.check(b"!Current configuration: 100 bytes\n!version 4.1.4\nhostname A10\n", "a10").ok
     assert netconfig.check(DMOS_CFG, "datacom").ok
     assert netconfig.check(FIBERHOME_CFG, "fiberhome").ok
     assert not netconfig.check(JUNOS_CFG, "fiberhome").ok  # outro fabricante

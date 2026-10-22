@@ -64,6 +64,7 @@ const NAV: NavEntry[] = [
       { to: "/help/cpanel", label: "cPanel / WHM", icon: "server" },
       { to: "/help/ftp-files", label: "Arquivos e bancos (FTP)", icon: "database" },
       { to: "/help/juniper", label: "Juniper (Junos)", icon: "router" },
+      { to: "/help/a10", label: "A10 (ACOS)", icon: "router" },
       { to: "/help/huawei", label: "Huawei (VRP)", icon: "router" },
       { to: "/help/datacom", label: "Datacom (DmOS)", icon: "router" },
       { to: "/help/mikrotik", label: "MikroTik (RouterOS)", icon: "router" },

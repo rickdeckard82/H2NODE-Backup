@@ -1,4 +1,4 @@
-export type Vendor = "datacom" | "huawei" | "juniper" | "fiberhome" | "mikrotik" | "generic" | "files";
+export type Vendor = "datacom" | "huawei" | "juniper" | "a10" | "fiberhome" | "mikrotik" | "generic" | "files";
 /** Fabricantes que ENVIAM a configuração (FTP/TFTP). O MikroTik é coletado por SSH (menu próprio). */
 export type PushVendor = Exclude<Vendor, "mikrotik">;
 
@@ -6,6 +6,7 @@ export const VENDOR_LABEL: Record<Vendor, string> = {
   datacom: "Datacom (DmOS)",
   huawei: "Huawei (VRP)",
   juniper: "Juniper (Junos)",
+  a10: "A10 (ACOS)",
   fiberhome: "Fiberhome (OLT / UNM2000)",
   mikrotik: "MikroTik (RouterOS)",
   generic: "Genérico",
@@ -17,6 +18,7 @@ export const VENDOR_PROTOCOL: Record<PushVendor, "ftp" | "tftp"> = {
   datacom: "tftp",
   huawei: "ftp",
   juniper: "ftp",
+  a10: "ftp",
   fiberhome: "ftp",
   generic: "ftp",
   files: "ftp",

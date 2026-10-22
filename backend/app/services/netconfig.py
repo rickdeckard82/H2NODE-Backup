@@ -6,22 +6,25 @@ verificação profunda (depois de decifrar). Formatos aceitos:
 - texto puro (Datacom DmOS `show running-config`, Huawei .cfg, Fiberhome `config_<IP>_<data>`,
   MikroTik `/export`);
 - gzip (Juniper archival: `<host>_juniper.conf.gz_AAAAMMDD_HHMMSS`);
-- zip (Huawei pode enviar o `vrpcfg.zip`).
+- zip (Huawei pode enviar o `vrpcfg.zip`);
+- tar.gz (A10 ACOS `backup system`: startup-config + aFleX + certificados).
 """
 
 import gzip
 import hashlib
 import io
 import re
+import tarfile
 import zipfile
 import zlib
 from dataclasses import dataclass
 
-VENDORS = ("datacom", "huawei", "juniper", "fiberhome", "mikrotik", "generic", "files")
+VENDORS = ("datacom", "huawei", "juniper", "a10", "fiberhome", "mikrotik", "generic", "files")
 VENDOR_LABEL = {
     "datacom": "Datacom (DmOS)",
     "huawei": "Huawei (VRP)",
     "juniper": "Juniper (Junos)",
+    "a10": "A10 (ACOS)",
     "fiberhome": "Fiberhome (OLT / UNM2000)",
     "mikrotik": "MikroTik (RouterOS)",
     "generic": "Genérico",
@@ -97,6 +100,25 @@ def looks_textual(b: bytes) -> bool:
     return printable / len(sample) > 0.95
 
 
+def _check_a10_archive(tar_bytes: bytes) -> ConfigCheck:
+    """`backup system` do ACOS: tar dentro do gzip. Lê todos os membros para provar que não truncou."""
+    try:
+        with tarfile.open(fileobj=io.BytesIO(tar_bytes), mode="r:") as tf:
+            files = 0
+            for m in tf:
+                if not m.isfile():
+                    continue
+                files += 1
+                f = tf.extractfile(m)
+                while f is not None and f.read(1 << 20):
+                    pass
+    except (tarfile.TarError, EOFError, OSError) as exc:
+        return ConfigCheck(False, f"backup A10 inválido (tar corrompido ou truncado): {exc}", format="gzip")
+    if not files:
+        return ConfigCheck(False, "backup A10 sem nenhum arquivo dentro do tar.gz", format="gzip")
+    return ConfigCheck(True, f"backup de sistema válido ({files} arquivos, tar.gz)", files, "gzip")
+
+
 def check(data: bytes, vendor: str | None) -> ConfigCheck:
     """Confere se `data` é uma configuração plausível do fabricante."""
     if not data:
@@ -107,6 +129,8 @@ def check(data: bytes, vendor: str | None) -> ConfigCheck:
         return ConfigCheck(False, f"arquivo compactado inválido: {exc}")
     # O VRP (Huawei) grava o vrpcfg.cfg com um \x00 depois do "return" final: enchimento
     # no fim não conta como binário. \x00 no meio do arquivo continua reprovando.
+    if vendor == "a10" and fmt == "gzip":
+        return _check_a10_archive(text_bytes)
     text_bytes = text_bytes.rstrip(b"\x00")
     if not looks_textual(text_bytes):
         return ConfigCheck(False, "conteúdo não parece texto de configuração", format=fmt)
@@ -120,6 +144,10 @@ def check(data: bytes, vendor: str | None) -> ConfigCheck:
         # VRP termina a configuração salva com "return".
         if stripped[-1] != "return":
             return ConfigCheck(False, "configuração Huawei sem o \"return\" final (truncada?)", lines, fmt)
+    elif vendor == "a10" and not any(ln.startswith("!") or ln.startswith("hostname ") for ln in stripped):
+        return ConfigCheck(
+            False, "não parece uma configuração do ACOS (cabeçalho \"!\" ou hostname ausente)", lines, fmt
+        )
     elif vendor == "juniper":
         if "system {" not in text and not any(ln.startswith("set system ") for ln in stripped):
             return ConfigCheck(False, "configuração Junos sem o bloco \"system\"", lines, fmt)

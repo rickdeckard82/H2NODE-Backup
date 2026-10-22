@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.13";
+export const APP_VERSION = "0.9.14";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,13 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.14",
+    date: "2026-10-22",
+    changes: [
+      "Novo fabricante A10 (ACOS / Thunder): backup de sistema (backup system) por FTP, validado pelo tar.gz. Inclui a página de ajuda \"A10 (ACOS)\" com a GUI, a CLI e a restauração.",
+    ],
+  },
   {
     version: "0.9.13",
     date: "2026-10-21",

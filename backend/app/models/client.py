@@ -22,7 +22,7 @@ class Client(Base, TimestampMixin):
     kind: Mapped[str] = mapped_column(String(16), default="server", server_default="server", index=True)
 
     # ---- Só para equipamentos de rede ----
-    # datacom | huawei | juniper | fiberhome | mikrotik | generic — define as instruções e a validação.
+    # datacom | huawei | juniper | a10 | fiberhome | mikrotik | generic — define as instruções e a validação.
     vendor: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # IP de origem com que o equipamento chega ao servidor (identifica o upload).
     # MikroTik (ssh): o IP onde o coletor conecta. Pode repetir entre cadastros: no FTP

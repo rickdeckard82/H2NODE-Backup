@@ -58,6 +58,14 @@ set system archival configuration archive-sites "ftp://juniper:<senha>@<servidor
 commit
 ```
 
+**A10 Thunder (ACOS) — FTP** (backup de sistema: startup-config, aFleX e certificados, em `.tar.gz`):
+```
+backup system ftp://a10@<servidor>/<nome>.tar.gz
+backup-periodic system day 1 ftp://a10@<servidor>/<nome>.tar.gz   # + write memory
+```
+Também na GUI: System → Maintenance → Backup → System (protocolo FTP, *Encrypt* desabilitado).
+Use `use-mgmt-port` se o envio sair pela gerência (o IP de origem passa a ser o do management).
+
 **Fiberhome (OLTs e UNM2000) — FTP.** A UNM2000 comanda a exportação, mas **cada OLT envia
 direto ao servidor, do IP dela**, um arquivo `<ID>_<MMDD>` por dia (texto, `!WOS system config file`):
 
@@ -82,6 +90,7 @@ cá: o receptor é só de gravação.
 | Fabricante | Na recepção e na verificação profunda |
 |---|---|
 | Huawei | texto (ou `.zip` com o `.cfg`) terminando em `return` |
+| A10 (ACOS) | `.tar.gz` do `backup system` lido por inteiro (ou texto com `!`/`hostname`) |
 | Juniper | `.gz` íntegro, bloco `system`, chaves `{ }` balanceadas |
 | Datacom | texto com comandos de primeiro nível do DmOS (`hostname`, `dot1q`, `interface`…) |
 | Fiberhome (OLT / UNM2000) | texto da OLT com `!WOS system config file` ou `hostname`; cada OLT envia o próprio arquivo (`<ID>_<MMDD>`) e é um equipamento (IP de origem = IP da OLT); o **IP da UNM2000** é informado em cada OLT (campo "IP da UNM2000") |

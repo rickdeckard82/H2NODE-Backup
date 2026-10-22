@@ -516,6 +516,18 @@ def render_device_commands(c: Client, host: str, ftp_user: str) -> tuple[str, li
             "commit"
         )
         notes.append("O Junos envia um .conf.gz a cada commit (sob demanda: use intervalo 0).")
+    elif c.vendor == "a10" and c.protocol == "ftp":
+        cmds = (
+            "# Em modo config (use-mgmt-port só se a saída for pela interface de gerência):\n"
+            f"backup system ftp://{ftp_user}@{host}/{c.slug}.tar.gz\n"
+            "# periódico (a cada N dias; depois, write memory para não perder o agendamento):\n"
+            f"backup-periodic system day 1 ftp://{ftp_user}@{host}/{c.slug}.tar.gz\n"
+            "write memory"
+        )
+        notes.append("O ACOS pede a senha da conta FTP ao executar o comando (ou use a GUI: System → "
+                     "Maintenance → Backup → System, protocolo FTP).")
+        notes.append("O ACOS envia sob comando ou por agendamento: ajuste o intervalo esperado ao "
+                     "backup-periodic (ex.: 24 h).")
     elif c.vendor == "fiberhome" and c.protocol == "ftp":
         cmds = (
             "# Na UNM2000: tarefa de exportação de configuração com destino FTP (cada OLT envia direto)\n"
