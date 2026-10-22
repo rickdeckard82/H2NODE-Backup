@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.14";
+export const APP_VERSION = "0.9.15";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.15",
+    date: "2026-10-22",
+    changes: [
+      "Nova página FTP Firmwares: envie imagens de firmware pelo painel (com barra de progresso) e os switches, OLTs e roteadores as baixam por TFTP (sem login) ou FTP (login próprio, somente leitura), nas mesmas portas 21 e 69.",
+      "Acesso aos firmwares só das redes liberadas na página e, se marcado, dos IPs dos equipamentos cadastrados. Os backups continuam só gravação: nenhuma conta ou IP lê o que foi recebido.",
+      "Cada firmware mostra o SHA-256 e os comandos para baixar (URLs tftp:// e ftp://, Huawei VRP, Cisco e teste no Linux).",
+    ],
+  },
   {
     version: "0.9.14",
     date: "2026-10-22",

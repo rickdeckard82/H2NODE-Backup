@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import client_ip, enforce_csrf, require_admin
 from app.core.db import get_db
 from app.core.security import hash_password
-from app.models import FtpAccount, SystemUser
+from app.models import FirmwareSettings, FtpAccount, SystemUser
 from app.schemas.ftp_account import FtpAccountCreate, FtpAccountOut, FtpAccountUpdate
 from app.services import audit, receivers
 
@@ -28,6 +28,9 @@ def create_account(
 ) -> FtpAccountOut:
     if db.execute(select(FtpAccount.id).where(FtpAccount.username == body.username)).first():
         raise HTTPException(status.HTTP_409_CONFLICT, "já existe uma conta com este usuário")
+    fw = db.get(FirmwareSettings, 1)
+    if fw and fw.ftp_username == body.username:
+        raise HTTPException(status.HTTP_409_CONFLICT, "este usuário é o login do servidor de firmwares")
     a = FtpAccount(username=body.username, password_hash=hash_password(body.password),
                    description=body.description, is_active=body.is_active)
     db.add(a)

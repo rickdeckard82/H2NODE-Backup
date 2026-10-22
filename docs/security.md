@@ -43,6 +43,10 @@ sistema compensa no que controla — só IPs cadastrados, receptores só de grav
 sessões isoladas, cifragem GPG imediata na chegada e remoção do original —, mas o
 trecho de rede entre equipamento e servidor deve ser a rede de gerência ou uma VPN.
 
+O servidor de firmwares (página FTP Firmwares) é a única leitura dos receptores: serve só
+`STORAGE_PATH/firmware/files` (imagens enviadas pelo administrador, nunca backups), só para
+as redes liberadas na página, e o FTP só com o login de firmware, sem gravar nem apagar.
+
 ## MikroTik (coleta por SSH)
 
 - A coleta roda no serviço **puller**, separado do worker: ele precisa de saída para a

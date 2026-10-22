@@ -90,6 +90,8 @@ class Settings(BaseSettings):
     # Tamanho máximo de um arquivo do tipo "Arquivos e bancos" (dumps .sql, .zip…) recebido por FTP.
     # Enquanto chega, o arquivo fica em claro no disco do servidor (até o worker cifrá-lo).
     net_files_max_mb: int = Field(default=4096, alias="NET_FILES_MAX_MB")
+    # Tamanho máximo de um firmware enviado pelo painel (página FTP Firmwares).
+    firmware_max_mb: int = Field(default=2048, alias="FIRMWARE_MAX_MB")
 
     # ---- Downloads (página do painel) ----
     # Pasta agent/ do repositório montada só-leitura: o .tar.gz do agente Linux é montado

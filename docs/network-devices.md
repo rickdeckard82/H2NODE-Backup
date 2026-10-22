@@ -82,8 +82,9 @@ direto ao servidor, do IP dela**, um arquivo `<ID>_<MMDD>` por dia (texto, `!WOS
    cadastro de FTP de backup da UNM2000 para este servidor (porta 21, modo passivo).
 5. Intervalo esperado: o da tarefa de exportação (ex. 24 h).
 
-O cadastro de FTP **de firmware** da UNM2000 (as OLTs *baixam* o arquivo) não deve apontar para
-cá: o receptor é só de gravação.
+O cadastro de FTP **de firmware** da UNM2000 (as OLTs *baixam* o arquivo) só pode apontar para
+cá com o login de **FTP Firmwares** (abaixo) e o IP das OLTs liberado lá — as contas de backup
+não leem nada.
 
 ## Validação
 
@@ -121,6 +122,24 @@ A verificação profunda confere o SHA-256 do conteúdo decifrado contra o da re
 Limite por arquivo: `NET_FILES_MAX_MB` (o arquivo fica em claro no disco só até o worker
 cifrá-lo). Passo a passo com script de exemplo em **Ajuda → Arquivos e bancos (FTP)**.
 
+## Servidor de firmwares (FTP Firmwares)
+
+Página **FTP Firmwares**: o administrador envia imagens de firmware e os equipamentos as
+**baixam** por TFTP ou FTP, nas mesmas portas 21 e 69 dos backups.
+
+- Arquivos em `STORAGE_PATH/firmware/files/` (os envios em andamento ficam em
+  `firmware/.tmp/`, fora do que é servido). Nome: letras, números, `.`, `-`, `_`; até
+  `FIRMWARE_MAX_MB` (padrão 2048).
+- **Quem baixa**: os IPs das *redes liberadas* (CIDR) e, se marcado, os IPs dos equipamentos
+  cadastrados. Desativado, ninguém baixa nada.
+- **TFTP**: RRQ sem login (o protocolo não tem); vale o último componente do caminho pedido
+  (`/fw/S5720.cc` → `S5720.cc`), sem diferença de maiúsculas se só um arquivo combinar.
+  Suporta `blksize`, `tsize`, `timeout` e arquivos acima de 32 MB (rollover do bloco).
+- **FTP**: login próprio de firmware (não é Conta FTP; os nomes não podem coincidir), sessão
+  com raiz em `firmware/files` e permissão só de listar e baixar (`elr`).
+- Libere no ufw as redes dos equipamentos: `ufw-setup.sh device 192.0.2.0/24 tftp` e/ou
+  `ufw-setup.sh device 192.0.2.0/24 ftp` (21 + faixa passiva).
+
 ## Segurança
 
 - **FTP e TFTP trafegam em claro**, inclusive a senha FTP. Use a rede de gerência
@@ -129,8 +148,11 @@ cifrá-lo). Passo a passo com script de exemplo em **Ajuda → Arquivos e bancos
 - Exceção controlada: para o **IP da UNM2000** informado nas OLTs Fiberhome, os comandos FTP `DELE`, `RNFR` e `RNTO`
   respondem sucesso **sem fazer nada** (a UNM2000 apaga/renomeia o arquivo que a OLT enviou e o servidor já o guardou).
   Para qualquer outro equipamento continuam recusados, e nenhum backup guardado pode ser lido, alterado ou apagado.
-- Os receptores só aceitam **gravação**: TFTP recusa leitura (RRQ); a conta FTP não
-  tem RETR, DELE nem APPE, e cada sessão grava numa pasta própria, vazia.
+- Os backups só aceitam **gravação**: a conta FTP não tem RETR, DELE nem APPE, e cada
+  sessão grava numa pasta própria, vazia; o TFTP nunca lê a área de recepção.
+- A única leitura é a do servidor de firmwares: só `firmware/files`, só para IPs liberados na
+  página, FTP só com o login de firmware (sem gravar, renomear nem apagar). Nenhum backup fica
+  nessa pasta.
 - Conexões de IPs não cadastrados são recusadas antes do login.
 - O arquivo em claro fica no disco só até o worker cifrá-lo (segundos) e é apagado.
 - Os receptores não acessam o banco: leem `receivers.json` (IPs + hash Argon2id
@@ -148,6 +170,7 @@ cifrá-lo). Passo a passo com script de exemplo em **Ajuda → Arquivos e bancos
 | `NET_PUBLIC_HOST` | `SSH_PUBLIC_HOST` | endereço nos comandos de exemplo |
 | `NET_MAX_FILE_MB` | 64 | tamanho máximo de um arquivo de configuração recebido |
 | `NET_FILES_MAX_MB` | 4096 | tamanho máximo de um arquivo do tipo "Arquivos e bancos" |
+| `FIRMWARE_MAX_MB` | 2048 | tamanho máximo de um firmware enviado na página FTP Firmwares |
 
 ## Problemas comuns
 

@@ -20,6 +20,7 @@ from app.api.routes import (
     dashboard,
     device_credentials,
     downloads,
+    firmware,
     ftp_accounts,
     health,
     server,
@@ -120,5 +121,6 @@ for r in (
     system_users.router,
     agent_upload.router,
     downloads.router,
+    firmware.router,
 ):
     app.include_router(r, prefix=_p)

@@ -116,7 +116,7 @@ def agent_bundle() -> tuple[str, bytes, datetime] | None:
 _sha_cache: dict[tuple, str] = {}
 
 
-def _sha256_file(p: Path) -> str:
+def sha256_file(p: Path) -> str:
     st = p.stat()
     key = (str(p), st.st_mtime_ns, st.st_size)
     if key not in _sha_cache:
@@ -186,7 +186,7 @@ def list_items() -> tuple[list[Item], list[str]]:
         m = _VERSION_RE.search(p.name)
         try:
             st = p.stat()
-            sha = _sha256_file(p)
+            sha = sha256_file(p)
         except OSError as e:
             _problem(problems, p.name, e)
             continue

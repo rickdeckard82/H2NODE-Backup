@@ -10,6 +10,9 @@ Regras:
 - Arquivo completo vai para a fila do worker, atribuído ao equipamento pelo IP. No tipo
   "Arquivos e bancos" os arquivos ficam na pasta da sessão até o fim da conexão e vão juntos,
   como uma execução com uma parte por arquivo.
+- Exceção de LEITURA, e só ela: o login do servidor de firmwares (página FTP Firmwares), de IP
+  liberado para firmware, entra em STORAGE_PATH/firmware/files com permissão de listar e baixar
+  — sem gravar, renomear, criar pasta nem apagar. Nenhum backup fica nessa pasta.
 
 Uso: python -m app.receivers.ftp   (precisa de root só para abrir a porta 21)
 """
@@ -28,12 +31,14 @@ from pyftpdlib.servers import FTPServer
 from app.core.config import settings
 from app.core.logging import configure_logging, logger
 from app.core.security import verify_password
-from app.services import receivers
+from app.services import firmware, receivers
 
 # e=CWD  l=LIST  m=MKD  w=STOR  f=RENAME  d=DELE/RMD — sem r (RETR), a (APPE), M (chmod).
 # O "d" só deixa o comando CHEGAR ao handler: DELE/RMD continuam recusados (ver DeviceHandler),
 # exceto como no-op para o gerenciador UNM2000.
 PERMS = "elmwfd"
+# Sessão de firmware: e=CWD  l=LIST  r=RETR — nada mais.
+FIRMWARE_PERMS = "elr"
 
 # IP de UNM2000 (campo "IP da UNM2000" das OLTs Fiberhome): depois que cada OLT envia o arquivo,
 # a UNM2000 entra no FTP para apagar o antigo e RENOMEAR o novo. Aqui cada sessão é isolada e o
@@ -50,6 +55,8 @@ class AllowlistAuthorizer(DummyAuthorizer):
         self._homes: dict[str, str] = {}
 
     def validate_authentication(self, username, password, handler):  # noqa: ANN001
+        if self.allowlist.is_firmware_user(username):
+            return self._firmware_login(username, password, handler)
         # a conta escolhe o cadastro quando o IP tem mais de um (ex.: serviços no mesmo servidor)
         device = self.allowlist.device(handler.remote_ip, "ftp", username)
         stored = self.allowlist.accounts.get(username)
@@ -66,19 +73,34 @@ class AllowlistAuthorizer(DummyAuthorizer):
         self._homes[username] = str(home)
         logger.info("ftp_login", ip=handler.remote_ip, user=username, device=device.slug)
 
+    def _firmware_login(self, username, password, handler):  # noqa: ANN001
+        ok = verify_password(password, self.allowlist.fw_hash or receivers_dummy_hash())
+        home = firmware.files_dir()
+        if not ok or not self.allowlist.firmware_allows(handler.remote_ip) or not home.is_dir():
+            logger.warning("ftp_firmware_login_failed", ip=handler.remote_ip, user=username[:64])
+            raise AuthenticationFailed("login inválido")
+        handler.firmware = True
+        self._homes[username] = str(home)
+        logger.info("ftp_firmware_login", ip=handler.remote_ip, user=username)
+
     def get_home_dir(self, username):  # noqa: ANN001
         return self._homes.pop(username)
 
     def has_user(self, username):  # noqa: ANN001
         return True
 
+    def _perms(self, username: str) -> str:
+        return FIRMWARE_PERMS if self.allowlist.is_firmware_user(username) else PERMS
+
     def get_perms(self, username):  # noqa: ANN001
-        return PERMS
+        return self._perms(username)
 
     def has_perm(self, username, perm, path=None):  # noqa: ANN001
-        return perm in PERMS
+        return perm in self._perms(username)
 
     def get_msg_login(self, username):  # noqa: ANN001
+        if self.allowlist.is_firmware_user(username):
+            return "Pulse Backup: firmwares (somente leitura)."
         return "Pulse Backup: somente envio de configuracao."
 
     def get_msg_quit(self, username):  # noqa: ANN001
@@ -111,13 +133,18 @@ class AutoMkdirFS(AbstractedFS):
         root = os.path.realpath(self.root)
         return os.path.realpath(path).startswith(root + os.sep) or os.path.realpath(path) == root
 
+    def _firmware(self) -> bool:
+        return getattr(self.cmd_channel, "firmware", False)
+
     def open(self, filename, mode):  # noqa: ANN001
+        if self._firmware() and mode != "rb":
+            raise PermissionError("somente leitura")
         if "w" in mode and self._inside(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename), mode=0o700, exist_ok=True)
         return super().open(filename, mode)
 
     def chdir(self, path):  # noqa: ANN001
-        if self._inside(path) and not os.path.exists(path):
+        if not self._firmware() and self._inside(path) and not os.path.exists(path):
             os.makedirs(path, mode=0o700, exist_ok=True)
         super().chdir(path)
 
@@ -132,10 +159,26 @@ class DeviceHandler(FTPHandler):
     def on_connect(self):  # noqa: D401
         self.device = None
         self.session_home = None
-        if self.server.allowlist.device(self.remote_ip, "ftp") is None:
+        self.firmware = False
+        allow = self.server.allowlist
+        if allow.device(self.remote_ip, "ftp") is None and not allow.firmware_allows(self.remote_ip):
             logger.warning("ftp_unknown_ip", ip=self.remote_ip)
             self.respond("421 IP nao autorizado.")
             self.close_when_done()
+
+    def pre_process_command(self, line, cmd, arg):  # noqa: ANN001
+        # sessão de firmware: só o que FIRMWARE_PERMS permite, conferido pela SESSÃO (o nome do
+        # usuário no receivers.json pode mudar no meio da conexão)
+        if self.firmware and self.authenticated:
+            perm = self.proto_cmds.get(cmd, {}).get("perm")
+            if perm and perm not in FIRMWARE_PERMS:
+                self.respond("550 Somente leitura.")
+                return None
+        return super().pre_process_command(line, cmd, arg)
+
+    def on_file_sent(self, file):  # noqa: ANN001
+        if self.firmware:
+            logger.info("ftp_firmware_sent", ip=self.remote_ip, file=os.path.basename(file))
 
     def _is_manager(self) -> bool:
         return getattr(getattr(self, "device", None), "vendor", None) == MANAGER_VENDOR
@@ -169,6 +212,9 @@ class DeviceHandler(FTPHandler):
 
     def on_file_received(self, file):  # noqa: ANN001
         path = Path(file)
+        if self.firmware or self.device is None:  # não deveria acontecer (sem permissão de gravar)
+            logger.error("ftp_unexpected_upload", ip=self.remote_ip, file=path.name)
+            return
         size = path.stat().st_size
         # tipo "Arquivos e bancos" (dumps, .zip) tem limite próprio, maior que o de configuração
         files = getattr(self.device, "vendor", None) == receivers.FILES_VENDOR

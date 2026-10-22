@@ -1,7 +1,8 @@
-"""Receptor TFTP (RFC 1350 + opções RFC 2347/2348/2349) — SOMENTE gravação.
+"""Receptor TFTP (RFC 1350 + opções RFC 2347/2348/2349).
 
-- Só aceita WRQ (upload) de IPs cadastrados como equipamento TFTP ativo.
-- RRQ (download) é sempre recusado: ninguém lê nada deste servidor.
+- WRQ (upload de backup) só de IPs cadastrados como equipamento TFTP ativo.
+- RRQ (download) serve SÓ o servidor de firmwares (STORAGE_PATH/firmware/files), para IPs
+  liberados na página FTP Firmwares. Nenhum backup é lido por aqui.
 - O caminho pedido pelo equipamento (ex.: "DM4380MP/config.txt") é só um rótulo:
   o arquivo vai para a área do equipamento identificado pelo IP de origem.
 - Tamanho máximo NET_MAX_FILE_MB; transferências simultâneas limitadas.
@@ -19,10 +20,11 @@ from pathlib import Path
 
 from app.core.config import settings
 from app.core.logging import configure_logging, logger
-from app.services import receivers
+from app.services import firmware, receivers
 
 OP_RRQ, OP_WRQ, OP_DATA, OP_ACK, OP_ERROR, OP_OACK = 1, 2, 3, 4, 5, 6
-ERR_NOT_DEFINED, ERR_ACCESS, ERR_DISK_FULL, ERR_ILLEGAL_OP, ERR_UNKNOWN_TID, ERR_OPTION = 0, 2, 3, 4, 5, 8
+ERR_NOT_DEFINED, ERR_NOT_FOUND, ERR_ACCESS, ERR_DISK_FULL = 0, 1, 2, 3
+ERR_ILLEGAL_OP, ERR_UNKNOWN_TID, ERR_OPTION = 4, 5, 8
 
 DEFAULT_BLKSIZE = 512
 MAX_BLKSIZE = 8192
@@ -182,6 +184,100 @@ class Transfer(threading.Thread):
             sock.close()
 
 
+class ReadTransfer(threading.Thread):
+    """Envia um firmware (RRQ). Blocos de até MAX_BLKSIZE; acima de 65535 blocos o número
+    volta a 0 (o que tftp-hpa, U-Boot e os switches esperam)."""
+
+    def __init__(self, server: "TftpServer", addr: tuple, path: Path, opts: dict[str, str]) -> None:
+        super().__init__(daemon=True)
+        self.server, self.addr, self.path, self.opts = server, addr, path, opts
+
+    def run(self) -> None:
+        try:
+            self._run()
+        except Exception as exc:  # noqa: BLE001
+            logger.error("tftp_read_error", ip=self.addr[0], file=self.path.name, error=str(exc))
+        finally:
+            _slots.release()
+
+    def _negotiate(self, size: int) -> tuple[int, float, dict[str, str]]:
+        blksize, timeout, accepted = DEFAULT_BLKSIZE, 3.0, {}
+        if "blksize" in self.opts:
+            try:
+                b = int(self.opts["blksize"])
+                if 8 <= b <= 65464:
+                    blksize = min(b, MAX_BLKSIZE)
+                    accepted["blksize"] = str(blksize)
+            except ValueError:
+                pass
+        if "timeout" in self.opts:
+            try:
+                t = int(self.opts["timeout"])
+                if 1 <= t <= 255:
+                    timeout = float(t)
+                    accepted["timeout"] = str(t)
+            except ValueError:
+                pass
+        if "tsize" in self.opts:
+            accepted["tsize"] = str(size)  # no RRQ o servidor informa o tamanho
+        return blksize, timeout, accepted
+
+    def _exchange(self, sock: socket.socket, pkt: bytes, block: int, blksize: int) -> bool:
+        """Envia `pkt` e espera o ACK de `block`, reenviando no timeout."""
+        sock.sendto(pkt, self.addr)
+        retries = 0
+        while True:
+            try:
+                data, addr = sock.recvfrom(blksize + 4)
+            except TimeoutError:
+                retries += 1
+                if retries > RETRIES:
+                    logger.warning("tftp_timeout", ip=self.addr[0], file=self.path.name)
+                    return False
+                sock.sendto(pkt, self.addr)
+                continue
+            if addr != self.addr:
+                sock.sendto(error_packet(ERR_UNKNOWN_TID, "TID desconhecido"), addr)
+                continue
+            if len(data) < 4:
+                continue
+            op, n = struct.unpack("!HH", data[:4])
+            if op == OP_ERROR:
+                logger.warning("tftp_client_error", ip=self.addr[0], msg=data[4:-1][:100])
+                return False
+            if op != OP_ACK:
+                sock.sendto(error_packet(ERR_ILLEGAL_OP, "esperava ACK"), self.addr)
+                return False
+            if n == block:
+                return True
+            # ACK antigo/duplicado: ignora (sem reenviar, evita a "síndrome do aprendiz de feiticeiro")
+
+    def _run(self) -> None:
+        family = socket.AF_INET6 if ":" in self.addr[0] else socket.AF_INET
+        sock = socket.socket(family, socket.SOCK_DGRAM)
+        sock.bind((self.server.bind_host if family == self.server.family else "", 0))
+        try:
+            with open(self.path, "rb") as f:
+                size = os.fstat(f.fileno()).st_size
+                blksize, timeout, accepted = self._negotiate(size)
+                sock.settimeout(timeout)
+                if accepted:
+                    body = b"".join(k.encode() + b"\0" + v.encode() + b"\0" for k, v in accepted.items())
+                    if not self._exchange(sock, struct.pack("!H", OP_OACK) + body, 0, blksize):
+                        return
+                block = 0
+                while True:
+                    chunk = f.read(blksize)
+                    block = (block + 1) % 65536
+                    if not self._exchange(sock, struct.pack("!HH", OP_DATA, block) + chunk, block, blksize):
+                        return
+                    if len(chunk) < blksize:
+                        break
+            logger.info("tftp_firmware_sent", ip=self.addr[0], file=self.path.name, size=size)
+        finally:
+            sock.close()
+
+
 class TftpServer:
     def __init__(self, host: str = "0.0.0.0", port: int | None = None,
                  allowlist: receivers.Allowlist | None = None) -> None:
@@ -206,8 +302,22 @@ class TftpServer:
             self.sock.sendto(error_packet(ERR_ILLEGAL_OP, "requisição inválida"), addr)
             return
         if op == OP_RRQ:
-            logger.warning("tftp_read_refused", ip=ip, file=filename)
-            self.sock.sendto(error_packet(ERR_ACCESS, "leitura não permitida"), addr)
+            if not self.allowlist.firmware_allows(ip):
+                logger.warning("tftp_read_refused", ip=ip, file=filename)
+                self.sock.sendto(error_packet(ERR_ACCESS, "leitura não permitida"), addr)
+                return
+            try:
+                path = firmware.resolve(filename)
+            except (ValueError, OSError):
+                path = None
+            if path is None:
+                logger.warning("tftp_firmware_not_found", ip=ip, file=filename[:200])
+                self.sock.sendto(error_packet(ERR_NOT_FOUND, "arquivo nao encontrado"), addr)
+                return
+            if not _slots.acquire(blocking=False):
+                self.sock.sendto(error_packet(ERR_NOT_DEFINED, "servidor ocupado, tente de novo"), addr)
+                return
+            ReadTransfer(self, addr, path, opts).start()
             return
         if op != OP_WRQ:
             self.sock.sendto(error_packet(ERR_ILLEGAL_OP, "operação inválida"), addr)

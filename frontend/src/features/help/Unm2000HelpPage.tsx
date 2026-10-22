@@ -101,8 +101,12 @@ senha    : <senha da conta FTP>
 caminho  : ./`}
           />
           <Note>
-            Os nomes dos menus variam conforme a versão da UNM2000. Se existir um cadastro de FTP só para firmware (as OLTs{" "}
-            <b>baixam</b> o arquivo), ele <b>não</b> deve apontar para cá: este servidor é só de gravação.
+            Os nomes dos menus variam conforme a versão da UNM2000. O cadastro de FTP de <b>firmware</b> (as OLTs{" "}
+            <b>baixam</b> o arquivo) não usa a conta acima, que só grava: para ele, use o usuário e as redes da página{" "}
+            <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/firmware">
+              FTP Firmwares
+            </Link>
+            .
           </Note>
         </Step>
 

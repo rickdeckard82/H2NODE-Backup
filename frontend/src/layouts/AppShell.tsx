@@ -32,6 +32,7 @@ const NAV: NavEntry[] = [
   { to: "/", label: "Painel", icon: "home" },
   { to: "/clients", label: "Servidores", icon: "server" },
   { to: "/devices", label: "FTP/TFTP", icon: "router" },
+  { to: "/firmware", label: "FTP Firmwares", icon: "hardDrive" },
   { to: "/backups", label: "Backups", icon: "archive" },
   { to: "/accounts", label: "Contas cPanel", icon: "database" },
   { to: "/downloads", label: "Downloads", icon: "download" },

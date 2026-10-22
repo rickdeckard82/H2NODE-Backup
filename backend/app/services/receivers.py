@@ -4,7 +4,9 @@ sem acesso ao banco).
 O painel/worker grava `receivers.json` no volume compartilhado com:
   - equipamentos ATIVOS (slug, IP de origem, protocolo e, no FTP, a conta presa ao
     cadastro — um IP pode ter vários cadastros FTP, um por conta);
-  - contas FTP ATIVAS (usuário + hash Argon2id da senha).
+  - contas FTP ATIVAS (usuário + hash Argon2id da senha);
+  - o servidor de firmwares, se ativo: login FTP próprio e IPs/redes que podem BAIXAR
+    de STORAGE_PATH/firmware/files (a única área servida para leitura).
 Os receptores recarregam o arquivo quando ele muda.
 
 Layout da recepção, dentro de STORAGE_PATH:
@@ -14,6 +16,7 @@ Layout da recepção, dentro de STORAGE_PATH:
     netin/<slug>/<carimbo>__<nome>.meta.json   (gravado por ÚLTIMO)
 """
 
+import ipaddress
 import json
 import os
 import re
@@ -42,7 +45,7 @@ def netin() -> Path:
 
 
 def render(db: Session) -> dict:
-    from app.models import Client, FtpAccount
+    from app.models import Client, FirmwareSettings, FtpAccount
 
     users = {a.id: a.username for a in db.execute(select(FtpAccount)).scalars()}
     devices = [
@@ -67,7 +70,30 @@ def render(db: Session) -> dict:
         ).scalars()
         if c.manager_ip and c.protocol == "ftp"
     })
-    return {"version": 1, "devices": devices, "ftp_accounts": accounts, "managers": managers}
+    return {"version": 1, "devices": devices, "ftp_accounts": accounts, "managers": managers,
+            "firmware": _render_firmware(db, FirmwareSettings, Client)}
+
+
+def _render_firmware(db: Session, model, client_model) -> dict | None:  # noqa: ANN001
+    fw = db.get(model, 1)
+    if fw is None or not fw.enabled:
+        return None
+    ips: list[str] = []
+    if fw.include_devices:
+        ips = sorted({
+            c.mgmt_ip
+            for c in db.execute(
+                select(client_model).where(client_model.kind == "network", client_model.is_active.is_(True))
+            ).scalars()
+            if c.mgmt_ip
+        })
+    has_login = bool(fw.ftp_username and fw.ftp_password_hash)
+    return {
+        "ftp_user": fw.ftp_username if has_login else None,
+        "password_hash": fw.ftp_password_hash if has_login else None,
+        "networks": [n for n in (fw.allowed_networks or "").splitlines() if n.strip()],
+        "ips": ips,
+    }
 
 
 def sync(db: Session) -> bool:
@@ -119,12 +145,18 @@ class Allowlist:
         self.by_ip: dict[str, list[Device]] = {}
         self.managers: set[str] = set()
         self.accounts: dict[str, str] = {}
+        # servidor de firmwares (só leitura): login FTP e quem pode baixar
+        self.fw_user: str | None = None
+        self.fw_hash: str | None = None
+        self.fw_nets: list = []
+        self.fw_ips: set[str] = set()
 
     def refresh(self) -> None:
         try:
             mtime = self.path.stat().st_mtime
         except OSError:
             self.by_ip, self.accounts, self.managers, self._mtime = {}, {}, set(), None
+            self.fw_user, self.fw_hash, self.fw_nets, self.fw_ips = None, None, [], set()
             return
         if mtime == self._mtime:
             return
@@ -141,6 +173,17 @@ class Allowlist:
         self.by_ip = by_ip
         self.accounts = {a["username"]: a["password_hash"] for a in data.get("ftp_accounts", [])}
         self.managers = {m for m in data.get("managers", []) if isinstance(m, str)}
+        fw = data.get("firmware") or {}
+        self.fw_user = fw.get("ftp_user") or None
+        self.fw_hash = fw.get("password_hash") or None
+        nets = []
+        for n in fw.get("networks", []):
+            try:
+                nets.append(ipaddress.ip_network(n, strict=False))
+            except ValueError:
+                logger.warning("firmware_network_invalid", network=str(n)[:64])
+        self.fw_nets = nets
+        self.fw_ips = {i for i in fw.get("ips", []) if isinstance(i, str)}
         self._mtime = mtime
         logger.info("receivers_allowlist_loaded", devices=len(self.by_ip), accounts=len(self.accounts),
                     managers=len(self.managers))
@@ -164,6 +207,23 @@ class Allowlist:
         if protocol == "ftp" and ip in self.managers:
             return Device(MANAGER_SLUG, ip, "ftp", MANAGER_VENDOR)
         return None
+
+    def firmware_allows(self, ip: str) -> bool:
+        """Este IP pode baixar firmware (FTP com o login de firmware, TFTP RRQ)?"""
+        self.refresh()
+        if ip.startswith("::ffff:"):
+            ip = ip[7:]
+        if ip in self.fw_ips:
+            return True
+        try:
+            addr = ipaddress.ip_address(ip)
+        except ValueError:
+            return False
+        return any(addr.version == n.version and addr in n for n in self.fw_nets)
+
+    def is_firmware_user(self, username: str) -> bool:
+        self.refresh()
+        return self.fw_user is not None and username == self.fw_user
 
 
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")

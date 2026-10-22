@@ -207,6 +207,31 @@ export interface DeviceCredential {
   updated_at: string;
 }
 
+export interface FirmwareFile {
+  name: string;
+  size: number;
+  sha256: string;
+  updated_at: string;
+}
+
+export interface FirmwareSettings {
+  enabled: boolean;
+  ftp_username: string | null;
+  has_password: boolean;
+  allowed_networks: string[];
+  include_devices: boolean;
+}
+
+export interface FirmwareInfo {
+  files: FirmwareFile[];
+  settings: FirmwareSettings;
+  host: string;
+  ftp_port: number;
+  ftp_passive_ports: string;
+  tftp_port: number;
+  max_mb: number;
+}
+
 export interface FtpAccount {
   id: number;
   username: string;
