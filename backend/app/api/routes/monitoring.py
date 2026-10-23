@@ -131,8 +131,12 @@ def monitoring_status(request: Request, db: Session = Depends(get_db)) -> dict:
         "version": _version(),
         "generated_at": int(time.time()),
         "worker": {
+            # sinal de vida (thread a cada 30 s, também no meio de tarefas longas)
             "last_seen_age": _age(ws.last_seen_at) if ws else -1,
             "deep_verify": 1 if ws and ws.deep_verify else 0,
+            # tarefa atual: "" e -1 = ocioso
+            "busy_with": (ws.busy_with or "") if ws else "",
+            "busy_age": _age(ws.busy_since) if ws and ws.busy_with else -1,
         },
         "disk": {
             "total": disk.total, "used": disk.used, "free": disk.free,

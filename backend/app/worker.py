@@ -11,8 +11,10 @@ Uso: python -m app.worker
 """
 
 import signal
+import threading
 import time
-from datetime import timedelta
+from contextlib import contextmanager
+from datetime import datetime, timedelta
 
 from sqlalchemy import func, select, update
 
@@ -36,6 +38,30 @@ def _on_signal(signum, _frame) -> None:  # noqa: ANN001
     logger.info("worker_stopping", signal=signum)
 
 
+# Sinal de vida: uma thread grava a cada HEARTBEAT_SECONDS, inclusive no meio de uma tarefa longa.
+HEARTBEAT_SECONDS = 30
+_task: tuple[str, datetime] | None = None
+_task_lock = threading.Lock()
+
+
+@contextmanager
+def task(label: str):  # noqa: ANN201
+    """Marca o que o worker está fazendo (aparece no painel e no monitoramento)."""
+    global _task
+    with _task_lock:
+        _task = (label[:255], utcnow())
+    try:
+        yield
+    finally:
+        with _task_lock:
+            _task = None
+
+
+def current_task() -> tuple[str, datetime] | None:
+    with _task_lock:
+        return _task
+
+
 def heartbeat(db, keyring: gpg.PrivateKeyring) -> None:
     row = db.get(WorkerStatus, 1)
     if row is None:
@@ -44,7 +70,22 @@ def heartbeat(db, keyring: gpg.PrivateKeyring) -> None:
     row.last_seen_at = utcnow()
     row.deep_verify = keyring.available
     row.message = (keyring.error or "verificação profunda ativa")[:255]
+    cur = current_task()
+    row.busy_with, row.busy_since = cur if cur else (None, None)
     db.commit()
+
+
+def _heartbeat_loop(keyring: gpg.PrivateKeyring) -> None:
+    while not _stop:
+        try:
+            with SessionLocal() as db:
+                heartbeat(db, keyring)
+        except Exception as exc:  # noqa: BLE001  (o sinal nunca derruba o worker)
+            logger.warning("worker_heartbeat_failed", error=str(exc))
+        for _ in range(HEARTBEAT_SECONDS):
+            if _stop:
+                break
+            time.sleep(1)
 
 
 def prepare(db) -> None:
@@ -92,7 +133,9 @@ def run_verifications(db, keyring: gpg.PrivateKeyring) -> int:
         if b is None:
             break
         try:
-            verify.verify_backup(db, b, keyring)
+            label = f"verificando {b.client.slug}/{b.run_name}" if b.client else f"verificando backup {b.id}"
+            with task(label):
+                verify.verify_backup(db, b, keyring)
         except Exception as exc:  # noqa: BLE001
             db.rollback()
             logger.error("verify_error", backup=b.id, error=str(exc))
@@ -152,24 +195,27 @@ def main() -> None:
 
     with SessionLocal() as db:
         prepare(db)
+    threading.Thread(target=_heartbeat_loop, args=(keyring,), name="heartbeat", daemon=True).start()
 
     last_housekeeping = 0.0
     last_snapshot = 0.0
     while not _stop:
         try:
             with SessionLocal() as db:
-                heartbeat(db, keyring)
                 # novos clientes cadastrados no painel desde o último ciclo
                 for c in db.execute(select(Client)).scalars():
                     storage.ensure_client_dirs(c.slug)
-                ingest.scan(db)
-                netingest.scan(db)
+                with task("recebendo backups dos agentes"):
+                    ingest.scan(db)
+                with task("recebendo e cifrando arquivos FTP/TFTP"):
+                    netingest.scan(db)
                 run_verifications(db, keyring)
                 now = time.monotonic()
                 if now - last_housekeeping >= _HOUSEKEEPING_EVERY:
-                    retention.apply_all(db)
-                    retention.purge_quarantine()
-                    netingest.cleanup()
+                    with task("aplicando a retenção"):
+                        retention.apply_all(db)
+                        retention.purge_quarantine()
+                        netingest.cleanup()
                     queued = schedule_reverify(db)
                     if queued:
                         logger.info("reverify_scheduled", count=queued)

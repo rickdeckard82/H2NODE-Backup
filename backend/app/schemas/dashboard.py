@@ -48,6 +48,8 @@ class WorkerInfo(BaseModel):
     last_seen_at: UtcDatetime | None
     deep_verify: bool
     message: str | None
+    busy_with: str | None = None
+    busy_since: UtcDatetime | None = None
 
 
 class DashboardOut(BaseModel):

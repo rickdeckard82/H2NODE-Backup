@@ -10,7 +10,7 @@ zabbix_export:
     description: 'Monitora o Pulse Backup pela API (pull): saúde de cada servidor/equipamento (falha, atraso, verificação), worker e disco. Requer um token gerado em Configuração → Zabbix no painel.'
     vendor:
       name: Pulse Backup
-      version: 0.9.21
+      version: 0.9.24
     groups:
     - name: Templates/Applications
     items:
@@ -81,7 +81,56 @@ zabbix_export:
         name: 'Pulse Backup: worker parado (sem sinal há mais de {$PULSE.WORKER.MAX.AGE}s)'
         priority: HIGH
         opdata: 'Último sinal: {ITEM.LASTVALUE1}'
-        description: 'O worker recebe, cifra, verifica e aplica a retenção. Parado, nada novo entra. Veja: docker compose logs worker.'
+        description: 'O processo do worker não manda sinal (a thread de sinal grava a cada 30 s, mesmo no meio de tarefas longas): parado, morto ou sem banco. Nada novo entra. Veja: docker compose logs worker.'
+        dependencies:
+        - name: 'Pulse Backup: sem resposta da API há {$PULSE.NODATA}'
+          expression: nodata(/Pulse Backup by HTTP/pulse.backup.get,{$PULSE.NODATA})=1
+    - uuid: 21ac805c9db8444495c12a24091c8be5
+      name: 'Pulse Backup: worker — tarefa atual'
+      type: DEPENDENT
+      key: pulse.backup.worker.busy_with
+      delay: '0'
+      history: 7d
+      value_type: CHAR
+      trends: '0'
+      description: O que o worker está fazendo (vazio = ocioso).
+      preprocessing:
+      - type: JSONPATH
+        parameters:
+        - $.worker.busy_with
+      - type: DISCARD_UNCHANGED_HEARTBEAT
+        parameters:
+        - 1h
+      master_item:
+        key: pulse.backup.get
+      tags:
+      - tag: component
+        value: worker
+    - uuid: 24f08630e4d84393895783905be7ece7
+      name: 'Pulse Backup: worker — tempo na tarefa atual'
+      type: DEPENDENT
+      key: pulse.backup.worker.busy_age
+      delay: '0'
+      history: 31d
+      value_type: FLOAT
+      units: s
+      description: Segundos na tarefa atual (-1 = ocioso).
+      preprocessing:
+      - type: JSONPATH
+        parameters:
+        - $.worker.busy_age
+      master_item:
+        key: pulse.backup.get
+      tags:
+      - tag: component
+        value: worker
+      triggers:
+      - uuid: 564cbbf79435413e8501d72b51b23592
+        expression: last(/Pulse Backup by HTTP/pulse.backup.worker.busy_age)>{$PULSE.WORKER.BUSY.MAX} and length(last(/Pulse Backup by HTTP/pulse.backup.worker.busy_with))>=0
+        name: 'Pulse Backup: worker na mesma tarefa há mais de {$PULSE.WORKER.BUSY.MAX}'
+        priority: WARNING
+        opdata: '{ITEM.LASTVALUE2} há {ITEM.LASTVALUE1}'
+        description: O worker está vivo (manda sinal), mas preso na mesma tarefa. Verificar um backup de centenas de GB leva horas; muito além disso, veja docker compose logs worker.
         dependencies:
         - name: 'Pulse Backup: sem resposta da API há {$PULSE.NODATA}'
           expression: nodata(/Pulse Backup by HTTP/pulse.backup.get,{$PULSE.NODATA})=1
@@ -417,7 +466,10 @@ zabbix_export:
       description: Sem resposta da API por este tempo = alerta.
     - macro: '{$PULSE.WORKER.MAX.AGE}'
       value: '300'
-      description: Segundos sem sinal do worker para alertar.
+      description: Segundos sem sinal do worker para alertar (o sinal vem a cada 30 s).
+    - macro: '{$PULSE.WORKER.BUSY.MAX}'
+      value: 12h
+      description: 'Tempo máximo na mesma tarefa (ex.: verificar um backup grande).'
     - macro: '{$PULSE.DISK.PUSED.WARN}'
       value: '85'
       description: Uso do disco dos backups (%) para aviso.

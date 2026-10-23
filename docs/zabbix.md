@@ -29,7 +29,8 @@ Resposta (resumo):
 {
   "version": "0.9.20",
   "generated_at": 1792750000,
-  "worker": {"last_seen_age": 12, "deep_verify": 1},
+  "worker": {"last_seen_age": 12, "deep_verify": 1,
+             "busy_with": "verificando whm-cpanel/20261023T010002Z-beefbe", "busy_age": 5400},
   "disk": {"total": 4000000000000, "used": 1200000000000, "free": 2800000000000, "pused": 30.0},
   "summary": {"ok": 40, "warning": 1, "failed": 1, "overdue": 0, "never": 2},
   "clients": [
@@ -46,6 +47,11 @@ Resposta (resumo):
 | `health_code` | 0 ok · 1 com avisos · 2 falhou (ou corrompido) · 3 atrasado · 4 nunca recebeu |
 | `verify_code` | 0 ok · 1 pendente · 2 falhou · 3 sem verificação |
 | `last_backup_age`, `worker.last_seen_age` | segundos; `-1` = nunca |
+| `worker.busy_with`, `worker.busy_age` | tarefa atual e há quantos segundos; `""` e `-1` = ocioso |
+
+O sinal do worker (`last_seen_age`) vem de uma thread a cada 30 s, também no meio de tarefas longas
+(verificar um backup de centenas de GB leva horas). Sem sinal = processo morto ou travado; sinal em
+dia com a mesma tarefa há muito tempo = worker preso (`busy_age`).
 
 Os códigos são o contrato com os gatilhos do template: valores novos entram no fim, nunca reordene.
 Clientes inativos não aparecem.
@@ -68,7 +74,8 @@ Zabbix **7.0+**, nome **Pulse Backup by HTTP**:
 | `{#NAME}: verificação do último backup falhou` | Alta |
 | `{#NAME}: nenhum backup recebido ainda` | Atenção |
 | `{#NAME}: último backup com avisos` | Atenção |
-| Worker parado | Alta |
+| Worker parado (sem sinal há `{$PULSE.WORKER.MAX.AGE}` s) | Alta |
+| Worker na mesma tarefa há mais de `{$PULSE.WORKER.BUSY.MAX}` | Atenção |
 | Disco acima de `{$PULSE.DISK.PUSED.WARN}` / `{$PULSE.DISK.PUSED.HIGH}` % | Atenção / Alta |
 | Verificação profunda desativada | Atenção |
 | Sem resposta da API há `{$PULSE.NODATA}` | Alta |
@@ -83,7 +90,8 @@ Os alertas de cliente se resolvem sozinhos quando o próximo backup chega bem.
 | `{$PULSE.TOKEN}` | — | token do painel (tipo **texto secreto**) |
 | `{$PULSE.INTERVAL}` | `2m` | intervalo da consulta |
 | `{$PULSE.NODATA}` | `15m` | sem resposta por este tempo = alerta |
-| `{$PULSE.WORKER.MAX.AGE}` | `300` | segundos sem sinal do worker |
+| `{$PULSE.WORKER.MAX.AGE}` | `300` | segundos sem sinal do worker (o sinal vem a cada 30 s) |
+| `{$PULSE.WORKER.BUSY.MAX}` | `12h` | tempo máximo na mesma tarefa |
 | `{$PULSE.DISK.PUSED.WARN}` / `.HIGH` | `85` / `95` | uso do disco dos backups (%) |
 | `{$PULSE.WARNING.ALERT}` | `1` | `0` = não alerta backups com avisos |
 | `{$PULSE.CLIENT.ALERT:"<slug>"}` | `1` | `0` silencia um cliente (macro de contexto) |

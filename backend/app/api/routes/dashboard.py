@@ -7,7 +7,6 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_auditor
-from app.core.config import settings
 from app.core.db import get_db
 from app.core.security import utcnow
 from app.models import Backup, BackupStatus, Client, StorageSnapshot, SystemUser, VerifyStatus, WorkerStatus
@@ -129,7 +128,8 @@ def dashboard(
     ]
 
     ws = db.get(WorkerStatus, 1)
-    online = bool(ws and now - ws.last_seen_at <= timedelta(seconds=settings.worker_poll_seconds * 3 + 600))
+    # sinal a cada 30 s (thread), inclusive durante tarefas longas: 5 min sem sinal = parado
+    online = bool(ws and now - ws.last_seen_at <= timedelta(minutes=5))
 
     return DashboardOut(
         days=days,
@@ -161,5 +161,6 @@ def dashboard(
         ],
         overdue_clients=overdue,
         worker=WorkerInfo(online=online, last_seen_at=ws.last_seen_at if ws else None,
-                          deep_verify=bool(ws and ws.deep_verify), message=ws.message if ws else None),
+                          deep_verify=bool(ws and ws.deep_verify), message=ws.message if ws else None,
+                          busy_with=ws.busy_with if ws else None, busy_since=ws.busy_since if ws else None),
     )

@@ -54,7 +54,14 @@ interface Dashboard {
     last_backup_at: string | null;
     expected_interval_hours: number;
   }[];
-  worker: { online: boolean; last_seen_at: string | null; deep_verify: boolean; message: string | null };
+  worker: {
+    online: boolean;
+    last_seen_at: string | null;
+    deep_verify: boolean;
+    message: string | null;
+    busy_with?: string | null;
+    busy_since?: string | null;
+  };
 }
 
 function Stat({
@@ -136,8 +143,14 @@ export default function DashboardPage() {
           {!d.worker.online && (
             <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
               <b>Worker parado</b> — os uploads não estão sendo recebidos nem verificados
-              {d.worker.last_seen_at ? ` (último sinal ${fmtDate(d.worker.last_seen_at)})` : ""}. Veja{" "}
+              {d.worker.last_seen_at ? ` (último sinal ${fmtDate(d.worker.last_seen_at)})` : ""}
+              {d.worker.busy_with ? `, na tarefa "${d.worker.busy_with}"` : ""}. Veja{" "}
               <code className="font-mono">docker compose logs worker</code>.
+            </div>
+          )}
+          {d.worker.online && d.worker.busy_with && d.worker.busy_since && (
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              Worker: {d.worker.busy_with} desde {fmtDate(d.worker.busy_since)}
             </div>
           )}
           {d.worker.online && !d.worker.deep_verify && (

@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.23";
+export const APP_VERSION = "0.9.24";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.24",
+    date: "2026-10-23",
+    changes: [
+      "Worker: o sinal de vida passa a ser gravado a cada 30 s também no meio de tarefas longas. Antes, verificar um backup grande (ex.: o do WHM, centenas de GB) deixava o sinal parado por horas, e o Zabbix acusava \"worker parado\" com o worker trabalhando.",
+      "O worker registra o que está fazendo (ex.: \"verificando whm-cpanel/…\") e desde quando: aparece no Painel e no monitoramento.",
+      "Zabbix: novos itens da tarefa atual e o alerta \"worker na mesma tarefa há mais de {$PULSE.WORKER.BUSY.MAX}\" (12h), para distinguir worker morto de worker preso. Baixe e importe o template de novo.",
+    ],
+  },
   {
     version: "0.9.23",
     date: "2026-10-23",
