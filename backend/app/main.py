@@ -23,6 +23,7 @@ from app.api.routes import (
     firmware,
     ftp_accounts,
     health,
+    monitoring,
     server,
     system_users,
 )
@@ -122,5 +123,6 @@ for r in (
     agent_upload.router,
     downloads.router,
     firmware.router,
+    monitoring.router,
 ):
     app.include_router(r, prefix=_p)

@@ -1,0 +1,464 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+  - uuid: a571c0d144b14fd4a87a9d9b2aa9fcd6
+    name: Templates/Applications
+  templates:
+  - uuid: bd32186ee3d25cfa8cccf4c5f1592963
+    template: Pulse Backup by HTTP
+    name: Pulse Backup by HTTP
+    description: 'Monitora o Pulse Backup pela API (pull): saúde de cada servidor/equipamento (falha, atraso, verificação), worker e disco. Requer um token gerado em Configuração → Zabbix no painel.'
+    vendor:
+      name: Pulse Backup
+      version: 0.9.20
+    groups:
+    - name: Templates/Applications
+    items:
+    - uuid: 140e543f1efe53468970567bf6de096a
+      name: 'Pulse Backup: obter status'
+      type: HTTP_AGENT
+      key: pulse.backup.get
+      delay: '{$PULSE.INTERVAL}'
+      history: 1h
+      value_type: TEXT
+      trends: '0'
+      description: JSON de GET /api/monitoring/status (token gerado em Configuração → Zabbix no painel). Os demais itens e a descoberta de clientes saem daqui.
+      timeout: 15s
+      url: '{$PULSE.URL}/api/monitoring/status'
+      headers:
+      - name: Authorization
+        value: Bearer {$PULSE.TOKEN}
+      tags:
+      - tag: component
+        value: raw
+      triggers:
+      - uuid: a62166106310537d99b2ac0b0bf23a48
+        expression: nodata(/Pulse Backup by HTTP/pulse.backup.get,{$PULSE.NODATA})=1
+        name: 'Pulse Backup: sem resposta da API há {$PULSE.NODATA}'
+        priority: HIGH
+        description: 'O Zabbix não consegue ler o status: painel fora do ar, token trocado/revogado, IP do Zabbix fora das redes liberadas ou URL errada. Veja o erro do item "Pulse Backup: obter status".'
+    - uuid: d5f3b042441d5ae78423570febbb56d7
+      name: 'Pulse Backup: versão'
+      type: DEPENDENT
+      key: pulse.backup.version
+      delay: '0'
+      history: 7d
+      value_type: CHAR
+      trends: '0'
+      preprocessing:
+      - type: JSONPATH
+        parameters:
+        - $.version
+      - type: DISCARD_UNCHANGED_HEARTBEAT
+        parameters:
+        - 1d
+      master_item:
+        key: pulse.backup.get
+      tags:
+      - tag: component
+        value: application
+    - uuid: e74587f5bddb5ae2a3b3f78b3474ceb5
+      name: 'Pulse Backup: worker — último sinal'
+      type: DEPENDENT
+      key: pulse.backup.worker.age
+      delay: '0'
+      history: 31d
+      value_type: FLOAT
+      units: s
+      description: Segundos desde o último ciclo do worker (-1 = nunca rodou).
+      preprocessing:
+      - type: JSONPATH
+        parameters:
+        - $.worker.last_seen_age
+      master_item:
+        key: pulse.backup.get
+      tags:
+      - tag: component
+        value: worker
+      triggers:
+      - uuid: 90bdeced72f95ff6b717b9ded18a2e04
+        expression: last(/Pulse Backup by HTTP/pulse.backup.worker.age)>{$PULSE.WORKER.MAX.AGE} or last(/Pulse Backup by HTTP/pulse.backup.worker.age)<0
+        name: 'Pulse Backup: worker parado (sem sinal há mais de {$PULSE.WORKER.MAX.AGE}s)'
+        priority: HIGH
+        opdata: 'Último sinal: {ITEM.LASTVALUE1}'
+        description: 'O worker recebe, cifra, verifica e aplica a retenção. Parado, nada novo entra. Veja: docker compose logs worker.'
+        dependencies:
+        - name: 'Pulse Backup: sem resposta da API há {$PULSE.NODATA}'
+          expression: nodata(/Pulse Backup by HTTP/pulse.backup.get,{$PULSE.NODATA})=1
+    - uuid: 0c9e6ef9f8e35d7f89f083e93a225d44
+      name: 'Pulse Backup: verificação profunda'
+      type: DEPENDENT
+      key: pulse.backup.worker.deep_verify
+      delay: '0'
+      history: 31d
+      value_type: UNSIGNED
+      valuemap:
+        name: Pulse Backup ativo
+      preprocessing:
+      - type: JSONPATH
+        parameters:
+        - $.worker.deep_verify
+      master_item:
+        key: pulse.backup.get
+      tags:
+      - tag: component
+        value: worker
+      triggers:
+      - uuid: 243909e2286750bb9e50e0546790aca2
+        expression: last(/Pulse Backup by HTTP/pulse.backup.worker.deep_verify)=0
+        name: 'Pulse Backup: verificação profunda desativada'
+        priority: WARNING
+        description: 'O worker está sem a chave privada GPG (secrets/private): os backups são conferidos só por hash, sem decifrar e testar o conteúdo.'
+    - uuid: fd658f153f2a592b8ccbccca03d2ace6
+      name: 'Pulse Backup: disco — usado (%)'
+      type: DEPENDENT
+      key: pulse.backup.disk.pused
+      delay: '0'
+      history: 31d
+      value_type: FLOAT
+      units: '%'
+      preprocessing:
+      - type: JSONPATH
+        parameters:
+        - $.disk.pused
+      master_item:
+        key: pulse.backup.get
+      tags:
+      - tag: component
+        value: storage
+      triggers:
+      - uuid: 70bbfd5b0a995fcdbf00f213a593f80d
+        expression: min(/Pulse Backup by HTTP/pulse.backup.disk.pused,10m)>{$PULSE.DISK.PUSED.HIGH}
+        name: 'Pulse Backup: disco dos backups acima de {$PULSE.DISK.PUSED.HIGH}%'
+        priority: HIGH
+        opdata: 'Usado: {ITEM.LASTVALUE1}'
+      - uuid: fb538b8c49d255df958a20e795a88387
+        expression: min(/Pulse Backup by HTTP/pulse.backup.disk.pused,10m)>{$PULSE.DISK.PUSED.WARN}
+        name: 'Pulse Backup: disco dos backups acima de {$PULSE.DISK.PUSED.WARN}%'
+        priority: WARNING
+        opdata: 'Usado: {ITEM.LASTVALUE1}'
+        dependencies:
+        - name: 'Pulse Backup: disco dos backups acima de {$PULSE.DISK.PUSED.HIGH}%'
+          expression: min(/Pulse Backup by HTTP/pulse.backup.disk.pused,10m)>{$PULSE.DISK.PUSED.HIGH}
+    - uuid: 53104280c4bc5a58a4fbb67eb8729451
+      name: 'Pulse Backup: disco — livre'
+      type: DEPENDENT
+      key: pulse.backup.disk.free
+      delay: '0'
+      history: 31d
+      value_type: UNSIGNED
+      units: B
+      preprocessing:
+      - type: JSONPATH
+        parameters:
+        - $.disk.free
+      master_item:
+        key: pulse.backup.get
+      tags:
+      - tag: component
+        value: storage
+    - uuid: 66c62ff60c60582782d4ac9095c4e73d
+      name: 'Pulse Backup: disco — total'
+      type: DEPENDENT
+      key: pulse.backup.disk.total
+      delay: '0'
+      history: 7d
+      value_type: UNSIGNED
+      units: B
+      preprocessing:
+      - type: JSONPATH
+        parameters:
+        - $.disk.total
+      - type: DISCARD_UNCHANGED_HEARTBEAT
+        parameters:
+        - 1d
+      master_item:
+        key: pulse.backup.get
+      tags:
+      - tag: component
+        value: storage
+    - uuid: 153af59fdcb9598191c9db286fd26e40
+      name: 'Pulse Backup: clientes ok'
+      type: DEPENDENT
+      key: pulse.backup.summary[ok]
+      delay: '0'
+      history: 31d
+      value_type: UNSIGNED
+      preprocessing:
+      - type: JSONPATH
+        parameters:
+        - $.summary.ok
+      master_item:
+        key: pulse.backup.get
+      tags:
+      - tag: component
+        value: summary
+    - uuid: f61293d44bb45f3f8e820f3a09dac71f
+      name: 'Pulse Backup: clientes com avisos'
+      type: DEPENDENT
+      key: pulse.backup.summary[warning]
+      delay: '0'
+      history: 31d
+      value_type: UNSIGNED
+      preprocessing:
+      - type: JSONPATH
+        parameters:
+        - $.summary.warning
+      master_item:
+        key: pulse.backup.get
+      tags:
+      - tag: component
+        value: summary
+    - uuid: 18e27ee4b6425c9c9323424d4fd1c562
+      name: 'Pulse Backup: clientes com falha'
+      type: DEPENDENT
+      key: pulse.backup.summary[failed]
+      delay: '0'
+      history: 31d
+      value_type: UNSIGNED
+      preprocessing:
+      - type: JSONPATH
+        parameters:
+        - $.summary.failed
+      master_item:
+        key: pulse.backup.get
+      tags:
+      - tag: component
+        value: summary
+    - uuid: f4e4918f14b756e197daae114ce2bcb8
+      name: 'Pulse Backup: clientes atrasados'
+      type: DEPENDENT
+      key: pulse.backup.summary[overdue]
+      delay: '0'
+      history: 31d
+      value_type: UNSIGNED
+      preprocessing:
+      - type: JSONPATH
+        parameters:
+        - $.summary.overdue
+      master_item:
+        key: pulse.backup.get
+      tags:
+      - tag: component
+        value: summary
+    - uuid: 831d6e39944a570ebd4d5046650da6e1
+      name: 'Pulse Backup: clientes sem nenhum backup'
+      type: DEPENDENT
+      key: pulse.backup.summary[never]
+      delay: '0'
+      history: 31d
+      value_type: UNSIGNED
+      preprocessing:
+      - type: JSONPATH
+        parameters:
+        - $.summary.never
+      master_item:
+        key: pulse.backup.get
+      tags:
+      - tag: component
+        value: summary
+    discovery_rules:
+    - uuid: e4ab27eb2c045e529972f7da2405f0a8
+      name: Clientes de backup
+      type: DEPENDENT
+      key: pulse.backup.clients.discovery
+      delay: '0'
+      description: Servidores e equipamentos ATIVOS do painel. Cliente desativado ou excluído some daqui.
+      item_prototypes:
+      - uuid: 574076bbdd155789908b8069cd4b80f8
+        name: '{#NAME}: saúde do backup'
+        type: DEPENDENT
+        key: pulse.backup.client.health[{#SLUG}]
+        delay: '0'
+        history: 90d
+        value_type: UNSIGNED
+        description: 0 ok · 1 com avisos · 2 falhou · 3 atrasado · 4 nunca recebeu (mesma saúde do painel).
+        valuemap:
+          name: Pulse Backup saúde
+        preprocessing:
+        - type: JSONPATH
+          parameters:
+          - $.clients[?(@.slug=='{#SLUG}')].health_code.first()
+        master_item:
+          key: pulse.backup.get
+        tags: &id001
+        - tag: client
+          value: '{#SLUG}'
+        - tag: kind
+          value: '{#KIND}'
+        trigger_prototypes:
+        - uuid: fe9de02490de5c99bf41d5ebf602dcbe
+          expression: last(/Pulse Backup by HTTP/pulse.backup.client.health[{#SLUG}])=2 and length(last(/Pulse Backup by HTTP/pulse.backup.client.error[{#SLUG}]))>=0 and {$PULSE.CLIENT.ALERT:"{#SLUG}"}=1
+          name: '{#NAME}: último backup falhou'
+          priority: HIGH
+          opdata: '{ITEM.LASTVALUE2}'
+          description: A última execução de {#NAME} ({#SLUG}) falhou ou chegou corrompida. Veja Backups no painel.
+        - uuid: aef38decff155cd1b7b903da054a5541
+          expression: last(/Pulse Backup by HTTP/pulse.backup.client.health[{#SLUG}])=3 and last(/Pulse Backup by HTTP/pulse.backup.client.age[{#SLUG}])>=0 and {$PULSE.CLIENT.ALERT:"{#SLUG}"}=1
+          name: '{#NAME}: backup atrasado'
+          priority: HIGH
+          opdata: Último backup há {ITEM.LASTVALUE2}
+          description: Nenhum backup de {#NAME} dentro do intervalo esperado + tolerância (OVERDUE_GRACE_MINUTES).
+        - uuid: 728be52916c4505890545e7f810583ec
+          expression: last(/Pulse Backup by HTTP/pulse.backup.client.health[{#SLUG}])=4 and {$PULSE.CLIENT.ALERT:"{#SLUG}"}=1
+          name: '{#NAME}: nenhum backup recebido ainda'
+          priority: WARNING
+          description: Cliente ativo e cadastrado que ainda não enviou nenhum backup.
+        - uuid: 6b3a2713ffe3515684b833dd46682e24
+          expression: last(/Pulse Backup by HTTP/pulse.backup.client.health[{#SLUG}])=1 and length(last(/Pulse Backup by HTTP/pulse.backup.client.error[{#SLUG}]))>=0 and {$PULSE.WARNING.ALERT}=1 and {$PULSE.CLIENT.ALERT:"{#SLUG}"}=1
+          name: '{#NAME}: último backup com avisos'
+          priority: WARNING
+          opdata: '{ITEM.LASTVALUE2}'
+          description: 'Concluído com avisos (ex.: arquivo mudou durante o tar). Para não alertar avisos, use {$PULSE.WARNING.ALERT}=0.'
+      - uuid: cd63afe12ab5570b991b447ade6185fa
+        name: '{#NAME}: último backup há'
+        type: DEPENDENT
+        key: pulse.backup.client.age[{#SLUG}]
+        delay: '0'
+        history: 31d
+        value_type: FLOAT
+        units: s
+        description: Segundos desde o último backup recebido (-1 = nunca).
+        preprocessing:
+        - type: JSONPATH
+          parameters:
+          - $.clients[?(@.slug=='{#SLUG}')].last_backup_age.first()
+        master_item:
+          key: pulse.backup.get
+        tags: *id001
+      - uuid: 873f293796805d12b6981fe02500de00
+        name: '{#NAME}: verificação do último backup'
+        type: DEPENDENT
+        key: pulse.backup.client.verify[{#SLUG}]
+        delay: '0'
+        history: 31d
+        value_type: UNSIGNED
+        valuemap:
+          name: Pulse Backup verificação
+        preprocessing:
+        - type: JSONPATH
+          parameters:
+          - $.clients[?(@.slug=='{#SLUG}')].verify_code.first()
+        master_item:
+          key: pulse.backup.get
+        tags: *id001
+        trigger_prototypes:
+        - uuid: 06e72788764451ba993a124e4830f7e0
+          expression: last(/Pulse Backup by HTTP/pulse.backup.client.verify[{#SLUG}])=2 and {$PULSE.CLIENT.ALERT:"{#SLUG}"}=1
+          name: '{#NAME}: verificação do último backup falhou'
+          priority: HIGH
+          description: O worker não conseguiu confirmar o conteúdo do último backup de {#NAME} (hash, decifragem ou teste do dump).
+      - uuid: f9a543e7ffa85ba6b47bdac73d961e54
+        name: '{#NAME}: tamanho do último backup'
+        type: DEPENDENT
+        key: pulse.backup.client.size[{#SLUG}]
+        delay: '0'
+        history: 31d
+        value_type: UNSIGNED
+        units: B
+        preprocessing:
+        - type: JSONPATH
+          parameters:
+          - $.clients[?(@.slug=='{#SLUG}')].last_size.first()
+        master_item:
+          key: pulse.backup.get
+        tags: *id001
+      - uuid: 5e49b2abc1e95746aef26cc972f7e689
+        name: '{#NAME}: erro do último backup'
+        type: DEPENDENT
+        key: pulse.backup.client.error[{#SLUG}]
+        delay: '0'
+        history: 31d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: JSONPATH
+          parameters:
+          - $.clients[?(@.slug=='{#SLUG}')].error.first()
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1d
+        master_item:
+          key: pulse.backup.get
+        tags: *id001
+      master_item:
+        key: pulse.backup.get
+      lld_macro_paths:
+      - lld_macro: '{#SLUG}'
+        path: $.slug
+      - lld_macro: '{#NAME}'
+        path: $.name
+      - lld_macro: '{#KIND}'
+        path: $.kind
+      - lld_macro: '{#VENDOR}'
+        path: $.vendor
+      preprocessing:
+      - type: JSONPATH
+        parameters:
+        - $.clients
+    tags:
+    - tag: class
+      value: software
+    - tag: target
+      value: pulse-backup
+    macros:
+    - macro: '{$PULSE.URL}'
+      value: https://backup.example.com
+      description: Endereço do painel, sem barra no fim.
+    - macro: '{$PULSE.TOKEN}'
+      value: ''
+      description: Token gerado em Configuração → Zabbix no painel.
+      type: SECRET_TEXT
+    - macro: '{$PULSE.INTERVAL}'
+      value: 2m
+      description: Intervalo da consulta ao painel.
+    - macro: '{$PULSE.NODATA}'
+      value: 15m
+      description: Sem resposta da API por este tempo = alerta.
+    - macro: '{$PULSE.WORKER.MAX.AGE}'
+      value: '300'
+      description: Segundos sem sinal do worker para alertar.
+    - macro: '{$PULSE.DISK.PUSED.WARN}'
+      value: '85'
+      description: Uso do disco dos backups (%) para aviso.
+    - macro: '{$PULSE.DISK.PUSED.HIGH}'
+      value: '95'
+      description: Uso do disco dos backups (%) para alerta alto.
+    - macro: '{$PULSE.WARNING.ALERT}'
+      value: '1'
+      description: 1 = alerta backups concluídos com avisos; 0 = não.
+    - macro: '{$PULSE.CLIENT.ALERT}'
+      value: '1'
+      description: 'Por cliente: {$PULSE.CLIENT.ALERT:"slug"}=0 silencia os alertas dele.'
+    valuemaps:
+    - uuid: 4fed1289f5c75ac0a4338047475cb0fc
+      name: Pulse Backup saúde
+      mappings:
+      - value: '0'
+        newvalue: ok
+      - value: '1'
+        newvalue: com avisos
+      - value: '2'
+        newvalue: falhou
+      - value: '3'
+        newvalue: atrasado
+      - value: '4'
+        newvalue: nunca recebeu
+    - uuid: 58f166cb1a2255a4bc1e38272c49a78e
+      name: Pulse Backup verificação
+      mappings:
+      - value: '0'
+        newvalue: ok
+      - value: '1'
+        newvalue: pendente
+      - value: '2'
+        newvalue: falhou
+      - value: '3'
+        newvalue: sem verificação
+    - uuid: ea65214c5b0353fdbc69520efcf5132e
+      name: Pulse Backup ativo
+      mappings:
+      - value: '0'
+        newvalue: desativada
+      - value: '1'
+        newvalue: ativa

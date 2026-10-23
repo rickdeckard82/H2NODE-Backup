@@ -73,6 +73,9 @@ Renomeie o arquivo gerado para `AAAAMMDD_NNNN_descricao.py` com `revision = "NNN
 - `backend/app/receivers/` — receptores FTP (pyftpdlib) e TFTP (próprio: WRQ de backup, RRQ só de firmware);
   `services/receivers.py` (receivers.json + fila netin/), `services/netingest.py` (cifra na chegada),
   `services/netconfig.py` (validação), `services/firmware.py` + `routes/firmware.py` (página FTP Firmwares).
+- `backend/app/api/routes/monitoring.py` — `/api/monitoring/status` para o Zabbix (pull, token Bearer, só leitura);
+  template em `frontend/public/zabbix/` (docs/zabbix.md). Os `health_code`/`verify_code` são contrato com os
+  gatilhos: não reordene. Mudou o JSON? Atualize o template e a página Configuração → Zabbix.
 - `backend/app/worker.py` — loop do worker. `backend/app/api/routes/` — API.
 - `frontend/src/features/` — páginas (`help/` = menu Ajuda por equipamento; `accounts/` = Contas cPanel).
   Mudou o procedimento de um equipamento/agente? Atualize a página de ajuda correspondente. `docs/` — segurança, restauração, deploy.

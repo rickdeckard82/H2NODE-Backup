@@ -18,6 +18,7 @@ const DownloadsPage = lazy(() => import("./features/downloads/DownloadsPage"));
 const FirmwarePage = lazy(() => import("./features/firmware/FirmwarePage"));
 const BackupsPage = lazy(() => import("./features/backups/BackupsPage"));
 const ServerPage = lazy(() => import("./features/settings/ServerPage"));
+const ZabbixPage = lazy(() => import("./features/settings/ZabbixPage"));
 const SystemUsersPage = lazy(() => import("./features/system-users/SystemUsersPage"));
 const AuditPage = lazy(() => import("./features/audit/AuditPage"));
 const DecryptHelpPage = lazy(() => import("./features/help/DecryptHelpPage"));
@@ -102,6 +103,14 @@ export const router = createBrowserRouter([
         ),
       },
       { path: "settings/server", element: <ServerPage /> },
+      {
+        path: "settings/zabbix",
+        element: (
+          <Protected roles={["admin"]}>
+            <ZabbixPage />
+          </Protected>
+        ),
+      },
       {
         path: "system-users",
         element: (

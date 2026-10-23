@@ -7,6 +7,7 @@ from app.models.firmware_note import FirmwareNote
 from app.models.firmware_settings import FirmwareSettings
 from app.models.ftp_account import FtpAccount
 from app.models.mfa_recovery_code import MfaRecoveryCode
+from app.models.monitoring_settings import MonitoringSettings
 from app.models.refresh_token import RefreshToken
 from app.models.storage_snapshot import StorageSnapshot
 from app.models.system_user import SystemRole, SystemUser
@@ -25,6 +26,7 @@ __all__ = [
     "FirmwareSettings",
     "FtpAccount",
     "MfaRecoveryCode",
+    "MonitoringSettings",
     "RefreshToken",
     "StorageSnapshot",
     "SystemRole",

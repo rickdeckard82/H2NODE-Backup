@@ -36,6 +36,9 @@ Pulse RADIUS e do Projeto.io.
 
 Detalhes do modelo de segurança em [docs/security.md](docs/security.md).
 
+Alertas no **Zabbix** (backup com falha, atrasado, verificação, worker, disco): template pronto e
+token em **Configuração → Zabbix** — ver [docs/zabbix.md](docs/zabbix.md).
+
 ## Subir o servidor
 
 Pré-requisitos: Docker + Docker Compose, `openssl` e `gnupg` no host.

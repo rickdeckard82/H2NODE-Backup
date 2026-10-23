@@ -51,6 +51,7 @@ const NAV: NavEntry[] = [
     children: [
       { to: "/settings/server", label: "Chaves e servidor", icon: "key" },
       { to: "/settings/ftp-accounts", label: "Contas FTP", icon: "lock", roles: ["admin"] },
+      { to: "/settings/zabbix", label: "Zabbix", icon: "activity", roles: ["admin"] },
       { to: "/system-users", label: "Usuários do painel", icon: "userCog", roles: ["admin"] },
       { to: "/audit", label: "Auditoria", icon: "clipboard", roles: ["admin"] },
     ],

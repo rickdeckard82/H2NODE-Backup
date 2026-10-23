@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.19";
+export const APP_VERSION = "0.9.20";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.20",
+    date: "2026-10-23",
+    changes: [
+      "Integração com Zabbix (Configuração → Zabbix): o Zabbix consulta o painel por HTTPS com um token só de leitura e alerta backup com falha, atrasado, sem verificação ou nunca recebido, worker parado, disco cheio e o próprio painel fora do ar.",
+      "Template pronto para Zabbix 7.0 (pulse_backup_zabbix7.yaml) com descoberta automática de servidores e equipamentos, para baixar na mesma página, que mostra quando e de qual IP o Zabbix consultou pela última vez.",
+    ],
+  },
   {
     version: "0.9.19",
     date: "2026-10-23",
