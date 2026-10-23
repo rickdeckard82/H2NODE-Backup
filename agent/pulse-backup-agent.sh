@@ -32,7 +32,7 @@ umask 077
 # devolver variáveis). Funciona porque o script não tem controle de jobs.
 shopt -s lastpipe
 
-AGENT_VERSION="1.4.0"
+AGENT_VERSION="1.4.1"
 CONF_DIR="/etc/pulse-backup"
 CONF_FILE="${PULSE_BACKUP_CONF:-$CONF_DIR/agent.conf}"
 LOCK_FILE="/run/pulse-backup-agent.lock"
@@ -317,6 +317,28 @@ backup_paths() {
 # "@today" no caminho vira a data de hoje (2026-10-16); "@yesterday", a de ontem; "@latest", a
 # pasta datada mais recente.
 # Ex. do cPanel (só a pasta do dia): /backup/cpanel/@today/accounts/*.tar.gz
+# date_token_hint <padrão com @today/@yesterday/@latest> — explica o que o token virou e quais
+# pastas datadas existem (ex.: "@today = 2026-10-22; pastas em /backup/cpanel/: 2026-10-19 2026-10-21").
+date_token_hint() {
+    local pat="$1" tok="" pre d found=()
+    case "$pat" in
+        *@today*) tok="@today"; pre="${pat%%@today*}" ;;
+        *@yesterday*) tok="@yesterday"; pre="${pat%%@yesterday*}" ;;
+        *@latest*) tok="@latest"; pre="${pat%%@latest*}" ;;
+        *) return 0 ;;
+    esac
+    for d in "$pre"[0-9]*/; do [ -d "$d" ] && found+=("$(basename "$d")"); done   # glob em ordem
+    local n=${#found[@]} val last=""
+    case "$tok" in
+        @today) val="$(date +%F)" ;;
+        @yesterday) val="$(date -d '12:00 yesterday' +%F)" ;;
+        *) if [ "$n" -gt 0 ]; then val="${found[$((n - 1))]}"; else val="(nenhuma)"; fi ;;
+    esac
+    local i=$((n > 3 ? n - 3 : 0))
+    while [ "$i" -lt "$n" ]; do last+="${last:+ }${found[$i]}"; i=$((i + 1)); done
+    printf '%s = %s (relógio do servidor); pastas datadas em %s: %s' "$tok" "$val" "$pre" "${last:-nenhuma}"
+}
+
 resolve_file_pattern() {
     local pat
     pat="$(expand_date_tokens "$1")"
@@ -414,7 +436,13 @@ backup_files() {
         local list=()
         mapfile -t list < <(resolve_file_pattern "$pat")
         if [ "${#list[@]}" -eq 0 ]; then
-            add_component file "$pat" "" failed "nenhum arquivo encontrado para o padrão (com @today/@yesterday: o backup do WHM desse dia rodou e terminou?)" 0
+            local hint
+            hint="$(date_token_hint "$pat")"
+            if [ -n "$hint" ]; then
+                add_component file "$pat" "" failed "nenhum arquivo encontrado — $hint. O backup do WHM desse dia rodou e terminou? Use o mesmo token em BACKUP_PATHS e BACKUP_FILES (@yesterday se o agente roda no dia seguinte ao WHM)" 0
+            else
+                add_component file "$pat" "" failed "nenhum arquivo encontrado para o padrão" 0
+            fi
             continue
         fi
         cpanel_check_on "$pat" && cpanel_note_pattern "$pat" && cpanel_note_files "${list[@]}"

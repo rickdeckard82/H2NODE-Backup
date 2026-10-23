@@ -220,7 +220,7 @@ export default function AccountsPage() {
     <div>
       <PageHeader
         title="Contas e arquivos"
-        subtitle="Cada conta do cPanel (ou arquivo enviado como está) com a cópia mais recente e o histórico de versões"
+        subtitle="Cada conta do cPanel (ou arquivo enviado como está pelo agente) com a última cópia guardada e o histórico de versões"
         actions={<RefreshButton keys={["accounts", "account-history"]} />}
       />
 

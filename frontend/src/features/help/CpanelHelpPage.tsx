@@ -119,6 +119,12 @@ BWLIMIT=""`}
             <Code>@yesterday</Code> nas duas listas. Use <Code>@latest</Code> no lugar de <Code>@today</Code> só se quiser a pasta
             datada mais recente, qualquer que seja a data.
           </Note>
+          <Note>
+            <b>O token tem de ser o mesmo nas duas listas.</b> Com <Code>@yesterday</Code> na pasta <Code>system</Code> e{" "}
+            <Code>@today</Code> nas contas, uma delas sempre procura o dia errado: o backup falha com "nenhum arquivo encontrado
+            — @today = AAAA-MM-DD; pastas datadas em /backup/cpanel/: …" (agente 1.4.1 mostra a data procurada e as pastas que
+            existem).
+          </Note>
         </Step>
 
         <Step n={4} title="Teste e rode o primeiro backup">

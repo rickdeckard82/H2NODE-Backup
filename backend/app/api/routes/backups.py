@@ -88,9 +88,16 @@ def list_backups(
 
 
 def _live_files():
-    """Componentes "arquivo" (kind=file) de backups que ainda estão guardados."""
+    """Cópias de contas/arquivos (kind=file) de SERVIDORES (agente) ainda guardadas.
+
+    Ficam de fora: equipamentos e "Arquivos e bancos" por FTP (kind=network — dumps com data
+    no nome virariam uma "conta" por envio) e os componentes de falha sem arquivo (padrão sem
+    arquivo encontrado, conta que o WHM não copiou): não há o que baixar, e a falha já aparece
+    no backup. Assim a linha da conta mostra a última cópia que existe de fato."""
     return (
         BackupComponent.kind == "file",
+        BackupComponent.file_name.is_not(None),
+        Client.kind == "server",
         Backup.deleted_at.is_(None),
         Backup.storage_path.is_not(None),
     )
@@ -181,6 +188,7 @@ def account_history(
     rows = db.execute(
         select(BackupComponent, Backup)
         .join(Backup, Backup.id == BackupComponent.backup_id)
+        .join(Client, Client.id == Backup.client_id)
         .where(*_live_files(), Backup.client_id == client_id, BackupComponent.name == name)
         .order_by(Backup.received_at.desc(), Backup.id.desc())
         .limit(500)

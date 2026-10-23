@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.21";
+export const APP_VERSION = "0.9.22";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.22",
+    date: "2026-10-23",
+    changes: [
+      "Contas cPanel: deixam de aparecer os arquivos de equipamentos e de \"Arquivos e bancos\" por FTP (ex.: dumps com data no nome, cada um virando uma \"conta\") e as linhas de falha sem arquivo (padrão como /backup/cpanel/@today/accounts/* ou conta que o WHM não copiou, com 0 B). Cada conta mostra a última cópia que existe de fato; as falhas continuam em Backups.",
+      "Agente 1.4.1: quando o padrão com @today/@yesterday/@latest não encontra arquivo, o erro diz a data procurada e as pastas datadas que existem (ex.: \"@today = 2026-10-22; pastas em /backup/cpanel/: 2026-10-19 2026-10-21\").",
+      "Ajuda cPanel/WHM: o token (@today, @yesterday ou @latest) tem de ser o mesmo em BACKUP_PATHS e BACKUP_FILES.",
+    ],
+  },
   {
     version: "0.9.21",
     date: "2026-10-23",
