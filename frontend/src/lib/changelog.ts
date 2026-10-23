@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.15";
+export const APP_VERSION = "0.9.16";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,13 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.16",
+    date: "2026-10-22",
+    changes: [
+      "FTP Firmwares: novo card \"Conexões ativas\", atualizado a cada 3 s, com os equipamentos conectados agora (FTP logado e TFTP baixando): IP, usuário, tempo conectado, arquivo em transferência com progresso e velocidade, e se os receptores FTP/TFTP estão no ar.",
+    ],
+  },
   {
     version: "0.9.15",
     date: "2026-10-22",

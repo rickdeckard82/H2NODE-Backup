@@ -308,3 +308,52 @@ def test_api_firmware_upload_too_large(auth_client, monkeypatch):
     monkeypatch.setattr(settings, "firmware_max_mb", 0)
     assert auth_client.put("/api/firmware/files/grande.bin", content=b"x").status_code == 413
     assert list(firmware.tmp_dir().iterdir()) == []
+
+
+# ------------------------------------------------------- conexões ativas --
+
+
+def _wait_status(proto: str, n: int) -> list[dict]:
+    import time
+
+    for _ in range(60):
+        online, _, sessions = firmware.read_status(proto)
+        if online and len(sessions) == n:
+            return sessions
+        time.sleep(0.05)
+    return firmware.read_status(proto)[2]
+
+
+def test_ftp_firmware_session_is_published_while_connected(ftp_fw):
+    put_firmware("img.bin", IMAGE)
+    f = ftp_login(ftp_fw, FW_USER, FW_PASS)
+    sessions = _wait_status("ftp", 1)
+    assert len(sessions) == 1 and sessions[0]["user"] == FW_USER and sessions[0]["ip"] == "127.0.0.1"
+    f.quit()
+    assert _wait_status("ftp", 0) == []
+    # sessão de backup não aparece no monitor de firmware
+    b = ftp_login(ftp_fw, FTP_USER, FTP_PASS)
+    assert _wait_status("ftp", 0) == []
+    b.quit()
+
+
+def test_tftp_read_is_published_and_cleared(tftp_fw):
+    put_firmware("img.bin", IMAGE)
+    assert tftp_get(tftp_fw.port, "img.bin") == (None, IMAGE)
+    assert _wait_status("tftp", 0) == []
+    assert firmware.read_status("tftp")[0] is True
+
+
+def test_api_connections_reads_status_and_detects_stale(auth_client, monkeypatch):
+    import time
+
+    firmware.StatusPublisher("ftp").publish([{"id": "ftp-1", "ip": "192.0.2.9", "user": "firmware",
+                                               "since": time.time() - 30, "file": "img.bin",
+                                               "sent": 100, "size": 1000}])
+    r = auth_client.get("/api/firmware/connections").json()
+    assert r["receivers"]["ftp"]["online"] is True and r["receivers"]["tftp"]["online"] is False
+    assert [(c["protocol"], c["ip"], c["file"], c["sent"], c["size"]) for c in r["connections"]] == [
+        ("ftp", "192.0.2.9", "img.bin", 100, 1000)]
+    monkeypatch.setattr(firmware, "STATUS_STALE", -1)
+    r = auth_client.get("/api/firmware/connections").json()
+    assert r["receivers"]["ftp"]["online"] is False and r["connections"] == []

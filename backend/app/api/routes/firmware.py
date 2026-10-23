@@ -2,6 +2,7 @@
 
 import os
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -54,6 +55,27 @@ class FirmwareSettingsIn(BaseModel):
     include_devices: bool = True
 
 
+class ConnectionOut(BaseModel):
+    id: str
+    protocol: str
+    ip: str
+    user: str | None
+    since: UtcDatetime
+    file: str | None
+    sent: int
+    size: int | None
+
+
+class ReceiverOut(BaseModel):
+    online: bool
+    updated_at: UtcDatetime | None
+
+
+class ConnectionsOut(BaseModel):
+    receivers: dict[str, ReceiverOut]
+    connections: list[ConnectionOut]
+
+
 def _settings_out(row: FirmwareSettings | None) -> FirmwareSettingsOut:
     if row is None:
         return FirmwareSettingsOut(enabled=False, ftp_username=None, has_password=False,
@@ -78,6 +100,27 @@ def get_firmware(db: Session = Depends(get_db), _: SystemUser = Depends(require_
         tftp_port=settings.tftp_port,
         max_mb=settings.firmware_max_mb,
     )
+
+
+@router.get("/connections", response_model=ConnectionsOut)
+def connections(_: SystemUser = Depends(require_auditor)) -> ConnectionsOut:
+    """Sessões de firmware abertas agora (FTP logado, TFTP transferindo), lidas do retrato
+    que cada receptor publica em firmware/.status/."""
+    recv: dict[str, ReceiverOut] = {}
+    conns: list[ConnectionOut] = []
+    for proto in ("ftp", "tftp"):
+        online, at, sessions = firmware.read_status(proto)
+        recv[proto] = ReceiverOut(online=online, updated_at=at)
+        for s in sessions:
+            try:
+                conns.append(ConnectionOut(
+                    id=str(s["id"]), protocol=proto, ip=str(s["ip"]), user=s.get("user"),
+                    since=datetime.fromtimestamp(float(s["since"]), UTC).replace(tzinfo=None),
+                    file=s.get("file"), sent=int(s.get("sent") or 0), size=s.get("size"),
+                ))
+            except (KeyError, TypeError, ValueError):
+                continue
+    return ConnectionsOut(receivers=recv, connections=sorted(conns, key=lambda c: c.since))
 
 
 @router.put("/settings", response_model=FirmwareSettingsOut, dependencies=[Depends(enforce_csrf)])

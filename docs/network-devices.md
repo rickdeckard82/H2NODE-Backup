@@ -137,6 +137,9 @@ Página **FTP Firmwares**: o administrador envia imagens de firmware e os equipa
   Suporta `blksize`, `tsize`, `timeout` e arquivos acima de 32 MB (rollover do bloco).
 - **FTP**: login próprio de firmware (não é Conta FTP; os nomes não podem coincidir), sessão
   com raiz em `firmware/files` e permissão só de listar e baixar (`elr`).
+- **Conexões ativas**: cada receptor grava em `firmware/.status/<ftp|tftp>.json` as sessões de
+  firmware abertas (IP, usuário, arquivo, bytes enviados) a cada 2 s; o painel mostra e,
+  sem atualização há 60 s, marca o receptor como "sem sinal". Sessões de backup não aparecem.
 - Libere no ufw as redes dos equipamentos: `ufw-setup.sh device 192.0.2.0/24 tftp` e/ou
   `ufw-setup.sh device 192.0.2.0/24 ftp` (21 + faixa passiva).
 

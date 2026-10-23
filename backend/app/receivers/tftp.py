@@ -16,6 +16,7 @@ import socket
 import struct
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 from app.core.config import settings
@@ -32,6 +33,21 @@ RETRIES = 5
 MAX_TRANSFERS = 32
 
 _slots = threading.BoundedSemaphore(MAX_TRANSFERS)
+
+# leituras de firmware em andamento (monitor da página FTP Firmwares)
+_reads: dict[int, "ReadTransfer"] = {}
+_reads_lock = threading.Lock()
+_fw_status = firmware.StatusPublisher("tftp")
+
+
+def publish_status(force: bool = False) -> None:
+    with _reads_lock:
+        sessions = [{"id": f"tftp-{id(t):x}", "ip": t.addr[0], "user": None, "since": t.since,
+                     "file": t.path.name, "sent": t.sent, "size": t.size} for t in _reads.values()]
+    try:
+        _fw_status.publish(sorted(sessions, key=lambda s: s["since"]), force=force)
+    except Exception as exc:  # noqa: BLE001  (o monitor nunca derruba o receptor)
+        logger.warning("tftp_status_failed", error=str(exc))
 
 
 def error_packet(code: int, msg: str) -> bytes:
@@ -191,14 +207,21 @@ class ReadTransfer(threading.Thread):
     def __init__(self, server: "TftpServer", addr: tuple, path: Path, opts: dict[str, str]) -> None:
         super().__init__(daemon=True)
         self.server, self.addr, self.path, self.opts = server, addr, path, opts
+        self.since, self.sent, self.size = time.time(), 0, None
 
     def run(self) -> None:
+        with _reads_lock:
+            _reads[id(self)] = self
+        publish_status(force=True)
         try:
             self._run()
         except Exception as exc:  # noqa: BLE001
             logger.error("tftp_read_error", ip=self.addr[0], file=self.path.name, error=str(exc))
         finally:
+            with _reads_lock:
+                _reads.pop(id(self), None)
             _slots.release()
+            publish_status(force=True)
 
     def _negotiate(self, size: int) -> tuple[int, float, dict[str, str]]:
         blksize, timeout, accepted = DEFAULT_BLKSIZE, 3.0, {}
@@ -258,7 +281,7 @@ class ReadTransfer(threading.Thread):
         sock.bind((self.server.bind_host if family == self.server.family else "", 0))
         try:
             with open(self.path, "rb") as f:
-                size = os.fstat(f.fileno()).st_size
+                size = self.size = os.fstat(f.fileno()).st_size
                 blksize, timeout, accepted = self._negotiate(size)
                 sock.settimeout(timeout)
                 if accepted:
@@ -271,6 +294,7 @@ class ReadTransfer(threading.Thread):
                     block = (block + 1) % 65536
                     if not self._exchange(sock, struct.pack("!HH", OP_DATA, block) + chunk, block, blksize):
                         return
+                    self.sent += len(chunk)
                     if len(chunk) < blksize:
                         break
             logger.info("tftp_firmware_sent", ip=self.addr[0], file=self.path.name, size=size)
@@ -332,8 +356,13 @@ class TftpServer:
             return
         Transfer(self, addr, device, filename, mode, opts).start()
 
+    def _publisher(self) -> None:
+        while not self._stop.wait(firmware.STATUS_EVERY):
+            publish_status()
+
     def serve_forever(self) -> None:
         logger.info("tftp_listening", host=self.bind_host, port=self.port)
+        threading.Thread(target=self._publisher, daemon=True).start()
         while not self._stop.is_set():
             try:
                 pkt, addr = self.sock.recvfrom(1024)

@@ -8,6 +8,7 @@ import { useFmtDate } from "../../lib/datetime";
 import { fmtBytes } from "../../lib/format";
 import type { FirmwareFile, FirmwareInfo, FirmwareSettings } from "../../lib/types";
 import { CopyBlock } from "../clients/ClientsPage";
+import { ConnectionsCard } from "./ConnectionsCard";
 
 const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$/;
 
@@ -158,7 +159,7 @@ export default function FirmwarePage() {
         subtitle="Arquivos que switches, OLTs e roteadores baixam por FTP ou TFTP para atualizar o firmware"
         actions={
           <>
-            <RefreshButton keys={["firmware"]} />
+            <RefreshButton keys={["firmware", "firmware-connections"]} />
             {can("admin") && s && (
               <Button variant="ghost" onClick={() => setForm(toForm(s))}>
                 Configurar acesso
@@ -243,6 +244,8 @@ export default function FirmwarePage() {
           </p>
         </Card>
       )}
+
+      {info && <ConnectionsCard />}
 
       {progress && (
         <Card className="mb-3 space-y-2 text-sm">

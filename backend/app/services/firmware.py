@@ -4,12 +4,17 @@ de switch, OLT, roteador…).
 Layout, dentro de STORAGE_PATH:
     firmware/files/   o que é servido (raiz do login FTP de firmware; RRQ do TFTP)
     firmware/.tmp/    envios do painel em andamento (fora da raiz servida)
+    firmware/.status/ conexões ativas publicadas pelos receptores (ftp.json, tftp.json)
 
 Nada aqui é backup: é a única área que os receptores servem para leitura, e só ela. Os
 arquivos são enviados pelo administrador no painel (página FTP Firmwares).
 """
 
 import ipaddress
+import json
+import os
+import tempfile
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -122,3 +127,59 @@ def networks_of(row) -> list[str]:  # noqa: ANN001
 
 def max_bytes() -> int:
     return settings.firmware_max_mb * 1024 * 1024
+
+
+# ------------------------------------------------- conexões ativas (monitor) --
+#
+# Os receptores não acessam o banco nem a API: cada um grava o próprio retrato das sessões
+# de firmware em firmware/.status/<protocolo>.json (troca atômica) a cada STATUS_EVERY s.
+# O painel lê esses arquivos; sem atualização há STATUS_STALE s, o receptor está fora do ar.
+
+STATUS_EVERY = 2.0
+STATUS_HEARTBEAT = 20.0
+STATUS_STALE = 60.0
+
+
+def status_dir() -> Path:
+    return base_dir() / ".status"
+
+
+class StatusPublisher:
+    """Grava o retrato quando ele muda (ou a cada STATUS_HEARTBEAT s, como sinal de vida)."""
+
+    def __init__(self, protocol: str) -> None:
+        self.protocol = protocol
+        self._last: list[dict] | None = None
+        self._at = 0.0
+
+    def publish(self, sessions: list[dict], force: bool = False) -> None:
+        now = time.time()
+        if not force and sessions == self._last and now - self._at < STATUS_HEARTBEAT:
+            return
+        d = status_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        data = json.dumps({"updated_at": now, "sessions": sessions})
+        fd, tmp = tempfile.mkstemp(dir=d, prefix=f".{self.protocol}.")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(data)
+            os.chmod(tmp, 0o644)
+            os.replace(tmp, d / f"{self.protocol}.json")
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
+        self._last, self._at = sessions, now
+
+
+def read_status(protocol: str) -> tuple[bool, datetime | None, list[dict]]:
+    """(receptor no ar, última atualização, sessões). Fora do ar: sessões vazias."""
+    try:
+        data = json.loads((status_dir() / f"{protocol}.json").read_text(encoding="utf-8"))
+        at = float(data["updated_at"])
+        sessions = [s for s in data.get("sessions", []) if isinstance(s, dict)]
+    except (OSError, ValueError, KeyError, TypeError):
+        return False, None, []
+    when = datetime.fromtimestamp(at, UTC).replace(tzinfo=None)
+    if time.time() - at > STATUS_STALE:
+        return False, when, []
+    return True, when, sessions

@@ -17,9 +17,11 @@ Regras:
 Uso: python -m app.receivers.ftp   (precisa de root só para abrir a porta 21)
 """
 
+import contextlib
 import os
 import shutil
 import signal
+import time
 import uuid
 from pathlib import Path
 
@@ -44,6 +46,33 @@ FIRMWARE_PERMS = "elr"
 # a UNM2000 entra no FTP para apagar o antigo e RENOMEAR o novo. Aqui cada sessão é isolada e o
 # arquivo já foi para a fila, então esses comandos respondem sucesso SEM fazer nada.
 MANAGER_VENDOR = receivers.MANAGER_VENDOR
+
+# sessões de firmware abertas (monitor da página FTP Firmwares)
+_fw_sessions: dict[int, "DeviceHandler"] = {}
+_fw_status = firmware.StatusPublisher("ftp")
+
+
+def _fw_snapshot() -> list[dict]:
+    out = []
+    for h in list(_fw_sessions.values()):
+        s = {"id": f"ftp-{id(h):x}", "ip": h.remote_ip, "user": h.username, "since": h.fw_since,
+             "file": None, "sent": 0, "size": None}
+        dc = getattr(h, "data_channel", None)
+        fo = getattr(dc, "file_obj", None) if dc is not None else None
+        if fo is not None and not dc.receive:
+            s["file"] = os.path.basename(getattr(fo, "name", "") or "") or None
+            s["sent"] = dc.tot_bytes_sent
+            with contextlib.suppress(OSError, ValueError):
+                s["size"] = os.fstat(fo.fileno()).st_size
+        out.append(s)
+    return sorted(out, key=lambda s: s["since"])
+
+
+def publish_status(force: bool = False) -> None:
+    try:
+        _fw_status.publish(_fw_snapshot(), force=force)
+    except Exception as exc:  # noqa: BLE001  (o monitor nunca derruba o receptor)
+        logger.warning("ftp_status_failed", error=str(exc))
 
 
 class AllowlistAuthorizer(DummyAuthorizer):
@@ -176,6 +205,12 @@ class DeviceHandler(FTPHandler):
                 return None
         return super().pre_process_command(line, cmd, arg)
 
+    def on_login(self, username):  # noqa: ANN001
+        if self.firmware:
+            self.fw_since = time.time()
+            _fw_sessions[id(self)] = self
+            publish_status(force=True)
+
     def on_file_sent(self, file):  # noqa: ANN001
         if self.firmware:
             logger.info("ftp_firmware_sent", ip=self.remote_ip, file=os.path.basename(file))
@@ -232,6 +267,8 @@ class DeviceHandler(FTPHandler):
         Path(file).unlink(missing_ok=True)
 
     def on_disconnect(self):
+        if _fw_sessions.pop(id(self), None) is not None:
+            publish_status(force=True)
         home = getattr(self, "session_home", None)
         if home is None:
             return
@@ -262,6 +299,7 @@ def build_server(host: str = "0.0.0.0", port: int | None = None,
     server.allowlist = handler.authorizer.allowlist
     server.max_cons = 64
     server.max_cons_per_ip = 4
+    server.ioloop.call_every(firmware.STATUS_EVERY, publish_status)
     return server
 
 
