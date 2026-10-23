@@ -4,17 +4,17 @@ zabbix_export:
   - uuid: a571c0d144b14fd4a87a9d9b2aa9fcd6
     name: Templates/Applications
   templates:
-  - uuid: bd32186ee3d25cfa8cccf4c5f1592963
+  - uuid: bd32186ee3d24cfa8cccf4c5f1592963
     template: Pulse Backup by HTTP
     name: Pulse Backup by HTTP
     description: 'Monitora o Pulse Backup pela API (pull): saúde de cada servidor/equipamento (falha, atraso, verificação), worker e disco. Requer um token gerado em Configuração → Zabbix no painel.'
     vendor:
       name: Pulse Backup
-      version: 0.9.20
+      version: 0.9.21
     groups:
     - name: Templates/Applications
     items:
-    - uuid: 140e543f1efe53468970567bf6de096a
+    - uuid: 140e543f1efe43468970567bf6de096a
       name: 'Pulse Backup: obter status'
       type: HTTP_AGENT
       key: pulse.backup.get
@@ -32,12 +32,12 @@ zabbix_export:
       - tag: component
         value: raw
       triggers:
-      - uuid: a62166106310537d99b2ac0b0bf23a48
+      - uuid: a62166106310437d99b2ac0b0bf23a48
         expression: nodata(/Pulse Backup by HTTP/pulse.backup.get,{$PULSE.NODATA})=1
         name: 'Pulse Backup: sem resposta da API há {$PULSE.NODATA}'
         priority: HIGH
         description: 'O Zabbix não consegue ler o status: painel fora do ar, token trocado/revogado, IP do Zabbix fora das redes liberadas ou URL errada. Veja o erro do item "Pulse Backup: obter status".'
-    - uuid: d5f3b042441d5ae78423570febbb56d7
+    - uuid: d5f3b042441d4ae78423570febbb56d7
       name: 'Pulse Backup: versão'
       type: DEPENDENT
       key: pulse.backup.version
@@ -57,7 +57,7 @@ zabbix_export:
       tags:
       - tag: component
         value: application
-    - uuid: e74587f5bddb5ae2a3b3f78b3474ceb5
+    - uuid: e74587f5bddb4ae2a3b3f78b3474ceb5
       name: 'Pulse Backup: worker — último sinal'
       type: DEPENDENT
       key: pulse.backup.worker.age
@@ -76,7 +76,7 @@ zabbix_export:
       - tag: component
         value: worker
       triggers:
-      - uuid: 90bdeced72f95ff6b717b9ded18a2e04
+      - uuid: 90bdeced72f94ff6b717b9ded18a2e04
         expression: last(/Pulse Backup by HTTP/pulse.backup.worker.age)>{$PULSE.WORKER.MAX.AGE} or last(/Pulse Backup by HTTP/pulse.backup.worker.age)<0
         name: 'Pulse Backup: worker parado (sem sinal há mais de {$PULSE.WORKER.MAX.AGE}s)'
         priority: HIGH
@@ -85,7 +85,7 @@ zabbix_export:
         dependencies:
         - name: 'Pulse Backup: sem resposta da API há {$PULSE.NODATA}'
           expression: nodata(/Pulse Backup by HTTP/pulse.backup.get,{$PULSE.NODATA})=1
-    - uuid: 0c9e6ef9f8e35d7f89f083e93a225d44
+    - uuid: 0c9e6ef9f8e34d7f89f083e93a225d44
       name: 'Pulse Backup: verificação profunda'
       type: DEPENDENT
       key: pulse.backup.worker.deep_verify
@@ -104,12 +104,12 @@ zabbix_export:
       - tag: component
         value: worker
       triggers:
-      - uuid: 243909e2286750bb9e50e0546790aca2
+      - uuid: 243909e2286740bb9e50e0546790aca2
         expression: last(/Pulse Backup by HTTP/pulse.backup.worker.deep_verify)=0
         name: 'Pulse Backup: verificação profunda desativada'
         priority: WARNING
         description: 'O worker está sem a chave privada GPG (secrets/private): os backups são conferidos só por hash, sem decifrar e testar o conteúdo.'
-    - uuid: fd658f153f2a592b8ccbccca03d2ace6
+    - uuid: fd658f153f2a492b8ccbccca03d2ace6
       name: 'Pulse Backup: disco — usado (%)'
       type: DEPENDENT
       key: pulse.backup.disk.pused
@@ -127,12 +127,12 @@ zabbix_export:
       - tag: component
         value: storage
       triggers:
-      - uuid: 70bbfd5b0a995fcdbf00f213a593f80d
+      - uuid: 70bbfd5b0a994fcdbf00f213a593f80d
         expression: min(/Pulse Backup by HTTP/pulse.backup.disk.pused,10m)>{$PULSE.DISK.PUSED.HIGH}
         name: 'Pulse Backup: disco dos backups acima de {$PULSE.DISK.PUSED.HIGH}%'
         priority: HIGH
         opdata: 'Usado: {ITEM.LASTVALUE1}'
-      - uuid: fb538b8c49d255df958a20e795a88387
+      - uuid: fb538b8c49d245df958a20e795a88387
         expression: min(/Pulse Backup by HTTP/pulse.backup.disk.pused,10m)>{$PULSE.DISK.PUSED.WARN}
         name: 'Pulse Backup: disco dos backups acima de {$PULSE.DISK.PUSED.WARN}%'
         priority: WARNING
@@ -140,7 +140,7 @@ zabbix_export:
         dependencies:
         - name: 'Pulse Backup: disco dos backups acima de {$PULSE.DISK.PUSED.HIGH}%'
           expression: min(/Pulse Backup by HTTP/pulse.backup.disk.pused,10m)>{$PULSE.DISK.PUSED.HIGH}
-    - uuid: 53104280c4bc5a58a4fbb67eb8729451
+    - uuid: 53104280c4bc4a58a4fbb67eb8729451
       name: 'Pulse Backup: disco — livre'
       type: DEPENDENT
       key: pulse.backup.disk.free
@@ -157,7 +157,7 @@ zabbix_export:
       tags:
       - tag: component
         value: storage
-    - uuid: 66c62ff60c60582782d4ac9095c4e73d
+    - uuid: 66c62ff60c60482782d4ac9095c4e73d
       name: 'Pulse Backup: disco — total'
       type: DEPENDENT
       key: pulse.backup.disk.total
@@ -177,7 +177,7 @@ zabbix_export:
       tags:
       - tag: component
         value: storage
-    - uuid: 153af59fdcb9598191c9db286fd26e40
+    - uuid: 153af59fdcb9498191c9db286fd26e40
       name: 'Pulse Backup: clientes ok'
       type: DEPENDENT
       key: pulse.backup.summary[ok]
@@ -193,7 +193,7 @@ zabbix_export:
       tags:
       - tag: component
         value: summary
-    - uuid: f61293d44bb45f3f8e820f3a09dac71f
+    - uuid: f61293d44bb44f3f8e820f3a09dac71f
       name: 'Pulse Backup: clientes com avisos'
       type: DEPENDENT
       key: pulse.backup.summary[warning]
@@ -209,7 +209,7 @@ zabbix_export:
       tags:
       - tag: component
         value: summary
-    - uuid: 18e27ee4b6425c9c9323424d4fd1c562
+    - uuid: 18e27ee4b6424c9c9323424d4fd1c562
       name: 'Pulse Backup: clientes com falha'
       type: DEPENDENT
       key: pulse.backup.summary[failed]
@@ -225,7 +225,7 @@ zabbix_export:
       tags:
       - tag: component
         value: summary
-    - uuid: f4e4918f14b756e197daae114ce2bcb8
+    - uuid: f4e4918f14b746e197daae114ce2bcb8
       name: 'Pulse Backup: clientes atrasados'
       type: DEPENDENT
       key: pulse.backup.summary[overdue]
@@ -241,7 +241,7 @@ zabbix_export:
       tags:
       - tag: component
         value: summary
-    - uuid: 831d6e39944a570ebd4d5046650da6e1
+    - uuid: 831d6e39944a470ebd4d5046650da6e1
       name: 'Pulse Backup: clientes sem nenhum backup'
       type: DEPENDENT
       key: pulse.backup.summary[never]
@@ -258,14 +258,14 @@ zabbix_export:
       - tag: component
         value: summary
     discovery_rules:
-    - uuid: e4ab27eb2c045e529972f7da2405f0a8
+    - uuid: e4ab27eb2c044e529972f7da2405f0a8
       name: Clientes de backup
       type: DEPENDENT
       key: pulse.backup.clients.discovery
       delay: '0'
       description: Servidores e equipamentos ATIVOS do painel. Cliente desativado ou excluído some daqui.
       item_prototypes:
-      - uuid: 574076bbdd155789908b8069cd4b80f8
+      - uuid: 574076bbdd154789908b8069cd4b80f8
         name: '{#NAME}: saúde do backup'
         type: DEPENDENT
         key: pulse.backup.client.health[{#SLUG}]
@@ -287,30 +287,30 @@ zabbix_export:
         - tag: kind
           value: '{#KIND}'
         trigger_prototypes:
-        - uuid: fe9de02490de5c99bf41d5ebf602dcbe
+        - uuid: fe9de02490de4c99bf41d5ebf602dcbe
           expression: last(/Pulse Backup by HTTP/pulse.backup.client.health[{#SLUG}])=2 and length(last(/Pulse Backup by HTTP/pulse.backup.client.error[{#SLUG}]))>=0 and {$PULSE.CLIENT.ALERT:"{#SLUG}"}=1
           name: '{#NAME}: último backup falhou'
           priority: HIGH
           opdata: '{ITEM.LASTVALUE2}'
           description: A última execução de {#NAME} ({#SLUG}) falhou ou chegou corrompida. Veja Backups no painel.
-        - uuid: aef38decff155cd1b7b903da054a5541
+        - uuid: aef38decff154cd1b7b903da054a5541
           expression: last(/Pulse Backup by HTTP/pulse.backup.client.health[{#SLUG}])=3 and last(/Pulse Backup by HTTP/pulse.backup.client.age[{#SLUG}])>=0 and {$PULSE.CLIENT.ALERT:"{#SLUG}"}=1
           name: '{#NAME}: backup atrasado'
           priority: HIGH
           opdata: Último backup há {ITEM.LASTVALUE2}
           description: Nenhum backup de {#NAME} dentro do intervalo esperado + tolerância (OVERDUE_GRACE_MINUTES).
-        - uuid: 728be52916c4505890545e7f810583ec
+        - uuid: 728be52916c4405890545e7f810583ec
           expression: last(/Pulse Backup by HTTP/pulse.backup.client.health[{#SLUG}])=4 and {$PULSE.CLIENT.ALERT:"{#SLUG}"}=1
           name: '{#NAME}: nenhum backup recebido ainda'
           priority: WARNING
           description: Cliente ativo e cadastrado que ainda não enviou nenhum backup.
-        - uuid: 6b3a2713ffe3515684b833dd46682e24
+        - uuid: 6b3a2713ffe3415684b833dd46682e24
           expression: last(/Pulse Backup by HTTP/pulse.backup.client.health[{#SLUG}])=1 and length(last(/Pulse Backup by HTTP/pulse.backup.client.error[{#SLUG}]))>=0 and {$PULSE.WARNING.ALERT}=1 and {$PULSE.CLIENT.ALERT:"{#SLUG}"}=1
           name: '{#NAME}: último backup com avisos'
           priority: WARNING
           opdata: '{ITEM.LASTVALUE2}'
           description: 'Concluído com avisos (ex.: arquivo mudou durante o tar). Para não alertar avisos, use {$PULSE.WARNING.ALERT}=0.'
-      - uuid: cd63afe12ab5570b991b447ade6185fa
+      - uuid: cd63afe12ab5470b991b447ade6185fa
         name: '{#NAME}: último backup há'
         type: DEPENDENT
         key: pulse.backup.client.age[{#SLUG}]
@@ -326,7 +326,7 @@ zabbix_export:
         master_item:
           key: pulse.backup.get
         tags: *id001
-      - uuid: 873f293796805d12b6981fe02500de00
+      - uuid: 873f293796804d12b6981fe02500de00
         name: '{#NAME}: verificação do último backup'
         type: DEPENDENT
         key: pulse.backup.client.verify[{#SLUG}]
@@ -343,12 +343,12 @@ zabbix_export:
           key: pulse.backup.get
         tags: *id001
         trigger_prototypes:
-        - uuid: 06e72788764451ba993a124e4830f7e0
+        - uuid: 06e72788764441ba993a124e4830f7e0
           expression: last(/Pulse Backup by HTTP/pulse.backup.client.verify[{#SLUG}])=2 and {$PULSE.CLIENT.ALERT:"{#SLUG}"}=1
           name: '{#NAME}: verificação do último backup falhou'
           priority: HIGH
           description: O worker não conseguiu confirmar o conteúdo do último backup de {#NAME} (hash, decifragem ou teste do dump).
-      - uuid: f9a543e7ffa85ba6b47bdac73d961e54
+      - uuid: f9a543e7ffa84ba6b47bdac73d961e54
         name: '{#NAME}: tamanho do último backup'
         type: DEPENDENT
         key: pulse.backup.client.size[{#SLUG}]
@@ -363,7 +363,7 @@ zabbix_export:
         master_item:
           key: pulse.backup.get
         tags: *id001
-      - uuid: 5e49b2abc1e95746aef26cc972f7e689
+      - uuid: 5e49b2abc1e94746aef26cc972f7e689
         name: '{#NAME}: erro do último backup'
         type: DEPENDENT
         key: pulse.backup.client.error[{#SLUG}]
@@ -431,7 +431,7 @@ zabbix_export:
       value: '1'
       description: 'Por cliente: {$PULSE.CLIENT.ALERT:"slug"}=0 silencia os alertas dele.'
     valuemaps:
-    - uuid: 4fed1289f5c75ac0a4338047475cb0fc
+    - uuid: 4fed1289f5c74ac0a4338047475cb0fc
       name: Pulse Backup saúde
       mappings:
       - value: '0'
@@ -444,7 +444,7 @@ zabbix_export:
         newvalue: atrasado
       - value: '4'
         newvalue: nunca recebeu
-    - uuid: 58f166cb1a2255a4bc1e38272c49a78e
+    - uuid: 58f166cb1a2245a4bc1e38272c49a78e
       name: Pulse Backup verificação
       mappings:
       - value: '0'
@@ -455,7 +455,7 @@ zabbix_export:
         newvalue: falhou
       - value: '3'
         newvalue: sem verificação
-    - uuid: ea65214c5b0353fdbc69520efcf5132e
+    - uuid: ea65214c5b0343fdbc69520efcf5132e
       name: Pulse Backup ativo
       mappings:
       - value: '0'

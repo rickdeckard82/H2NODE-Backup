@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.20";
+export const APP_VERSION = "0.9.21";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,13 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.21",
+    date: "2026-10-23",
+    changes: [
+      "Zabbix: o template pulse_backup_zabbix7.yaml deixa de ser recusado na importação com \"UUIDv4 is expected\". Baixe de novo em Configuração → Zabbix.",
+    ],
+  },
   {
     version: "0.9.20",
     date: "2026-10-23",
