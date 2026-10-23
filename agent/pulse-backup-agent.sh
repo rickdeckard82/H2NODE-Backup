@@ -32,7 +32,7 @@ umask 077
 # devolver variáveis). Funciona porque o script não tem controle de jobs.
 shopt -s lastpipe
 
-AGENT_VERSION="1.4.1"
+AGENT_VERSION="1.4.2"
 CONF_DIR="/etc/pulse-backup"
 CONF_FILE="${PULSE_BACKUP_CONF:-$CONF_DIR/agent.conf}"
 LOCK_FILE="/run/pulse-backup-agent.lock"
@@ -860,7 +860,8 @@ cmd_test() {
         if [ -n "$rp" ] && [ -e "$rp" ]; then
             echo "• Pasta $p: ok${rp:+ ($rp)}"
         else
-            echo "✗ Pasta $p não existe"; ok=0
+            echo "✗ Pasta $p não existe${rp:+ (procurado: $rp)}"; ok=0
+            [ "$rp" = "$p" ] || echo "    $(date_token_hint "$p")"
         fi
     done
     local pat f biggest=0 nfiles=0 size
@@ -869,7 +870,11 @@ cmd_test() {
         local list=()
         mapfile -t list < <(resolve_file_pattern "$pat")
         if [ "${#list[@]}" -eq 0 ]; then
-            echo "✗ Arquivos $pat: nenhum encontrado"; ok=0; continue
+            local rpat
+            rpat="$(expand_date_tokens "$pat")"
+            echo "✗ Arquivos $pat: nenhum encontrado${rpat:+ (procurado: $rpat)}"; ok=0
+            [ "$rpat" = "$pat" ] || echo "    $(date_token_hint "$pat")"
+            continue
         fi
         for f in "${list[@]}"; do
             [ -f "$f" ] || continue

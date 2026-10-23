@@ -123,7 +123,12 @@ BWLIMIT=""`}
             <b>O token tem de ser o mesmo nas duas listas.</b> Com <Code>@yesterday</Code> na pasta <Code>system</Code> e{" "}
             <Code>@today</Code> nas contas, uma delas sempre procura o dia errado: o backup falha com "nenhum arquivo encontrado
             — @today = AAAA-MM-DD; pastas datadas em /backup/cpanel/: …" (agente 1.4.1 mostra a data procurada e as pastas que
-            existem).
+            existem; o <Code>test</Code> também, a partir do 1.4.2).
+          </Note>
+          <Note>
+            <b>O WHM pula dias</b> (ex.: há 2026-10-21 e 2026-10-23, mas não 2026-10-22)? Então nenhuma data fixa serve sempre:
+            use <Code>@latest</Code> nas duas listas e agende o agente depois do horário em que o backup do WHM costuma
+            terminar. Se a pasta mais recente ainda estiver sendo gravada, as contas que faltarem aparecem como falha.
           </Note>
         </Step>
 

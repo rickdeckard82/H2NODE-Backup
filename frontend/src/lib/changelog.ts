@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.22";
+export const APP_VERSION = "0.9.23";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.23",
+    date: "2026-10-23",
+    changes: [
+      "Agente 1.4.2: o \"pulse-backup-agent test\" mostra o caminho de fato procurado (com @today/@yesterday/@latest trocados pela data) e as pastas datadas que existem, em vez de só o padrão.",
+      "Ajuda cPanel/WHM: quando o WHM pula dias, use @latest nas duas listas.",
+    ],
+  },
   {
     version: "0.9.22",
     date: "2026-10-23",
