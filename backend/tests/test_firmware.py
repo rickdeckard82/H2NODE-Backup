@@ -360,7 +360,7 @@ def test_api_connections_reads_status_and_detects_stale(auth_client, monkeypatch
 
 
 def test_api_firmware_comment(auth_client):
-    c = "/api/firmware/files/img.bin/comment"
+    c = "/api/firmware/files/img.bin/info"
     assert auth_client.put(c, json={"comment": "x"}).status_code == 404
     auth_client.put("/api/firmware/files/img.bin", content=IMAGE)
     r = auth_client.put(c, json={"comment": "  RP1900\n  OLT   GPON  "})
@@ -375,3 +375,16 @@ def test_api_firmware_comment(auth_client):
     assert auth_client.delete("/api/firmware/files/img.bin").status_code == 204
     auth_client.put("/api/firmware/files/img.bin", content=IMAGE)
     assert auth_client.get("/api/firmware").json()["files"][0]["comment"] is None
+
+
+def test_api_firmware_vendor(auth_client):
+    auth_client.put("/api/firmware/files/a.bin", content=IMAGE)
+    c = "/api/firmware/files/a.bin/info"
+    assert auth_client.put(c, json={"vendor": "files"}).status_code == 422  # não é fabricante de firmware
+    r = auth_client.put(c, json={"vendor": "fiberhome"}).json()
+    assert r["vendor"] == "fiberhome" and r["comment"] is None
+    r = auth_client.put(c, json={"vendor": "fiberhome", "comment": "GC8B"}).json()
+    assert (r["vendor"], r["comment"]) == ("fiberhome", "GC8B")
+    assert auth_client.get("/api/firmware").json()["files"][0]["vendor"] == "fiberhome"
+    r = auth_client.put(c, json={"comment": ""}).json()
+    assert r["vendor"] is None and r["comment"] is None

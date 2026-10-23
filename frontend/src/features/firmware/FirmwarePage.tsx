@@ -1,16 +1,80 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { RefreshButton } from "../../components/RefreshButton";
 import { Badge, Button, Card, Field, Modal, PageHeader, Spinner, useToast } from "../../components/ui";
 import { api, ApiError, csrfToken } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { useFmtDate } from "../../lib/datetime";
 import { fmtBytes } from "../../lib/format";
-import type { FirmwareFile, FirmwareInfo, FirmwareSettings } from "../../lib/types";
+import {
+  FIRMWARE_VENDORS,
+  VENDOR_LABEL,
+  type FirmwareFile,
+  type FirmwareInfo,
+  type FirmwareSettings,
+  type FirmwareVendor,
+} from "../../lib/types";
 import { CopyBlock } from "../clients/ClientsPage";
 import { ConnectionsCard } from "./ConnectionsCard";
 
 const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$/;
+
+type SortKey = "name" | "vendor" | "size" | "date";
+interface Sort {
+  key: SortKey;
+  dir: 1 | -1;
+}
+const SORT_STORAGE = "pb_firmware_sort";
+const SORT_KEYS: SortKey[] = ["name", "vendor", "size", "date"];
+
+function loadSort(): Sort {
+  try {
+    const s = JSON.parse(localStorage.getItem(SORT_STORAGE) ?? "null") as Sort | null;
+    if (s && SORT_KEYS.includes(s.key) && (s.dir === 1 || s.dir === -1)) return s;
+  } catch {
+    /* storage bloqueado ou valor inválido */
+  }
+  return { key: "name", dir: 1 };
+}
+
+const collator = new Intl.Collator("pt-BR", { numeric: true, sensitivity: "base" });
+
+function sortFiles(files: FirmwareFile[], s: Sort): FirmwareFile[] {
+  const byName = (a: FirmwareFile, b: FirmwareFile) => collator.compare(a.name, b.name);
+  return [...files].sort((a, b) => {
+    if (s.key === "vendor") {
+      // sem fabricante sempre por último, nos dois sentidos
+      if (!a.vendor !== !b.vendor) return a.vendor ? -1 : 1;
+      const c = a.vendor && b.vendor ? collator.compare(VENDOR_LABEL[a.vendor], VENDOR_LABEL[b.vendor]) : 0;
+      return (c || byName(a, b)) * s.dir;
+    }
+    const c =
+      s.key === "size"
+        ? a.size - b.size
+        : s.key === "date"
+          ? new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime()
+          : byName(a, b);
+    return (c || byName(a, b)) * s.dir;
+  });
+}
+
+function SortTh({ label, k, sort, onSort }: { label: string; k: SortKey; sort: Sort; onSort: (k: SortKey) => void }) {
+  const active = sort.key === k;
+  return (
+    <th className="th" aria-sort={active ? (sort.dir === 1 ? "ascending" : "descending") : "none"}>
+      <button
+        type="button"
+        className={`inline-flex items-center gap-1 uppercase hover:text-slate-700 dark:hover:text-slate-200 ${
+          active ? "text-slate-700 dark:text-slate-200" : ""
+        }`}
+        onClick={() => onSort(k)}
+      >
+        {label}
+        <span className={active ? "" : "opacity-30"}>{active && sort.dir === -1 ? "▼" : "▲"}</span>
+      </button>
+    </th>
+  );
+}
 
 interface SettingsForm {
   enabled: boolean;
@@ -89,7 +153,20 @@ export default function FirmwarePage() {
   const [progress, setProgress] = useState<{ name: string; pct: number } | null>(null);
   const [form, setForm] = useState<SettingsForm | null>(null);
   const [cmdFor, setCmdFor] = useState<FirmwareFile | null>(null);
-  const [note, setNote] = useState<{ name: string; comment: string } | null>(null);
+  const [note, setNote] = useState<{ name: string; comment: string; vendor: FirmwareVendor | "" } | null>(null);
+  const [sort, setSort] = useState<Sort>(loadSort);
+
+  function onSort(k: SortKey) {
+    // outra coluna: data e tamanho começam pelo mais novo/maior, as demais em A→Z; mesma coluna: inverte
+    const dir: 1 | -1 = sort.key === k ? (sort.dir === 1 ? -1 : 1) : k === "date" || k === "size" ? -1 : 1;
+    const next: Sort = { key: k, dir };
+    setSort(next);
+    try {
+      localStorage.setItem(SORT_STORAGE, JSON.stringify(next));
+    } catch {
+      /* storage bloqueado */
+    }
+  }
 
   const q = useQuery({ queryKey: ["firmware"], queryFn: () => api.get<FirmwareInfo>("/firmware") });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["firmware"] });
@@ -106,7 +183,7 @@ export default function FirmwarePage() {
     onSuccess: (f) => {
       toast("ok", `${f.name} enviado`);
       invalidate();
-      setNote({ name: f.name, comment: f.comment ?? "" });
+      setNote({ name: f.name, comment: f.comment ?? "", vendor: f.vendor ?? "" });
     },
     onError: (e) => toast("err", e instanceof ApiError ? e.detail : "Erro ao enviar"),
     onSettled: () => setProgress(null),
@@ -122,10 +199,13 @@ export default function FirmwarePage() {
   });
 
   const saveNote = useMutation({
-    mutationFn: (n: { name: string; comment: string }) =>
-      api.put<FirmwareFile>(`/firmware/files/${encodeURIComponent(n.name)}/comment`, { comment: n.comment }),
+    mutationFn: (n: { name: string; comment: string; vendor: FirmwareVendor | "" }) =>
+      api.put<FirmwareFile>(`/firmware/files/${encodeURIComponent(n.name)}/info`, {
+        comment: n.comment,
+        vendor: n.vendor || null,
+      }),
     onSuccess: () => {
-      toast("ok", "Comentário salvo");
+      toast("ok", "Dados do firmware salvos");
       setNote(null);
       invalidate();
     },
@@ -161,6 +241,8 @@ export default function FirmwarePage() {
     if (info?.files.some((x) => x.name === f.name) && !confirm(`Substituir ${f.name}?`)) return;
     upload.mutate(f);
   }
+
+  const files = useMemo(() => sortFiles(info?.files ?? [], sort), [info?.files, sort]);
 
   const sameUser = form && s && form.ftp_username.trim() === (s.ftp_username ?? "");
   const needsPassword = !!form && !!form.ftp_username.trim() && !(sameUser && s?.has_password);
@@ -277,22 +359,23 @@ export default function FirmwarePage() {
         <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
           <thead className="bg-slate-50 dark:bg-slate-800/50">
             <tr>
-              <th className="th">Arquivo</th>
-              <th className="th">Tamanho</th>
+              <SortTh label="Arquivo" k="name" sort={sort} onSort={onSort} />
+              <SortTh label="Fabricante" k="vendor" sort={sort} onSort={onSort} />
+              <SortTh label="Tamanho" k="size" sort={sort} onSort={onSort} />
               <th className="th">SHA-256</th>
-              <th className="th">Enviado</th>
+              <SortTh label="Enviado" k="date" sort={sort} onSort={onSort} />
               <th className="th" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {info?.files.length === 0 && (
               <tr>
-                <td className="td text-slate-400 dark:text-slate-500" colSpan={5}>
+                <td className="td text-slate-400 dark:text-slate-500" colSpan={6}>
                   Nenhum firmware enviado.
                 </td>
               </tr>
             )}
-            {info?.files.map((f) => (
+            {files.map((f) => (
               <tr key={f.name}>
                 <td className="td">
                   <div className="font-mono font-medium">{f.name}</div>
@@ -302,7 +385,7 @@ export default function FirmwarePage() {
                       {can("admin") && (
                         <button
                           className="ml-2 text-brand-600 hover:underline dark:text-brand-400"
-                          onClick={() => setNote({ name: f.name, comment: f.comment ?? "" })}
+                          onClick={() => setNote({ name: f.name, comment: f.comment ?? "", vendor: f.vendor ?? "" })}
                         >
                           editar
                         </button>
@@ -312,11 +395,25 @@ export default function FirmwarePage() {
                     can("admin") && (
                       <button
                         className="text-xs text-slate-400 hover:text-brand-600 hover:underline dark:text-slate-500 dark:hover:text-brand-400"
-                        onClick={() => setNote({ name: f.name, comment: "" })}
+                        onClick={() => setNote({ name: f.name, comment: "", vendor: f.vendor ?? "" })}
                       >
                         + adicionar comentário
                       </button>
                     )
+                  )}
+                </td>
+                <td className="td whitespace-nowrap">
+                  {f.vendor ? (
+                    VENDOR_LABEL[f.vendor]
+                  ) : can("admin") ? (
+                    <button
+                      className="text-xs text-slate-400 hover:text-brand-600 hover:underline dark:text-slate-500 dark:hover:text-brand-400"
+                      onClick={() => setNote({ name: f.name, comment: f.comment ?? "", vendor: "" })}
+                    >
+                      + definir
+                    </button>
+                  ) : (
+                    "—"
                   )}
                 </td>
                 <td className="td whitespace-nowrap">{fmtBytes(f.size)}</td>
@@ -363,7 +460,7 @@ export default function FirmwarePage() {
         )}
       </Modal>
 
-      <Modal open={!!note} onClose={() => setNote(null)} title={`Comentário — ${note?.name ?? ""}`}>
+      <Modal open={!!note} onClose={() => setNote(null)} title={`Firmware — ${note?.name ?? ""}`}>
         {note && (
           <form
             className="space-y-3"
@@ -372,6 +469,21 @@ export default function FirmwarePage() {
               saveNote.mutate(note);
             }}
           >
+            <Field label="Fabricante" hint="Os mesmos do Tipo dos equipamentos.">
+              <select
+                className="input"
+                value={note.vendor}
+                onChange={(e) => setNote({ ...note, vendor: e.target.value as FirmwareVendor | "" })}
+                autoFocus
+              >
+                <option value="">— não informado —</option>
+                {FIRMWARE_VENDORS.map((v) => (
+                  <option key={v} value={v}>
+                    {VENDOR_LABEL[v]}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <Field label="Comentário" hint="Até 200 caracteres. Ex.: modelo, versão, para quais equipamentos. Vazio apaga.">
               <input
                 className="input"
@@ -379,12 +491,11 @@ export default function FirmwarePage() {
                 maxLength={200}
                 placeholder="ex.: RP1900 para OLTs AN5516 — testado em 22/10"
                 onChange={(e) => setNote({ ...note, comment: e.target.value })}
-                autoFocus
               />
             </Field>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="ghost" onClick={() => setNote(null)}>
-                {note.comment ? "Cancelar" : "Pular"}
+                {note.comment || note.vendor ? "Cancelar" : "Pular"}
               </Button>
               <Button type="submit" loading={saveNote.isPending}>
                 Salvar

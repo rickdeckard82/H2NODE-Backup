@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.18";
+export const APP_VERSION = "0.9.19";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.19",
+    date: "2026-10-23",
+    changes: [
+      "FTP Firmwares: cada arquivo pode ter o fabricante (os mesmos do Tipo dos equipamentos: Datacom, Huawei, Juniper, A10, Fiberhome, MikroTik, Genérico), em nova coluna e no mesmo formulário do comentário.",
+      "FTP Firmwares: a lista ordena por arquivo, fabricante, tamanho ou data (clique no cabeçalho; outro clique inverte). A escolha fica guardada no navegador.",
+    ],
+  },
   {
     version: "0.9.18",
     date: "2026-10-22",

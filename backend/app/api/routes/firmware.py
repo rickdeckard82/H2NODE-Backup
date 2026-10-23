@@ -4,6 +4,7 @@ import os
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/firmware", tags=["firmware"])
 class FirmwareFileOut(BaseModel):
     name: str
     comment: str | None = None
+    vendor: str | None = None
     size: int
     sha256: str
     updated_at: UtcDatetime
@@ -87,17 +89,27 @@ def _settings_out(row: FirmwareSettings | None) -> FirmwareSettingsOut:
                                include_devices=row.include_devices)
 
 
-class CommentIn(BaseModel):
+# mesmos fabricantes do "Tipo" dos equipamentos, sem "Arquivos e bancos"
+FirmwareVendor = Literal["datacom", "huawei", "juniper", "a10", "fiberhome", "mikrotik", "generic"]
+
+
+class FirmwareInfoIn(BaseModel):
     comment: str = Field(default="", max_length=200)
+    vendor: FirmwareVendor | None = None
 
 
-def _notes(db: Session) -> dict[str, str]:
-    return {n.name: n.comment for n in db.execute(select(FirmwareNote)).scalars()}
+def _notes(db: Session) -> dict[str, FirmwareNote]:
+    return {n.name: n for n in db.execute(select(FirmwareNote)).scalars()}
 
 
 def _files_out(db: Session) -> list[FirmwareFileOut]:
     notes = _notes(db)
-    return [FirmwareFileOut(**vars(f), comment=notes.get(f.name)) for f in firmware.list_files()]
+    out = []
+    for f in firmware.list_files():
+        n = notes.get(f.name)
+        out.append(FirmwareFileOut(**vars(f), comment=n.comment if n else None,
+                                   vendor=n.vendor if n else None))
+    return out
 
 
 def _file_out(db: Session, name: str) -> FirmwareFileOut:
@@ -205,28 +217,29 @@ async def upload_file(name: str, request: Request, actor: SystemUser = Depends(r
     return _file_out(db, name)
 
 
-@router.put("/files/{name}/comment", response_model=FirmwareFileOut, dependencies=[Depends(enforce_csrf)])
-def set_comment(name: str, body: CommentIn, request: Request, db: Session = Depends(get_db),
-                actor: SystemUser = Depends(require_admin)) -> FirmwareFileOut:
-    """Comentário curto do firmware (vazio apaga)."""
+@router.put("/files/{name}/info", response_model=FirmwareFileOut, dependencies=[Depends(enforce_csrf)])
+def set_info(name: str, body: FirmwareInfoIn, request: Request, db: Session = Depends(get_db),
+             actor: SystemUser = Depends(require_admin)) -> FirmwareFileOut:
+    """Fabricante e comentário curto do firmware (os dois vazios apagam)."""
     if not firmware.NAME_RE.match(name):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "arquivo não encontrado")
     p = storage.safe_child(firmware.files_dir(), name)
     if p.is_symlink() or not p.is_file():
         raise HTTPException(status.HTTP_404_NOT_FOUND, "arquivo não encontrado")
-    text = " ".join(body.comment.split())  # uma linha, sem espaços sobrando
+    text = " ".join(body.comment.split()) or None  # uma linha, sem espaços sobrando
     note = db.get(FirmwareNote, name)
-    before = note.comment if note else None
-    if not text:
+    before = {"comment": note.comment, "vendor": note.vendor} if note else None
+    if not text and not body.vendor:
         if note:
             db.delete(note)
-    elif note:
-        note.comment = text
     else:
-        db.add(FirmwareNote(name=name, comment=text))
+        if note is None:
+            note = FirmwareNote(name=name)
+            db.add(note)
+        note.comment, note.vendor = text, body.vendor
     audit.record(db, action="update", entity_type="firmware", entity_id=name,
                  actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request),
-                 before={"comment": before}, after={"comment": text or None})
+                 before=before, after={"comment": text, "vendor": body.vendor})
     db.commit()
     return _file_out(db, name)
 

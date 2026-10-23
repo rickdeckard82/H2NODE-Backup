@@ -207,9 +207,14 @@ export interface DeviceCredential {
   updated_at: string;
 }
 
+/** Fabricante de um firmware: os mesmos do "Tipo" dos equipamentos, sem "Arquivos e bancos". */
+export type FirmwareVendor = Exclude<Vendor, "files">;
+export const FIRMWARE_VENDORS: FirmwareVendor[] = ["datacom", "huawei", "juniper", "a10", "fiberhome", "mikrotik", "generic"];
+
 export interface FirmwareFile {
   name: string;
   comment: string | null;
+  vendor: FirmwareVendor | null;
   size: number;
   sha256: string;
   updated_at: string;
