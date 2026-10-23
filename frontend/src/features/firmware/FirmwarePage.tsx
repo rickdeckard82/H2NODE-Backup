@@ -89,6 +89,7 @@ export default function FirmwarePage() {
   const [progress, setProgress] = useState<{ name: string; pct: number } | null>(null);
   const [form, setForm] = useState<SettingsForm | null>(null);
   const [cmdFor, setCmdFor] = useState<FirmwareFile | null>(null);
+  const [note, setNote] = useState<{ name: string; comment: string } | null>(null);
 
   const q = useQuery({ queryKey: ["firmware"], queryFn: () => api.get<FirmwareInfo>("/firmware") });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["firmware"] });
@@ -105,6 +106,7 @@ export default function FirmwarePage() {
     onSuccess: (f) => {
       toast("ok", `${f.name} enviado`);
       invalidate();
+      setNote({ name: f.name, comment: f.comment ?? "" });
     },
     onError: (e) => toast("err", e instanceof ApiError ? e.detail : "Erro ao enviar"),
     onSettled: () => setProgress(null),
@@ -117,6 +119,17 @@ export default function FirmwarePage() {
       invalidate();
     },
     onError: (e) => toast("err", e instanceof ApiError ? e.detail : "Erro ao remover"),
+  });
+
+  const saveNote = useMutation({
+    mutationFn: (n: { name: string; comment: string }) =>
+      api.put<FirmwareFile>(`/firmware/files/${encodeURIComponent(n.name)}/comment`, { comment: n.comment }),
+    onSuccess: () => {
+      toast("ok", "Comentário salvo");
+      setNote(null);
+      invalidate();
+    },
+    onError: (e) => toast("err", e instanceof ApiError ? e.detail : "Erro ao salvar"),
   });
 
   const save = useMutation({
@@ -281,7 +294,31 @@ export default function FirmwarePage() {
             )}
             {info?.files.map((f) => (
               <tr key={f.name}>
-                <td className="td font-mono font-medium">{f.name}</td>
+                <td className="td">
+                  <div className="font-mono font-medium">{f.name}</div>
+                  {f.comment ? (
+                    <div className="max-w-md text-xs text-slate-500 dark:text-slate-400">
+                      {f.comment}
+                      {can("admin") && (
+                        <button
+                          className="ml-2 text-brand-600 hover:underline dark:text-brand-400"
+                          onClick={() => setNote({ name: f.name, comment: f.comment ?? "" })}
+                        >
+                          editar
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    can("admin") && (
+                      <button
+                        className="text-xs text-slate-400 hover:text-brand-600 hover:underline dark:text-slate-500 dark:hover:text-brand-400"
+                        onClick={() => setNote({ name: f.name, comment: "" })}
+                      >
+                        + adicionar comentário
+                      </button>
+                    )
+                  )}
+                </td>
                 <td className="td whitespace-nowrap">{fmtBytes(f.size)}</td>
                 <td className="td font-mono text-xs text-slate-500 dark:text-slate-400" title={f.sha256}>
                   {f.sha256.slice(0, 16)}…
@@ -323,6 +360,37 @@ export default function FirmwarePage() {
               SHA-256 {cmdFor.sha256}
             </div>
           </div>
+        )}
+      </Modal>
+
+      <Modal open={!!note} onClose={() => setNote(null)} title={`Comentário — ${note?.name ?? ""}`}>
+        {note && (
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveNote.mutate(note);
+            }}
+          >
+            <Field label="Comentário" hint="Até 200 caracteres. Ex.: modelo, versão, para quais equipamentos. Vazio apaga.">
+              <input
+                className="input"
+                value={note.comment}
+                maxLength={200}
+                placeholder="ex.: RP1900 para OLTs AN5516 — testado em 22/10"
+                onChange={(e) => setNote({ ...note, comment: e.target.value })}
+                autoFocus
+              />
+            </Field>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" onClick={() => setNote(null)}>
+                {note.comment ? "Cancelar" : "Pular"}
+              </Button>
+              <Button type="submit" loading={saveNote.isPending}>
+                Salvar
+              </Button>
+            </div>
+          </form>
         )}
       </Modal>
 

@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.16";
+export const APP_VERSION = "0.9.17";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,13 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.17",
+    date: "2026-10-22",
+    changes: [
+      "FTP Firmwares: cada arquivo pode ter um comentário curto (até 200 caracteres), mostrado abaixo do nome. O painel pede o comentário logo após o envio e o administrador edita depois em \"editar\". Substituir o arquivo mantém o comentário; excluir apaga.",
+    ],
+  },
   {
     version: "0.9.16",
     date: "2026-10-22",

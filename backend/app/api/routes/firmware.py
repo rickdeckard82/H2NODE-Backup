@@ -14,7 +14,7 @@ from app.api.deps import client_ip, enforce_csrf, require_admin, require_auditor
 from app.core.config import settings
 from app.core.db import get_db
 from app.core.security import hash_password
-from app.models import FirmwareSettings, FtpAccount, SystemUser
+from app.models import FirmwareNote, FirmwareSettings, FtpAccount, SystemUser
 from app.schemas.common import UtcDatetime
 from app.services import audit, firmware, receivers, storage
 
@@ -23,6 +23,7 @@ router = APIRouter(prefix="/firmware", tags=["firmware"])
 
 class FirmwareFileOut(BaseModel):
     name: str
+    comment: str | None = None
     size: int
     sha256: str
     updated_at: UtcDatetime
@@ -86,15 +87,27 @@ def _settings_out(row: FirmwareSettings | None) -> FirmwareSettingsOut:
                                include_devices=row.include_devices)
 
 
-def _file_out(name: str) -> FirmwareFileOut:
-    f = next(f for f in firmware.list_files() if f.name == name)
-    return FirmwareFileOut(**vars(f))
+class CommentIn(BaseModel):
+    comment: str = Field(default="", max_length=200)
+
+
+def _notes(db: Session) -> dict[str, str]:
+    return {n.name: n.comment for n in db.execute(select(FirmwareNote)).scalars()}
+
+
+def _files_out(db: Session) -> list[FirmwareFileOut]:
+    notes = _notes(db)
+    return [FirmwareFileOut(**vars(f), comment=notes.get(f.name)) for f in firmware.list_files()]
+
+
+def _file_out(db: Session, name: str) -> FirmwareFileOut:
+    return next(f for f in _files_out(db) if f.name == name)
 
 
 @router.get("", response_model=FirmwareOut)
 def get_firmware(db: Session = Depends(get_db), _: SystemUser = Depends(require_auditor)) -> FirmwareOut:
     return FirmwareOut(
-        files=[FirmwareFileOut(**vars(f)) for f in firmware.list_files()],
+        files=_files_out(db),
         settings=_settings_out(db.get(FirmwareSettings, 1)),
         host=settings.net_host, ftp_port=settings.ftp_port, ftp_passive_ports=settings.ftp_passive_ports,
         tftp_port=settings.tftp_port,
@@ -189,7 +202,33 @@ async def upload_file(name: str, request: Request, actor: SystemUser = Depends(r
                  actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request),
                  after={"size": size, "replaced": replaced})
     db.commit()
-    return _file_out(name)
+    return _file_out(db, name)
+
+
+@router.put("/files/{name}/comment", response_model=FirmwareFileOut, dependencies=[Depends(enforce_csrf)])
+def set_comment(name: str, body: CommentIn, request: Request, db: Session = Depends(get_db),
+                actor: SystemUser = Depends(require_admin)) -> FirmwareFileOut:
+    """Comentário curto do firmware (vazio apaga)."""
+    if not firmware.NAME_RE.match(name):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "arquivo não encontrado")
+    p = storage.safe_child(firmware.files_dir(), name)
+    if p.is_symlink() or not p.is_file():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "arquivo não encontrado")
+    text = " ".join(body.comment.split())  # uma linha, sem espaços sobrando
+    note = db.get(FirmwareNote, name)
+    before = note.comment if note else None
+    if not text:
+        if note:
+            db.delete(note)
+    elif note:
+        note.comment = text
+    else:
+        db.add(FirmwareNote(name=name, comment=text))
+    audit.record(db, action="update", entity_type="firmware", entity_id=name,
+                 actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request),
+                 before={"comment": before}, after={"comment": text or None})
+    db.commit()
+    return _file_out(db, name)
 
 
 @router.delete("/files/{name}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(enforce_csrf)])
@@ -201,6 +240,9 @@ def delete_file(name: str, request: Request, db: Session = Depends(get_db),
     if p.is_symlink() or not p.is_file():
         raise HTTPException(status.HTTP_404_NOT_FOUND, "arquivo não encontrado")
     p.unlink()
+    note = db.get(FirmwareNote, name)
+    if note:
+        db.delete(note)
     audit.record(db, action="delete", entity_type="firmware", entity_id=name,
                  actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request))
     db.commit()

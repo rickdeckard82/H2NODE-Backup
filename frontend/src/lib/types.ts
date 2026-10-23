@@ -209,6 +209,7 @@ export interface DeviceCredential {
 
 export interface FirmwareFile {
   name: string;
+  comment: string | null;
   size: number;
   sha256: string;
   updated_at: string;

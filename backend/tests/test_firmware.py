@@ -357,3 +357,21 @@ def test_api_connections_reads_status_and_detects_stale(auth_client, monkeypatch
     monkeypatch.setattr(firmware, "STATUS_STALE", -1)
     r = auth_client.get("/api/firmware/connections").json()
     assert r["receivers"]["ftp"]["online"] is False and r["connections"] == []
+
+
+def test_api_firmware_comment(auth_client):
+    c = "/api/firmware/files/img.bin/comment"
+    assert auth_client.put(c, json={"comment": "x"}).status_code == 404
+    auth_client.put("/api/firmware/files/img.bin", content=IMAGE)
+    r = auth_client.put(c, json={"comment": "  RP1900\n  OLT   GPON  "})
+    assert r.status_code == 200 and r.json()["comment"] == "RP1900 OLT GPON"
+    assert auth_client.put(c, json={"comment": "x" * 201}).status_code == 422
+    # substituir o arquivo mantém o comentário; excluir apaga
+    r = auth_client.put("/api/firmware/files/img.bin", content=b"novo")
+    assert r.json()["comment"] == "RP1900 OLT GPON"
+    assert auth_client.get("/api/firmware").json()["files"][0]["comment"] == "RP1900 OLT GPON"
+    assert auth_client.put(c, json={"comment": " "}).json()["comment"] is None
+    auth_client.put(c, json={"comment": "antigo"})
+    assert auth_client.delete("/api/firmware/files/img.bin").status_code == 204
+    auth_client.put("/api/firmware/files/img.bin", content=IMAGE)
+    assert auth_client.get("/api/firmware").json()["files"][0]["comment"] is None
