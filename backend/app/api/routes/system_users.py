@@ -10,7 +10,7 @@ from app.core.security import hash_password
 from app.models import RefreshToken, SystemRole, SystemUser
 from app.schemas.common import Message, Page
 from app.schemas.system_user import SystemUserCreate, SystemUserOut, SystemUserUpdate
-from app.services import audit, twofactor
+from app.services import audit, trusted_devices, twofactor
 
 router = APIRouter(
     prefix="/system-users",
@@ -39,6 +39,8 @@ def _revoke_sessions(db: Session, user_id: int) -> None:
     db.query(RefreshToken).filter(
         RefreshToken.system_user_id == user_id, RefreshToken.revoked.is_(False)
     ).update({"revoked": True})
+    # senha redefinida / conta desativada: navegadores lembrados no 2FA também caem
+    trusted_devices.revoke_all(db, user_id)
 
 
 @router.get("", response_model=Page[SystemUserOut])
@@ -143,6 +145,7 @@ def reset_mfa(
         raise HTTPException(status.HTTP_409_CONFLICT, "2FA não está ativo para este usuário")
     user.mfa_enabled = False
     user.mfa_secret = None
+    trusted_devices.revoke_all(db, user.id)
     twofactor.discard_recovery_codes(user)
     audit.record(db, action="reset_mfa", entity_type="system_user", entity_id=user.id,
                  actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request))

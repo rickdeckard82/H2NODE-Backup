@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     # Sem 2FA, a conta só consegue ativá-lo, trocar a senha e sair.
     mfa_required_roles: str = Field(default="admin,operator", alias="MFA_REQUIRED_ROLES")
     refresh_token_ttl_days: int = Field(default=7, alias="REFRESH_TOKEN_TTL_DAYS")
+    # "Lembrar este dispositivo" no 2FA: dias sem pedir o código no mesmo navegador (a senha
+    # continua obrigatória). 0 desliga a opção.
+    trusted_device_days: int = Field(default=30, ge=0, le=365, alias="TRUSTED_DEVICE_DAYS")
     fernet_key: str = Field(alias="FERNET_KEY")
 
     # HTTP

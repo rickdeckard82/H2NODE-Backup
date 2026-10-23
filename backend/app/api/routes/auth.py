@@ -39,7 +39,7 @@ from app.schemas.auth import (
     SessionOut,
 )
 from app.schemas.common import Message
-from app.services import audit, twofactor
+from app.services import audit, trusted_devices, twofactor
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -128,6 +128,19 @@ def _set_auth_cookies(resp: Response, *, access: str, refresh: str, csrf: str) -
     )
 
 
+def _set_trusted_cookie(resp: Response, token: str) -> None:
+    resp.set_cookie(
+        trusted_devices.COOKIE, token, httponly=True, path=trusted_devices.COOKIE_PATH,
+        max_age=settings.trusted_device_days * 86400, secure=settings.cookie_secure,
+        samesite="strict", domain=settings.cookie_domain,
+    )
+
+
+def _clear_trusted_cookie(resp: Response) -> None:
+    resp.delete_cookie(trusted_devices.COOKIE, path=trusted_devices.COOKIE_PATH,
+                       domain=settings.cookie_domain)
+
+
 def _clear_auth_cookies(resp: Response) -> None:
     for name, path in (
         (settings.access_cookie_name, "/"),
@@ -153,7 +166,7 @@ def _issue_session(db: Session, resp: Response, user: SystemUser, request: Reque
 
 
 def _complete_login(
-    db: Session, response: Response, user: SystemUser, request: Request
+    db: Session, response: Response, user: SystemUser, request: Request, *, trusted_device: bool = False
 ) -> SessionOut:
     """Fecha o login (sem 2FA pendente): reseta contadores, abre sessão, audita."""
     user.failed_login_count = 0
@@ -166,6 +179,7 @@ def _complete_login(
         db, action="login", entity_type="system_user", entity_id=user.id,
         actor_id=user.id, actor_username=user.username, ip_address=client_ip(request),
         user_agent=request.headers.get("user-agent"),
+        after={"mfa": "dispositivo lembrado"} if trusted_device else None,
     )
     db.commit()
     return SessionOut(user=me_out(user), csrf_token=csrf)
@@ -208,8 +222,12 @@ def login(
         user.password_hash = hash_password(body.password)
 
     if user.mfa_enabled:
+        # navegador lembrado: dispensa só o código (a senha acabou de ser conferida)
+        if trusted_devices.check(db, user.id, request.cookies.get(trusted_devices.COOKIE)):
+            return _complete_login(db, response, user, request, trusted_device=True)
         db.commit()  # persiste o rehash de senha, se houve, antes de sair sem sessão
-        return SessionOut(mfa_required=True, mfa_token=create_mfa_token(str(user.id)))
+        return SessionOut(mfa_required=True, mfa_token=create_mfa_token(str(user.id)),
+                          remember_device_days=settings.trusted_device_days)
 
     return _complete_login(db, response, user, request)
 
@@ -235,6 +253,10 @@ def verify_mfa(
     if not _mfa_code_ok(user, body.code):
         _register_failure(db, request, user, user.username, "código 2FA inválido")
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "código de 2FA inválido")
+    if body.remember_device and trusted_devices.enabled():
+        token = trusted_devices.create(db, user.id, user_agent=request.headers.get("user-agent"),
+                                       ip=client_ip(request))
+        _set_trusted_cookie(response, token)
     return _complete_login(db, response, user, request)
 
 
@@ -324,6 +346,7 @@ def change_my_password(
     if not verify_password(body.current_password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "senha atual incorreta")
     user.password_hash = hash_password(body.new_password)
+    trusted_devices.revoke_all(db, user.id)
     audit.record(
         db, action="change_password", entity_type="system_user", entity_id=user.id,
         actor_id=user.id, actor_username=user.username, ip_address=client_ip(request),
@@ -378,6 +401,7 @@ def disable_mfa(
     user.mfa_enabled = False
     user.mfa_secret = None
     twofactor.discard_recovery_codes(user)
+    trusted_devices.revoke_all(db, user.id)
     audit.record(db, action="disable_mfa", entity_type="system_user", entity_id=user.id,
                  actor_id=user.id, actor_username=user.username, ip_address=client_ip(request))
     db.commit()
@@ -406,3 +430,17 @@ def regenerate_recovery_codes(
                  ip_address=client_ip(request))
     db.commit()
     return RecoveryCodesOut(recovery_codes=codes)
+
+@router.post("/mfa/trusted-devices/forget", response_model=Message, dependencies=[Depends(enforce_csrf)])
+def forget_trusted_devices(
+    request: Request, response: Response,
+    db: Session = Depends(get_db), user: SystemUser = Depends(get_current_user),
+) -> Message:
+    """Esquece todos os navegadores lembrados desta conta (o próximo login pede o código)."""
+    n = trusted_devices.revoke_all(db, user.id)
+    audit.record(db, action="forget_trusted_devices", entity_type="system_user", entity_id=user.id,
+                 actor_id=user.id, actor_username=user.username, ip_address=client_ip(request),
+                 after={"removed": n})
+    db.commit()
+    _clear_trusted_cookie(response)
+    return Message(detail=f"{n} dispositivo(s) esquecido(s)")

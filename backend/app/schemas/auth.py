@@ -42,6 +42,8 @@ class SessionOut(BaseModel):
     # 2ª etapa exigida: enviar `mfa_token` + código para /auth/mfa/verify.
     mfa_required: bool = False
     mfa_token: str | None = None
+    # dias da opção "lembrar este dispositivo" (0 = opção desligada no servidor)
+    remember_device_days: int = 0
 
 
 # Aceita um TOTP de 6 dígitos OU um código de recuperação (XXXXX-XXXXX).
@@ -51,6 +53,8 @@ _MfaOrRecovery = Field(min_length=6, max_length=32)
 class MfaVerifyIn(BaseModel):
     mfa_token: str
     code: str = _MfaOrRecovery
+    # "Lembrar este dispositivo" (TRUSTED_DEVICE_DAYS)
+    remember_device: bool = False
 
 
 class MfaSetupOut(BaseModel):

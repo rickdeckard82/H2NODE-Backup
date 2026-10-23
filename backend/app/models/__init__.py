@@ -10,6 +10,7 @@ from app.models.mfa_recovery_code import MfaRecoveryCode
 from app.models.refresh_token import RefreshToken
 from app.models.storage_snapshot import StorageSnapshot
 from app.models.system_user import SystemRole, SystemUser
+from app.models.trusted_device import TrustedDevice
 from app.models.worker_status import WorkerStatus
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     "StorageSnapshot",
     "SystemRole",
     "SystemUser",
+    "TrustedDevice",
     "VerifyStatus",
     "WorkerStatus",
 ]

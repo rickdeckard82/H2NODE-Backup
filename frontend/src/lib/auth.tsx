@@ -29,6 +29,8 @@ export interface Me {
 export interface LoginResult {
   mfaRequired: boolean;
   mfaToken?: string;
+  /** dias da opção "lembrar este dispositivo" (0 = desligada no servidor) */
+  rememberDays?: number;
 }
 
 interface SessionResponse {
@@ -36,13 +38,14 @@ interface SessionResponse {
   csrf_token: string | null;
   mfa_required: boolean;
   mfa_token: string | null;
+  remember_device_days?: number;
 }
 
 interface AuthCtx {
   user: Me | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<LoginResult>;
-  verifyMfa: (mfaToken: string, code: string) => Promise<void>;
+  verifyMfa: (mfaToken: string, code: string, rememberDevice?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   /** true se o papel do usuário é >= ao menor papel informado (hierárquico). */
@@ -73,13 +76,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (username: string, password: string): Promise<LoginResult> => {
     const res = await api.post<SessionResponse>("/auth/login", { username, password });
-    if (res.mfa_required) return { mfaRequired: true, mfaToken: res.mfa_token ?? undefined };
+    if (res.mfa_required)
+      return { mfaRequired: true, mfaToken: res.mfa_token ?? undefined, rememberDays: res.remember_device_days ?? 0 };
     setUser(res.user);
     return { mfaRequired: false };
   }, []);
 
-  const verifyMfa = useCallback(async (mfaToken: string, code: string) => {
-    const res = await api.post<SessionResponse>("/auth/mfa/verify", { mfa_token: mfaToken, code });
+  const verifyMfa = useCallback(async (mfaToken: string, code: string, rememberDevice = false) => {
+    const res = await api.post<SessionResponse>("/auth/mfa/verify", {
+      mfa_token: mfaToken,
+      code,
+      remember_device: rememberDevice,
+    });
     setUser(res.user);
   }, []);
 

@@ -123,6 +123,12 @@ export function TwoFactorModal({ open, onClose }: { open: boolean; onClose: () =
     onError: (e) => setError(e instanceof ApiError ? e.detail : "Senha ou código inválido"),
   });
 
+  const forgetDevices = useMutation({
+    mutationFn: () => api.post<{ detail: string }>("/auth/mfa/trusted-devices/forget"),
+    onSuccess: (r) => toast("ok", r.detail),
+    onError: (e) => toast("err", e instanceof ApiError ? e.detail : "Erro ao esquecer os dispositivos"),
+  });
+
   const confirmDisable = useMutation({
     mutationFn: () => api.post("/auth/mfa/disable", { password, code }),
     onSuccess: async () => {
@@ -169,6 +175,26 @@ export function TwoFactorModal({ open, onClose }: { open: boolean; onClose: () =
                     Você está quase sem códigos — gere um lote novo e guarde-o.
                   </p>
                 )}
+              </div>
+              <div className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-800">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-slate-600 dark:text-slate-300">
+                    Dispositivos lembrados no login (sem pedir o código)
+                  </span>
+                  <Button
+                    variant="ghost"
+                    loading={forgetDevices.isPending}
+                    onClick={() => {
+                      if (confirm("Esquecer todos os dispositivos lembrados? O próximo login em cada um pedirá o código."))
+                        forgetDevices.mutate();
+                    }}
+                  >
+                    Esquecer todos
+                  </Button>
+                </div>
+                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                  Trocar a senha ou desativar o 2FA também os esquece.
+                </p>
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" onClick={close}>

@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.17";
+export const APP_VERSION = "0.9.18";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.18",
+    date: "2026-10-22",
+    changes: [
+      "Login com 2FA: nova opção \"Lembrar este dispositivo por 30 dias\". No navegador lembrado a senha continua sendo pedida, mas o código do autenticador não (TRUSTED_DEVICE_DAYS; 0 desliga).",
+      "Os dispositivos lembrados são esquecidos ao trocar ou redefinir a senha, desativar ou redefinir o 2FA, desativar a conta ou em 2FA → \"Esquecer todos\".",
+    ],
+  },
   {
     version: "0.9.17",
     date: "2026-10-22",

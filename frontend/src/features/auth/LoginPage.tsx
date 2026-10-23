@@ -15,6 +15,8 @@ export default function LoginPage() {
   const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [useRecovery, setUseRecovery] = useState(false);
+  const [rememberDays, setRememberDays] = useState(0);
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -28,6 +30,7 @@ export default function LoginPage() {
       const res = await login(username.trim(), password);
       if (res.mfaRequired && res.mfaToken) {
         setMfaToken(res.mfaToken);
+        setRememberDays(res.rememberDays ?? 0);
       } else {
         navigate("/", { replace: true });
       }
@@ -44,7 +47,7 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      await verifyMfa(mfaToken, code);
+      await verifyMfa(mfaToken, code, remember);
       navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Código inválido");
@@ -86,6 +89,22 @@ export default function LoginPage() {
                 autoFocus
               />
             </Field>
+            {rememberDays > 0 && (
+              <label className="mt-3 flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                />
+                <span>
+                  Lembrar este dispositivo por {rememberDays} dias
+                  <span className="block text-xs text-slate-400 dark:text-slate-500">
+                    Neste navegador a senha continua sendo pedida, mas o código não. Não marque em computador compartilhado.
+                  </span>
+                </span>
+              </label>
+            )}
             <Button
               type="submit"
               className="mt-4 w-full"
