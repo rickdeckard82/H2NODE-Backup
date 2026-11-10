@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { DeleteClientModal } from "../../components/DeleteClientModal";
 import { RefreshButton } from "../../components/RefreshButton";
 import { HealthBadge } from "../../components/status";
 import { Badge, Button, Card, Field, Modal, PageHeader, Spinner, useToast } from "../../components/ui";
@@ -135,6 +136,7 @@ export default function DevicesPage() {
   const { can } = useAuth();
   const fmtDate = useFmtDate();
   const qc = useQueryClient();
+  const [delFor, setDelFor] = useState<Client | null>(null);
   const toast = useToast();
   const [q, setQ] = useState("");
   const [form, setForm] = useState<FormState | null>(null);
@@ -180,15 +182,6 @@ export default function DevicesPage() {
       if (!f.id) setCfgFor(c);
     },
     onError: (e) => toast("err", e instanceof ApiError ? e.detail : "Erro ao salvar"),
-  });
-
-  const remove = useMutation({
-    mutationFn: (c: Client) => api.del(`/clients/${c.id}`),
-    onSuccess: () => {
-      toast("ok", "Cadastro removido");
-      invalidate();
-    },
-    onError: (e) => toast("err", e instanceof ApiError ? e.detail : "Erro ao remover"),
   });
 
   const canEdit = can("operator");
@@ -311,8 +304,7 @@ export default function DevicesPage() {
                       <button
                         className="text-rose-600 hover:underline dark:text-rose-400"
                         onClick={() => {
-                          if (confirm(`Remover ${c.name}? O IP deixa de poder enviar na hora.`))
-                            remove.mutate(c);
+                          setDelFor(c);
                         }}
                       >
                         Excluir
@@ -500,6 +492,7 @@ export default function DevicesPage() {
       </Modal>
 
       <DeviceConfigModal device={cfgFor} onClose={() => setCfgFor(null)} />
+      <DeleteClientModal client={delFor} onClose={() => setDelFor(null)} onDone={invalidate} />
     </div>
   );
 }

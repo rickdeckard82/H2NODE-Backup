@@ -19,6 +19,7 @@ from app.schemas.client import (
 )
 from app.services import audit, gpg, mikrotik, receivers, sshkeys, storage
 from app.services.health import client_health
+from app.services.retention import delete_backup_files
 
 router = APIRouter(prefix="/clients", tags=["clients"], dependencies=[Depends(enforce_csrf)])
 
@@ -288,27 +289,41 @@ def update_client(
 @router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_client(
     client_id: int, request: Request,
+    purge_backups: bool = Query(False),
     db: Session = Depends(get_db), actor: SystemUser = Depends(require_admin),
 ) -> None:
-    """Remove o cadastro e o acesso SSH. Os backups já guardados NÃO são apagados
-    do disco aqui (exclua-os antes pela tela de backups, se for o caso)."""
+    """Remove o cadastro e o acesso (SSH/IP liberado). Com `purge_backups`, apaga
+    também do disco os backups guardados e as pastas do cliente; sem ele, recusa
+    se ainda houver backups (o painel oferece desativar para mantê-los)."""
     c = db.get(Client, client_id)
     if c is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "não encontrado")
-    stored = db.execute(
-        select(func.count()).select_from(Backup).where(
+    stored = list(db.execute(
+        select(Backup).where(
             Backup.client_id == c.id, Backup.deleted_at.is_(None), Backup.storage_path.is_not(None)
         )
-    ).scalar_one()
-    if stored:
+    ).scalars())
+    if stored and not purge_backups:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            f"o cliente ainda tem {stored} backup(s) guardado(s) — desative-o ou exclua os backups antes",
+            f"o cliente ainda tem {len(stored)} backup(s) guardado(s) — desative-o ou exclua os backups antes",
         )
+    if purge_backups:
+        try:
+            for b in stored:
+                delete_backup_files(b)
+            # Sobras: envios incompletos em incoming/ e a pasta vazia em store/.
+            for base in (storage.incoming(), storage.store()):
+                storage.remove_tree(storage.safe_child(base, c.slug))
+        except (ValueError, OSError) as exc:
+            # Arquivos já apagados ficam marcados; o cadastro só sai com o disco limpo.
+            db.commit()
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"falha ao apagar: {exc}") from exc
     db.delete(c)
     audit.record(db, action="delete", entity_type="client", entity_id=client_id,
                  actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request),
-                 before={"slug": c.slug, "name": c.name, "kind": c.kind})
+                 before={"slug": c.slug, "name": c.name, "kind": c.kind,
+                         "backups_removed": len(stored) if purge_backups else 0})
     db.commit()
     _sync_all(db)
 

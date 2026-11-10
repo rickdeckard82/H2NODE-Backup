@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.24";
+export const APP_VERSION = "0.9.25";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,13 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.25",
+    date: "2026-11-10",
+    changes: [
+      "Excluir servidor, equipamento ou MikroTik com backups guardados agora pergunta o que fazer: manter os backups (o cadastro é desativado e o acesso revogado) ou excluir tudo, apagando do disco os backups, as pastas do cliente e o cadastro (pede o identificador para confirmar).",
+    ],
+  },
   {
     version: "0.9.24",
     date: "2026-10-23",

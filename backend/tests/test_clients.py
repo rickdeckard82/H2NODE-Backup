@@ -68,3 +68,28 @@ def test_agent_config(auth_client):
     assert r.status_code == 200
     assert 'CLIENT_ID="db01"' in r.json()["content"]
     assert r.json()["public_key_available"] is False
+
+
+def test_delete_client_keep_or_purge_backups(auth_client, seeded, isolated_paths):
+    from app.models import Backup, BackupStatus, Client
+
+    r = auth_client.post("/api/clients", json={"slug": "web02", "name": "Web 02", "ssh_public_key": ED_KEY})
+    cid = r.json()["id"]
+    run = isolated_paths / "data" / "store" / "web02" / "r1"
+    run.mkdir(parents=True)
+    (run / "01-file.tar.gz.gpg").write_bytes(b"x")
+    (isolated_paths / "data" / "incoming" / "web02" / "parcial").write_bytes(b"y")
+    seeded.add(Backup(client_id=cid, run_name="r1", status=BackupStatus.ok, storage_path="store/web02/r1"))
+    seeded.commit()
+
+    # sem purge: recusa e não mexe em nada
+    assert auth_client.delete(f"/api/clients/{cid}").status_code == 409
+    assert run.is_dir()
+
+    # com purge: some o cadastro, os backups, as pastas e o acesso SSH
+    assert auth_client.delete(f"/api/clients/{cid}?purge_backups=true").status_code == 204
+    seeded.expire_all()
+    assert seeded.get(Client, cid) is None
+    assert not (isolated_paths / "data" / "store" / "web02").exists()
+    assert not (isolated_paths / "data" / "incoming" / "web02").exists()
+    assert "web02" not in (isolated_paths / "ssh" / "authorized_keys").read_text()

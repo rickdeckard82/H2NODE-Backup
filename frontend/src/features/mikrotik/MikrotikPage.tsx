@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { DeleteClientModal } from "../../components/DeleteClientModal";
 import { RefreshButton } from "../../components/RefreshButton";
 import { HealthBadge } from "../../components/status";
 import { Badge, Button, Card, Field, Modal, PageHeader, Spinner, useToast } from "../../components/ui";
@@ -177,6 +178,7 @@ export default function MikrotikPage() {
   const { can } = useAuth();
   const fmtDate = useFmtDate();
   const qc = useQueryClient();
+  const [delFor, setDelFor] = useState<Client | null>(null);
   const toast = useToast();
   const [q, setQ] = useState("");
   const [form, setForm] = useState<FormState | null>(null);
@@ -229,15 +231,6 @@ export default function MikrotikPage() {
       api.post<Client>(`/clients/${c.id}/${what}`),
     onSuccess: (_c, { what }) => {
       toast("ok", what === "pull-now" ? "Coleta agendada (sai em até 30 s)" : "Nova chave será aceita na próxima coleta");
-      invalidate();
-    },
-    onError: (e) => toast("err", errMsg(e)),
-  });
-
-  const remove = useMutation({
-    mutationFn: (c: Client) => api.del(`/clients/${c.id}`),
-    onSuccess: () => {
-      toast("ok", "MikroTik removido");
       invalidate();
     },
     onError: (e) => toast("err", errMsg(e)),
@@ -434,7 +427,7 @@ export default function MikrotikPage() {
                         <button
                           className="text-rose-600 hover:underline dark:text-rose-400"
                           onClick={() => {
-                            if (confirm(`Remover o MikroTik ${c.name}? A coleta para na hora.`)) remove.mutate(c);
+                            setDelFor(c);
                           }}
                         >
                           Excluir
@@ -579,6 +572,7 @@ export default function MikrotikPage() {
       </Modal>
 
       <ImportModal open={importing} creds={creds.data ?? []} onClose={() => setImporting(false)} onDone={invalidate} />
+      <DeleteClientModal client={delFor} onClose={() => setDelFor(null)} onDone={invalidate} />
     </div>
   );
 }
