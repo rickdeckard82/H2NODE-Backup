@@ -10,6 +10,7 @@ name = "pulse-backup-backend"
 version = "0.9.25"
 description = "API e worker do Pulse Backup (gestão de backups cifrados de servidores Linux)"
 requires-python = ">=3.12"
+license = { text = "MIT" }
 dependencies = [
     "fastapi==0.141.1",
     "uvicorn[standard]==0.34.0",

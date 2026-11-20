@@ -11,3 +11,7 @@ node_modules/
 frontend/dist/
 *.log
 .DS_Store
+
+# Instruções de agentes (não versionar)
+AGENTS.md
+CLAUDE.md

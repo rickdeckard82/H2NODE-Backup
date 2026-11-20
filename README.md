@@ -1,5 +1,7 @@
 # Pulse Backup
 
+![Painel do Pulse Backup — visão geral dos backups](docs/images/painel.png)
+
 Sistema para **fazer, receber, validar e acompanhar backups de servidores Linux
 (inclusive cPanel/WHM) e de configurações de switches, roteadores e OLTs** (FTP/TFTP),
 com painel web protegido por login. Stack: **FastAPI + PostgreSQL** no backend,
@@ -253,3 +255,9 @@ make test-backend   # pytest + ruff (inclui ingestão e verificação com gpg re
 make test-e2e       # stack isolada + cliente Debian com MariaDB/PostgreSQL de verdade
 make lint-agent     # shellcheck do agente
 ```
+
+## Licença
+
+Distribuído sob a licença **MIT** — veja [LICENSE](LICENSE). Uso livre, inclusive comercial,
+com modificação e redistribuição; a única exigência é manter o aviso de copyright e a licença
+(crédito ao autor: Everton — [github.com/rickdeckard82](https://github.com/rickdeckard82)).
