@@ -23,4 +23,4 @@ def configure_logging() -> None:
     )
 
 
-logger = structlog.get_logger("pulse-backup")
+logger = structlog.get_logger("h2node-backup")

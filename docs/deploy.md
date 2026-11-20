@@ -10,12 +10,12 @@
 
 - DNS: registro **A** (e AAAA, se houver IPv6) de `PUBLIC_DOMAIN` apontando para o IP público.
 - Docker + Docker Compose, `openssl`, `gnupg`.
-- Disco dedicado para os backups (ex. `/srv/pulse-backup`).
+- Disco dedicado para os backups (ex. `/srv/h2node-backup`).
 
 ## 2. Configuração
 
 ```bash
-git clone … pulse-backup && cd pulse-backup
+git clone … h2node-backup && cd h2node-backup
 make init                      # .env com segredos + chave GPG em secrets/
 vim .env
 ```
@@ -26,7 +26,7 @@ No `.env`:
 |---|---|
 | `PUBLIC_DOMAIN` | `backup.suaempresa.com.br` |
 | `ACME_EMAIL` | e-mail para avisos do Let's Encrypt |
-| `BACKUP_STORAGE_PATH` | `/srv/pulse-backup/data` |
+| `BACKUP_STORAGE_PATH` | `/srv/h2node-backup/data` |
 | `SSH_PUBLIC_PORT` | `2222` (porta que os clientes usam) |
 | `COOKIE_SECURE` | `true` |
 | `NET_PUBLIC_HOST` | IP público que os switches/roteadores usam |
@@ -99,7 +99,7 @@ A página **Downloads** acompanha a atualização sozinha:
 - o `.tar.gz` do agente Linux é montado na hora a partir de `agent/`;
 - o instalador do cliente Windows é compilado pelo serviço `client-builder` (Go + Wails + NSIS
   dentro do Docker, sem Windows). O `build` só recompila quando algo em `windows-client/` mudou;
-  no `up` o container copia o `PulseBackup-Setup-<versão>.exe` para o volume `client_dist`
+  no `up` o container copia o `H2nodeBackup-Setup-<versão>.exe` para o volume `client_dist`
   (lido só-leitura pelo backend) e termina — `Exited (0)` no `docker compose ps -a` é o normal.
   Para recompilar à força: `docker compose build --no-cache client-builder && docker compose up -d client-builder`.
 
@@ -108,7 +108,7 @@ A página **Downloads** acompanha a atualização sozinha:
 O PostgreSQL guarda só metadados (cadastro, histórico); os backups em si estão no
 disco. Ainda assim, faça dump periódico:
 ```bash
-docker compose exec -T db pg_dump -U pulse pulse_backup | gzip > painel-$(date +%F).sql.gz
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > painel-$(date +%F).sql.gz
 ```
 
 ## Usando outro proxy (Nginx Proxy Manager etc.)

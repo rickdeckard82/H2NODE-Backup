@@ -13,8 +13,8 @@ from app.api.deps import (
     enforce_csrf,
     get_current_user,
     require_admin,
-    require_mfa_ready,
     require_auditor,
+    require_mfa_ready,
     require_operator,
 )
 from app.core.config import settings
@@ -103,13 +103,14 @@ def create_link(
 async def upload(name: str, request: Request, actor: SystemUser = Depends(require_admin),
                  db: Session = Depends(get_db)) -> DownloadOut:
     """Envia (ou substitui) um arquivo para download — ex.: o instalador do Windows."""
-    if not downloads.UPLOAD_RE.match(name) or name.startswith("pulse-backup-agent-"):
+    if not downloads.UPLOAD_RE.match(name) or name.startswith("h2node-backup-agent-"):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                             "nome inválido: use letras, números, ponto, hífen e extensão .exe, .msi, .zip "
                             "ou .tar.gz (o agente Linux é gerado sozinho)")
     if name in downloads.built_names():
         raise HTTPException(status.HTTP_409_CONFLICT,
-                            "este arquivo é compilado pelo próprio servidor (client-builder) — não precisa enviar")
+                            "este arquivo é compilado pelo próprio servidor (client-builder) — "
+                            "não precisa enviar")
     d = downloads.uploads_dir()
     d.mkdir(parents=True, exist_ok=True)
     dest = storage.safe_child(d, name)
@@ -133,8 +134,8 @@ async def upload(name: str, request: Request, actor: SystemUser = Depends(requir
                  actor_id=actor.id, actor_username=actor.username, ip_address=client_ip(request),
                  after={"size": size})
     db.commit()
-    item = next(i for i in downloads.list_items()[0] if i.name == name)
-    return DownloadOut(**vars(item))
+    # não via list_items(): uma versão mais antiga que a compilada fica escondida da lista
+    return DownloadOut(**vars(downloads.file_item(dest, "uploaded")))
 
 
 @router.delete("/{name}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(enforce_csrf)])

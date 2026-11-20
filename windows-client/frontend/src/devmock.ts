@@ -25,7 +25,7 @@ export function installDevMock() {
     ],
     excludes: ["~$*", "*.tmp", "Thumbs.db", "desktop.ini"],
     schedule: { mode: "daily", time: "12:30", days: [1, 2, 3, 4, 5], interval_hours: 24, catch_up: true },
-    work_dir: "C:\\ProgramData\\PulseBackup\\work",
+    work_dir: "C:\\ProgramData\\H2nodeBackup\\work",
     use_vss: true,
     running: params.get("running") === "1",
     progress:
@@ -49,7 +49,7 @@ export function installDevMock() {
       { run_name: "20261016T153001Z-d4e5f6", started_at: iso(44.2 * 3600_000), finished_at: iso(44 * 3600_000), status: "success", bytes: 2100000000, components: [], errors: [] },
     ],
     service_ok: params.get("service") !== "0",
-    service_error: params.get("service") === "0" ? "o serviço Pulse Backup não está rodando" : "",
+    service_error: params.get("service") === "0" ? "o serviço H2NODE Backup não está rodando" : "",
     admin: params.get("admin") !== "0",
     admin_window: params.get("admin") !== "0",
   };

@@ -1,4 +1,4 @@
-name: pulse-backup
+name: h2node-backup
 
 networks:
   edge:
@@ -10,17 +10,27 @@ networks:
   egress:
     driver: bridge
 
+# Nomes fixos dos volumes. Instalações de antes do rebranding (projeto "pulse-backup")
+# usam VOLUME_PREFIX=pulse-backup no .env para continuar com o banco, as chaves de host
+# e os certificados de sempre (scripts/migrar-h2node.sh faz isso).
 volumes:
   db_data:
+    name: ${VOLUME_PREFIX:-h2node-backup}_db_data
   ssh_shared:
+    name: ${VOLUME_PREFIX:-h2node-backup}_ssh_shared
   ssh_hostkeys:
+    name: ${VOLUME_PREFIX:-h2node-backup}_ssh_hostkeys
   receivers_shared:   # receivers.json: IPs de equipamentos + contas FTP (hash)
+    name: ${VOLUME_PREFIX:-h2node-backup}_receivers_shared
   client_dist:    # instalador do cliente Windows compilado pelo client-builder
+    name: ${VOLUME_PREFIX:-h2node-backup}_client_dist
   caddy_data:     # certificados Let's Encrypt (não apague: limite de emissão)
+    name: ${VOLUME_PREFIX:-h2node-backup}_caddy_data
   caddy_config:
+    name: ${VOLUME_PREFIX:-h2node-backup}_caddy_config
 
 x-backend-env: &backend-env
-  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pulse}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pulse_backup}
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-h2node}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-h2node_backup}
   JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
   FERNET_KEY: ${FERNET_KEY:?set FERNET_KEY}
   STORAGE_PATH: /data
@@ -53,15 +63,15 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-pulse}
+      POSTGRES_USER: ${POSTGRES_USER:-h2node}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-pulse_backup}
+      POSTGRES_DB: ${POSTGRES_DB:-h2node_backup}
     volumes:
       - db_data:/var/lib/postgresql/data
     networks:
       - internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pulse} -d ${POSTGRES_DB:-pulse_backup}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-h2node} -d ${POSTGRES_DB:-h2node_backup}"]
       interval: 5s
       timeout: 5s
       retries: 15
@@ -88,7 +98,7 @@ services:
 
   # ───────────── client-builder: compila o instalador do cliente Windows ─────────────
   # O `docker compose build` recompila (Go + Wails + NSIS, no Linux) só quando algo em
-  # windows-client/ mudou; na subida o container copia o PulseBackup-Setup-<versão>.exe
+  # windows-client/ mudou; na subida o container copia o H2nodeBackup-Setup-<versão>.exe
   # para o volume client_dist e termina. O backend o publica em Downloads.
   client-builder:
     build:

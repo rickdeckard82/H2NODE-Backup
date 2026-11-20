@@ -1,5 +1,5 @@
 // Package config guarda a configuração e o histórico do cliente. No serviço, em
-// %ProgramData%\PulseBackup (só SYSTEM e Administradores). O token de envio fica
+// %ProgramData%\H2nodeBackup (só SYSTEM e Administradores). O token de envio fica
 // protegido com DPAPI da conta que roda o serviço (SYSTEM): só ela o decifra.
 package config
 
@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"pulse-backup/windows-client/internal/engine"
+	"h2node-backup/windows-client/internal/engine"
 )
 
 // Schedule: quando o backup roda sozinho.
@@ -65,14 +65,21 @@ func AppDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(base, "PulseBackup"), nil
+	dir := filepath.Join(base, "H2nodeBackup")
+	// antes do rebranding a pasta era "PulseBackup": aproveita a configuração existente
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if fi, err := os.Stat(filepath.Join(base, "PulseBackup")); err == nil && fi.IsDir() {
+			_ = os.Rename(filepath.Join(base, "PulseBackup"), dir)
+		}
+	}
+	return dir, nil
 }
 
 func LocalDir() string {
 	if base, err := os.UserCacheDir(); err == nil { // %LOCALAPPDATA%
-		return filepath.Join(base, "PulseBackup")
+		return filepath.Join(base, "H2nodeBackup")
 	}
-	return filepath.Join(os.TempDir(), "PulseBackup")
+	return filepath.Join(os.TempDir(), "H2nodeBackup")
 }
 
 func NewStore(dir string) (*Store, error) {

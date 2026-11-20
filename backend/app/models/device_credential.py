@@ -6,7 +6,7 @@ from app.models.base import Base, TimestampMixin
 
 class DeviceCredential(Base, TimestampMixin):
     """Usuário com que o coletor (serviço `puller`) entra por SSH nos equipamentos
-    que o Pulse Backup busca ativamente (hoje: MikroTik RouterOS).
+    que o H2NODE Backup busca ativamente (hoje: MikroTik RouterOS).
 
     A senha é guardada cifrada (Fernet, FERNET_KEY) porque precisa ser usada — não
     dá para guardar só o hash. Ela nunca volta pela API.

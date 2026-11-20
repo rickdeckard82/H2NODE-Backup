@@ -1,4 +1,4 @@
-module pulse-backup/windows-client
+module h2node-backup/windows-client
 
 go 1.27.2
 

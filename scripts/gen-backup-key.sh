@@ -13,7 +13,7 @@ if [ -e "$OUT/backup-key.pub.asc" ] || [ -e "$OUT/private/backup-key.sec.asc" ];
     echo "Já existe uma chave em $OUT/ — não sobrescrevo (os backups antigos dependem dela)." >&2
     exit 1
 fi
-UID_NAME="${1:-Pulse Backup <backup@$(hostname -f 2>/dev/null || hostname)>}"
+UID_NAME="${1:-H2NODE Backup <backup@$(hostname -f 2>/dev/null || hostname)>}"
 mkdir -p "$OUT/private" && chmod 700 "$OUT/private"
 umask 077
 

@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	UserPipe  = `\\.\pipe\PulseBackup`
-	AdminPipe = `\\.\pipe\PulseBackupAdmin`
+	UserPipe  = `\\.\pipe\H2nodeBackup`
+	AdminPipe = `\\.\pipe\H2nodeBackupAdmin`
 
 	// D:P = DACL protegida. NU (logon de rede) negado; SY e BA total; IU (interativo) lê/escreve.
 	UserSDDL  = "D:P(D;;GA;;;NU)(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;IU)"
@@ -34,8 +34,8 @@ const (
 )
 
 var (
-	ErrServiceDown  = errors.New("o serviço Pulse Backup não está rodando")
-	ErrAccessDenied = errors.New("é preciso abrir o Pulse Backup como administrador para alterar a configuração")
+	ErrServiceDown  = errors.New("o serviço H2NODE Backup não está rodando")
+	ErrAccessDenied = errors.New("é preciso abrir o H2NODE Backup como administrador para alterar a configuração")
 )
 
 // Listen abre um pipe com o descritor de segurança dado.
@@ -86,7 +86,7 @@ func (c *Client) Call(ctx context.Context, method, path string, in, out any) err
 		}
 		body = bytes.NewReader(b)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, "http://pulse-backup"+path, body)
+	req, err := http.NewRequestWithContext(ctx, method, "http://h2node-backup"+path, body)
 	if err != nil {
 		return err
 	}

@@ -12,7 +12,7 @@ API = "/api/agent/v1"
 
 def _manifest(slug: str, run: str, comps: list[dict], status: str = "success") -> dict:
     return {
-        "format": "pulse-backup/1", "client_id": slug, "run_name": run, "agent_version": "win-0.1.0",
+        "format": "h2node-backup/1", "client_id": slug, "run_name": run, "agent_version": "win-0.1.0",
         "hostname": "PC-FINANCEIRO", "os": "Windows 11 Pro 24H2",
         "started_at": "2026-10-18T10:00:00Z", "finished_at": "2026-10-18T10:05:00Z",
         "status": status, "components": comps, "errors": [],
@@ -50,7 +50,8 @@ def test_https_upload_end_to_end(auth_client, seeded, keys, keyring, tmp_path): 
     # pedaço repetido (cliente não sabe se o anterior chegou): 409 e retoma pelo tamanho
     assert auth_client.put(url, params={"offset": 0}, headers=H, content=data[:half]).status_code == 409
     assert auth_client.get(url, headers=H).json()["size"] == half
-    assert auth_client.put(url, params={"offset": half}, headers=H, content=data[half:]).json()["size"] == len(data)
+    r = auth_client.put(url, params={"offset": half}, headers=H, content=data[half:])
+    assert r.json()["size"] == len(data)
 
     comp = {"kind": "files", "name": r"C:\Users\fin\Documentos", "file": name, "size": len(data),
             "sha256": hashlib.sha256(data).hexdigest(), "plain_size": len(plain),

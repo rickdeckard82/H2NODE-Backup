@@ -1,5 +1,5 @@
 // Package service é o que roda dentro do serviço do Windows (LocalSystem): agenda e
-// faz os backups (com VSS), guarda a configuração em %ProgramData%\PulseBackup e
+// faz os backups (com VSS), guarda a configuração em %ProgramData%\H2nodeBackup e
 // atende a interface pelos named pipes (http.go).
 package service
 
@@ -17,10 +17,10 @@ import (
 	"sync"
 	"time"
 
-	"pulse-backup/windows-client/internal/api"
-	"pulse-backup/windows-client/internal/config"
-	"pulse-backup/windows-client/internal/engine"
-	"pulse-backup/windows-client/internal/vss"
+	"h2node-backup/windows-client/internal/api"
+	"h2node-backup/windows-client/internal/config"
+	"h2node-backup/windows-client/internal/engine"
+	"h2node-backup/windows-client/internal/vss"
 )
 
 // State é o que a interface mostra.
@@ -163,7 +163,7 @@ func (c *Core) poke() {
 
 // ---------------------------------------------------------------- servidor --
 
-func userAgent(v string) string { return "PulseBackupWindows/" + v }
+func userAgent(v string) string { return "H2nodeBackupWindows/" + v }
 
 // TestConnection confere endereço e token e devolve a impressão digital da chave GPG.
 // Nada é salvo até ConfirmConnection.
@@ -293,7 +293,7 @@ func (c *Core) SetWorkDir(dir string) error {
 	if !filepath.IsAbs(dir) {
 		return fmt.Errorf("pasta inválida: %q", dir)
 	}
-	dir = filepath.Join(dir, "PulseBackup-work")
+	dir = filepath.Join(dir, "H2nodeBackup-work")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("o serviço não consegue criar %s: %w", dir, err)
 	}
@@ -526,7 +526,7 @@ func (c *Core) scheduleNext(r engine.Result) {
 
 // Run é o laço do serviço: limpa órfãs, agenda e dispara os backups até ctx acabar.
 func (c *Core) Run(ctx context.Context) {
-	c.logf("serviço Pulse Backup %s iniciado (%s)", c.version, c.osInfo)
+	c.logf("serviço H2NODE Backup %s iniciado (%s)", c.version, c.osInfo)
 	c.cleanupOrphanSnapshots()
 	c.mu.Lock()
 	s, last := c.cfg.Schedule, c.hist.LastAttempt
@@ -586,7 +586,7 @@ func (c *Core) Stop(timeout time.Duration) {
 
 func openLog(dir string) (string, *log.Logger, io.Closer) {
 	_ = os.MkdirAll(dir, 0o700)
-	path := filepath.Join(dir, "pulse-backup.log")
+	path := filepath.Join(dir, "h2node-backup.log")
 	if st, err := os.Stat(path); err == nil && st.Size() > 5<<20 {
 		_ = os.Rename(path, path+".1") // um arquivo anterior basta
 	}

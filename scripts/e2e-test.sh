@@ -4,7 +4,7 @@
 #
 #   1. sobe db + sshd + backend + worker + frontend;
 #   2. cria um "servidor cliente" Debian com MariaDB e PostgreSQL de verdade;
-#   3. instala o agente, cadastra o cliente pela API e roda `pulse-backup-agent run`;
+#   3. instala o agente, cadastra o cliente pela API e roda `h2node-backup-agent run`;
 #   4. espera o worker receber e VERIFICAR (decifrar e testar) o backup;
 #   5. confere que nada ficou no WORK_DIR do cliente e que o rrsync barra leitura.
 #
@@ -15,8 +15,8 @@ ROOT="$PWD"
 KEEP=0
 [ "${1:-}" = "--keep" ] && KEEP=1
 
-P=pulse-backup-e2e
-WORK="$(mktemp -d /tmp/pulse-backup-e2e.XXXXXX)"
+P=h2node-backup-e2e
+WORK="$(mktemp -d /tmp/h2node-backup-e2e.XXXXXX)"
 WEB_PORT=18080
 SSH_PORT=12222
 API="http://127.0.0.1:$WEB_PORT/api"
@@ -24,6 +24,8 @@ JAR="$WORK/cookies"
 CLIENT_CT="$P-client"
 
 export COMPOSE_PROJECT_NAME=$P
+# os volumes têm nome fixo (VOLUME_PREFIX): sem isto o `down -v` do teste apagaria os de produção
+export VOLUME_PREFIX=$P
 export SECRETS_DIR="$WORK/secrets"
 export BACKUP_STORAGE_PATH="$WORK/data"
 export POSTGRES_PASSWORD=e2e-postgres
@@ -63,7 +65,7 @@ api() { # api METHOD PATH [JSON]
 
 step "Gerando chave GPG temporária"
 mkdir -p "$BACKUP_STORAGE_PATH"
-"$ROOT/scripts/gen-backup-key.sh" "Pulse Backup E2E <e2e@test>" >/dev/null
+"$ROOT/scripts/gen-backup-key.sh" "H2NODE Backup E2E <e2e@test>" >/dev/null
 FPR="$(gpg --with-colons --show-keys "$SECRETS_DIR/backup-key.pub.asc" | awk -F: '$1=="fpr"{print $10; exit}')"
 echo "fingerprint: $FPR"
 
@@ -97,7 +99,7 @@ docker exec "$CLIENT_CT" bash -c '
 
 step "Instalando o agente"
 docker exec "$CLIENT_CT" bash -c 'cd /agent && ./install.sh --no-cron' >/dev/null || fail "install.sh"
-SSH_PUB="$(docker exec "$CLIENT_CT" cat /etc/pulse-backup/id_ed25519.pub)"
+SSH_PUB="$(docker exec "$CLIENT_CT" cat /etc/h2node-backup/id_ed25519.pub)"
 
 step "Cadastrando o cliente pela API"
 CLIENT_JSON="$(api POST /clients "$(printf '{"slug":"web01","name":"Servidor Web 01","ssh_public_key":"%s","expected_interval_hours":24}' "$SSH_PUB")")" \
@@ -116,18 +118,18 @@ s = s.replace('EXCLUDES=(\n', 'EXCLUDES=(\n  "/srv/site/cache"\n')
 s = s.replace('MYSQL_ENABLED="no"', 'MYSQL_ENABLED="yes"').replace('POSTGRES_ENABLED="no"', 'POSTGRES_ENABLED="yes"')
 open(p, "w").write(s)
 PY
-docker cp "$WORK/agent.conf" "$CLIENT_CT:/etc/pulse-backup/agent.conf"
-docker cp "$WORK/known_hosts" "$CLIENT_CT:/etc/pulse-backup/known_hosts"
-docker cp "$SECRETS_DIR/backup-key.pub.asc" "$CLIENT_CT:/etc/pulse-backup/backup-key.pub.asc"
-docker exec "$CLIENT_CT" bash -c 'chown root: /etc/pulse-backup/* && chmod 600 /etc/pulse-backup/agent.conf'
+docker cp "$WORK/agent.conf" "$CLIENT_CT:/etc/h2node-backup/agent.conf"
+docker cp "$WORK/known_hosts" "$CLIENT_CT:/etc/h2node-backup/known_hosts"
+docker cp "$SECRETS_DIR/backup-key.pub.asc" "$CLIENT_CT:/etc/h2node-backup/backup-key.pub.asc"
+docker exec "$CLIENT_CT" bash -c 'chown root: /etc/h2node-backup/* && chmod 600 /etc/h2node-backup/agent.conf'
 
-step "pulse-backup-agent test"
-docker exec "$CLIENT_CT" pulse-backup-agent test || fail "agent test"
+step "h2node-backup-agent test"
+docker exec "$CLIENT_CT" h2node-backup-agent test || fail "agent test"
 
-step "pulse-backup-agent run"
-docker exec "$CLIENT_CT" pulse-backup-agent run || fail "agent run (veja /var/log/pulse-backup.log)"
-docker exec "$CLIENT_CT" tail -n 20 /var/log/pulse-backup.log
-LEFT="$(docker exec "$CLIENT_CT" bash -c 'find /var/tmp/pulse-backup -mindepth 1 | wc -l')"
+step "h2node-backup-agent run"
+docker exec "$CLIENT_CT" h2node-backup-agent run || fail "agent run (veja /var/log/h2node-backup.log)"
+docker exec "$CLIENT_CT" tail -n 20 /var/log/h2node-backup.log
+LEFT="$(docker exec "$CLIENT_CT" bash -c 'find /var/tmp/h2node-backup -mindepth 1 | wc -l')"
 [ "$LEFT" = "0" ] || fail "sobrou $LEFT arquivo(s) no WORK_DIR do cliente"
 echo "WORK_DIR do cliente vazio: ok"
 
@@ -172,10 +174,10 @@ docker run --rm -v "$BACKUP_STORAGE_PATH:/d:ro" -v "$SECRETS_DIR/private:/k:ro" 
 echo "tar restaurável, exclusão respeitada, dumps MariaDB/PostgreSQL com os dados: ok"
 
 step "Segurança do canal: a chave do cliente não lê nem lista nada no servidor"
-if docker exec "$CLIENT_CT" bash -c "rsync -e 'ssh -i /etc/pulse-backup/id_ed25519 -p $SSH_PORT -o UserKnownHostsFile=/etc/pulse-backup/known_hosts -o BatchMode=yes' backup@host.docker.internal:./ /tmp/x/" >/dev/null 2>&1; then
+if docker exec "$CLIENT_CT" bash -c "rsync -e 'ssh -i /etc/h2node-backup/id_ed25519 -p $SSH_PORT -o UserKnownHostsFile=/etc/h2node-backup/known_hosts -o BatchMode=yes' backup@host.docker.internal:./ /tmp/x/" >/dev/null 2>&1; then
     fail "rsync de LEITURA deveria ser negado"
 fi
-if docker exec "$CLIENT_CT" bash -c "ssh -i /etc/pulse-backup/id_ed25519 -p $SSH_PORT -o UserKnownHostsFile=/etc/pulse-backup/known_hosts -o BatchMode=yes backup@host.docker.internal id" 2>/dev/null | grep -q uid; then
+if docker exec "$CLIENT_CT" bash -c "ssh -i /etc/h2node-backup/id_ed25519 -p $SSH_PORT -o UserKnownHostsFile=/etc/h2node-backup/known_hosts -o BatchMode=yes backup@host.docker.internal id" 2>/dev/null | grep -q uid; then
     fail "shell deveria ser negado"
 fi
 echo "leitura e shell negados: ok"

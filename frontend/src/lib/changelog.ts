@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.25";
+export const APP_VERSION = "0.9.26";
 
 export interface ChangelogEntry {
   version: string;
@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.26",
+    date: "2026-11-19",
+    changes: [
+      "O Pulse Backup agora se chama H2NODE Backup: nome, logotipo animado e ícones novos no painel, no agente e no cliente Windows. Nada a refazer para continuar recebendo backups: o servidor segue aceitando os agentes e clientes Windows antigos.",
+      "Agente 1.5.0: instala em /usr/local/sbin/h2node-backup-agent e usa /etc/h2node-backup. Ao atualizar (install.sh ou na primeira execução), a pasta /etc/pulse-backup é migrada com a chave SSH e o agent.conf, o agendamento do crontab mantém o horário e os nomes antigos continuam funcionando como atalhos.",
+      "Cliente Windows 0.3.0: o instalador remove o Pulse Backup antigo e aproveita a configuração, o token e o histórico.",
+      "Zabbix: o template passa a ser \"H2NODE Backup by HTTP\", com macros {$H2NODE.*} e chaves h2node.backup.*. Importe o template novo (atualiza o atual, mantendo o histórico) e renomeie as macros {$PULSE.URL} e {$PULSE.TOKEN} do host para {$H2NODE.URL} e {$H2NODE.TOKEN}.",
+      "Downloads: enviar um instalador do Windows mais antigo que o compilado pelo servidor não dá mais erro (o arquivo é guardado e fica escondido da lista, como antes).",
+    ],
+  },
   {
     version: "0.9.25",
     date: "2026-11-10",
@@ -21,14 +32,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     changes: [
       "Worker: o sinal de vida passa a ser gravado a cada 30 s também no meio de tarefas longas. Antes, verificar um backup grande (ex.: o do WHM, centenas de GB) deixava o sinal parado por horas, e o Zabbix acusava \"worker parado\" com o worker trabalhando.",
       "O worker registra o que está fazendo (ex.: \"verificando whm-cpanel/…\") e desde quando: aparece no Painel e no monitoramento.",
-      "Zabbix: novos itens da tarefa atual e o alerta \"worker na mesma tarefa há mais de {$PULSE.WORKER.BUSY.MAX}\" (12h), para distinguir worker morto de worker preso. Baixe e importe o template de novo.",
+      "Zabbix: novos itens da tarefa atual e o alerta \"worker na mesma tarefa há mais de {$H2NODE.WORKER.BUSY.MAX}\" (12h), para distinguir worker morto de worker preso. Baixe e importe o template de novo.",
     ],
   },
   {
     version: "0.9.23",
     date: "2026-10-23",
     changes: [
-      "Agente 1.4.2: o \"pulse-backup-agent test\" mostra o caminho de fato procurado (com @today/@yesterday/@latest trocados pela data) e as pastas datadas que existem, em vez de só o padrão.",
+      "Agente 1.4.2: o \"h2node-backup-agent test\" mostra o caminho de fato procurado (com @today/@yesterday/@latest trocados pela data) e as pastas datadas que existem, em vez de só o padrão.",
       "Ajuda cPanel/WHM: quando o WHM pula dias, use @latest nas duas listas.",
     ],
   },
@@ -45,7 +56,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "0.9.21",
     date: "2026-10-23",
     changes: [
-      "Zabbix: o template pulse_backup_zabbix7.yaml deixa de ser recusado na importação com \"UUIDv4 is expected\". Baixe de novo em Configuração → Zabbix.",
+      "Zabbix: o template h2node_backup_zabbix7.yaml deixa de ser recusado na importação com \"UUIDv4 is expected\". Baixe de novo em Configuração → Zabbix.",
     ],
   },
   {
@@ -53,7 +64,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-10-23",
     changes: [
       "Integração com Zabbix (Configuração → Zabbix): o Zabbix consulta o painel por HTTPS com um token só de leitura e alerta backup com falha, atrasado, sem verificação ou nunca recebido, worker parado, disco cheio e o próprio painel fora do ar.",
-      "Template pronto para Zabbix 7.0 (pulse_backup_zabbix7.yaml) com descoberta automática de servidores e equipamentos, para baixar na mesma página, que mostra quando e de qual IP o Zabbix consultou pela última vez.",
+      "Template pronto para Zabbix 7.0 (h2node_backup_zabbix7.yaml) com descoberta automática de servidores e equipamentos, para baixar na mesma página, que mostra quando e de qual IP o Zabbix consultou pela última vez.",
     ],
   },
   {
@@ -219,7 +230,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-10-18",
     changes: [
       "Cliente Windows 0.2.0: o backup roda num serviço do Windows (conta do sistema, mesmo sem ninguém logado) e lê os arquivos de uma cópia de sombra (VSS) — Outlook .pst, planilhas e bancos abertos entram. A cópia é apagada no fim; sem VSS (pendrive, rede ou falha) lê ao vivo e marca aviso.",
-      "Cliente Windows: instalador (PulseBackup-Setup-<versão>.exe, NSIS) que registra e inicia o serviço, abre o ícone da bandeja no login de todos os usuários e cria os atalhos; desinstalador incluso. Mudar a configuração exige administrador (UAC); ver o estado e fazer backup agora, não.",
+      "Cliente Windows: instalador (H2nodeBackup-Setup-<versão>.exe, NSIS) que registra e inicia o serviço, abre o ícone da bandeja no login de todos os usuários e cria os atalhos; desinstalador incluso. Mudar a configuração exige administrador (UAC); ver o estado e fazer backup agora, não.",
       "Ajuda → Windows atualizada (instalador, serviço, VSS, unidades de rede).",
     ],
   },
@@ -261,7 +272,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "0.7.0",
     date: "2026-10-18",
     changes: [
-      "Novo menu MikroTik: o Pulse Backup entra por SSH em cada MikroTik, roda /export show-sensitive (RouterOS 7; /export no 6), cifra em memória e guarda cada versão — sem nada em claro no disco. Versões em que só a data do cabeçalho mudou aparecem como idênticas à anterior.",
+      "Novo menu MikroTik: o H2NODE Backup entra por SSH em cada MikroTik, roda /export show-sensitive (RouterOS 7; /export no 6), cifra em memória e guarda cada versão — sem nada em claro no disco. Versões em que só a data do cabeçalho mudou aparecem como idênticas à anterior.",
       "MikroTik → Usuário de acesso: credenciais (usuário, senha cifrada no servidor, porta) e os comandos RouterOS para criar o usuário somente leitura (grupo ssh,read,sensitive, preso ao IP do servidor).",
       "MikroTik → Hosts: cadastro individual ou importação de lista (IP[:porta] [nome] por linha), intervalo de coleta, \"Coletar agora\", erro da última coleta e chave SSH fixada na primeira coleta (se mudar, a coleta para até alguém aceitar a nova chave).",
       "Novo serviço puller no docker-compose (rede própria com saída; só a chave pública). Ajuda → MikroTik (RouterOS): criação do backup e restauração.",
@@ -272,7 +283,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-10-16",
     changes: [
       "Documentação e Ajuda atualizadas: servidor Linux (atalho do agente em /usr/bin, horário do cron, BACKUP_FILES), baixar e decifrar (Contas cPanel e busca), README, segurança e guias de equipamentos (Fiberhome/UNM2000).",
-      "Instalador do agente cria o atalho /usr/bin/pulse-backup-agent (o PATH do root/sudo nem sempre inclui /usr/local/sbin).",
+      "Instalador do agente cria o atalho /usr/bin/h2node-backup-agent (o PATH do root/sudo nem sempre inclui /usr/local/sbin).",
     ],
   },
   {

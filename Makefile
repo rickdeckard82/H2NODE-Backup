@@ -53,22 +53,22 @@ seed: ## Cria o primeiro admin (se não houver usuários)
 	$(COMPOSE) exec backend python -m app.seed
 
 test-backend: ## Suíte pytest + ruff do backend (imagem própria, sem tocar na stack)
-	docker build --build-arg INSTALL_DEV=true -t pulse-backup-backend-test ./backend
-	docker run --rm pulse-backup-backend-test sh -c 'ruff check app tests && pytest -q'
+	docker build --build-arg INSTALL_DEV=true -t h2node-backup-backend-test ./backend
+	docker run --rm h2node-backup-backend-test sh -c 'ruff check app tests && pytest -q'
 
 test-e2e: ## Teste ponta a ponta: stack isolada + agente real (MariaDB e PostgreSQL)
 	./scripts/e2e-test.sh
 
-windows-client: ## Gera windows-client/build/bin/PulseBackup.exe (requer Go, Node e o CLI do Wails v2)
+windows-client: ## Gera windows-client/build/bin/H2nodeBackup.exe (requer Go, Node e o CLI do Wails v2)
 	cd windows-client && wails build -clean -trimpath -platform windows/amd64
 
-windows-installer: windows-client ## Gera windows-client/build/bin/PulseBackup-Setup-<versão>.exe (requer também o NSIS: makensis)
+windows-installer: windows-client ## Gera windows-client/build/bin/H2nodeBackup-Setup-<versão>.exe (requer também o NSIS: makensis)
 	test -f windows-client/build/MicrosoftEdgeWebview2Setup.exe || curl -fsSL -o windows-client/build/MicrosoftEdgeWebview2Setup.exe "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
-	cd windows-client && makensis -V2 -DVERSION=$$(grep -oP 'Version = "\K[0-9.]+' main.go) -DWEBVIEW2_BOOTSTRAPPER=$(CURDIR)/windows-client/build/MicrosoftEdgeWebview2Setup.exe installer/pulse-backup.nsi
+	cd windows-client && makensis -V2 -DVERSION=$$(grep -oP 'Version = "\K[0-9.]+' main.go) -DWEBVIEW2_BOOTSTRAPPER=$(CURDIR)/windows-client/build/MicrosoftEdgeWebview2Setup.exe installer/h2node-backup.nsi
 
 test-windows-client: ## Testes do cliente Windows (Go) + tsc/eslint da interface
 	cd windows-client && go vet ./internal/... . && go test ./...
 	cd windows-client/frontend && npm ci && npx tsc --noEmit && npx eslint . --max-warnings 0
 
 lint-agent: ## shellcheck do agente
-	docker run --rm -v $$PWD/agent:/mnt koalaman/shellcheck:stable -S warning /mnt/pulse-backup-agent.sh /mnt/install.sh
+	docker run --rm -v $$PWD/agent:/mnt koalaman/shellcheck:stable -S warning /mnt/h2node-backup-agent.sh /mnt/install.sh

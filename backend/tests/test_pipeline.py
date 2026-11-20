@@ -94,7 +94,7 @@ def upload(slug: str, run: str, parts: list[tuple[str, str, str, bytes]], pubkey
         comps.append({"kind": kind, "name": name, "file": fname, "size": len(enc),
                       "sha256": _sha(enc), "plain_size": len(plain), "plain_sha256": _sha(plain),
                       "status": "ok", "duration_s": 1})
-    m = {"format": "pulse-backup/1", "client_id": slug, "run_name": run, "agent_version": "1.0.0",
+    m = {"format": "h2node-backup/1", "client_id": slug, "run_name": run, "agent_version": "1.0.0",
          "hostname": f"{slug}.local", "os": "Debian 12", "started_at": "2026-10-01T02:30:00Z",
          "finished_at": "2026-10-01T02:31:00Z", "status": status, "components": comps, "errors": []}
     if extra:
@@ -138,6 +138,28 @@ def test_ingest_and_deep_verify_ok(db, web01, keyring, keys, tmp_path):
     assert b.verify_mode == "full"
     files_comp = b.components[0]
     assert files_comp.item_count == 2
+
+
+def test_legacy_pulse_manifest_still_accepted(db, web01, keyring, keys, tmp_path):
+    """Agentes anteriores ao rebranding (Pulse Backup) mandam format "pulse-backup/1"."""
+    upload("web01", "run-legacy", [("mysql", "app", "01-mysql-app.sql.gz.gpg", GOOD_SQL)],
+           keys["server"][0], tmp_path, extra={"format": "pulse-backup/1"})
+    assert ingest.scan(db) == 1
+    b = db.query(Backup).one()
+    assert b.status == BackupStatus.ok
+    verify.verify_backup(db, b, keyring)
+    assert b.verify_status == VerifyStatus.ok, b.verify_message
+
+
+def test_legacy_agent_test_dir_is_cleaned(db, web01):
+    """O `test` dos agentes antigos deixa ".pulse-test" na pasta: some sem virar backup."""
+    for name in (".pulse-test", ".h2node-test"):
+        d = Path(settings.storage_path) / "incoming" / "web01" / name
+        d.mkdir(parents=True)
+        (d / "x").write_text("x")
+    assert ingest.scan(db) == 0
+    assert not (Path(settings.storage_path) / "incoming" / "web01" / ".pulse-test").exists()
+    assert not (Path(settings.storage_path) / "incoming" / "web01" / ".h2node-test").exists()
 
 
 def test_truncated_dump_is_detected(db, web01, keyring, keys, tmp_path):
@@ -208,7 +230,7 @@ def test_path_traversal_in_manifest_rejected(db, web01, keys, tmp_path):
     d = Path(settings.storage_path) / "incoming" / "web01" / "run-evil"
     d.mkdir(parents=True)
     (d / "manifest.json").write_text(json.dumps({
-        "format": "pulse-backup/1", "client_id": "web01", "run_name": "run-evil", "status": "success",
+        "format": "h2node-backup/1", "client_id": "web01", "run_name": "run-evil", "status": "success",
         "components": [{"kind": "files", "name": "/", "file": "../../../etc/passwd.gpg", "status": "ok"}],
     }))
     ingest.scan(db)

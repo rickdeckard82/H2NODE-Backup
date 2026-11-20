@@ -1,17 +1,17 @@
 # Integração com Zabbix
 
-O Zabbix **consulta** o Pulse Backup (pull) e alerta quando um backup falha, atrasa ou não passa
+O Zabbix **consulta** o H2NODE Backup (pull) e alerta quando um backup falha, atrasa ou não passa
 na verificação, quando o worker para, quando o disco enche, e quando o próprio painel deixa de responder.
 
 ## Por que pull
 
-- **Detecta o painel fora do ar.** Se o Pulse Backup cair, um alerta enviado *por ele* nunca sai;
+- **Detecta o painel fora do ar.** Se o H2NODE Backup cair, um alerta enviado *por ele* nunca sai;
   aqui o Zabbix percebe a falta de resposta (`nodata`).
 - **Uma fonte de verdade.** A saúde vem da mesma função do painel (`services/health.py`): o que
   aparece vermelho no painel é o que alerta no Zabbix.
 - **Descoberta automática (LLD).** Servidor ou equipamento cadastrado aparece sozinho no Zabbix;
   desativado ou excluído, some.
-- **Sem segredo do Zabbix no Pulse Backup** e sem porta nova: é HTTPS no mesmo endereço do painel.
+- **Sem segredo do Zabbix no H2NODE Backup** e sem porta nova: é HTTPS no mesmo endereço do painel.
 
 ## Endpoint
 
@@ -58,12 +58,12 @@ Clientes inativos não aparecem.
 
 ## Template
 
-`frontend/public/zabbix/pulse_backup_zabbix7.yaml` (baixável na página **Configuração → Zabbix**),
-Zabbix **7.0+**, nome **Pulse Backup by HTTP**:
+`frontend/public/zabbix/h2node_backup_zabbix7.yaml` (baixável na página **Configuração → Zabbix**),
+Zabbix **7.0+**, nome **H2NODE Backup by HTTP**:
 
-- 1 item HTTP agent (`pulse.backup.get`, a cada `{$PULSE.INTERVAL}`) e todo o resto como itens
+- 1 item HTTP agent (`h2node.backup.get`, a cada `{$H2NODE.INTERVAL}`) e todo o resto como itens
   dependentes — uma única requisição por ciclo, qualquer que seja o número de clientes;
-- descoberta `pulse.backup.clients.discovery` com saúde, idade do último backup, verificação,
+- descoberta `h2node.backup.clients.discovery` com saúde, idade do último backup, verificação,
   tamanho e erro por cliente;
 - gatilhos:
 
@@ -74,11 +74,11 @@ Zabbix **7.0+**, nome **Pulse Backup by HTTP**:
 | `{#NAME}: verificação do último backup falhou` | Alta |
 | `{#NAME}: nenhum backup recebido ainda` | Atenção |
 | `{#NAME}: último backup com avisos` | Atenção |
-| Worker parado (sem sinal há `{$PULSE.WORKER.MAX.AGE}` s) | Alta |
-| Worker na mesma tarefa há mais de `{$PULSE.WORKER.BUSY.MAX}` | Atenção |
-| Disco acima de `{$PULSE.DISK.PUSED.WARN}` / `{$PULSE.DISK.PUSED.HIGH}` % | Atenção / Alta |
+| Worker parado (sem sinal há `{$H2NODE.WORKER.MAX.AGE}` s) | Alta |
+| Worker na mesma tarefa há mais de `{$H2NODE.WORKER.BUSY.MAX}` | Atenção |
+| Disco acima de `{$H2NODE.DISK.PUSED.WARN}` / `{$H2NODE.DISK.PUSED.HIGH}` % | Atenção / Alta |
 | Verificação profunda desativada | Atenção |
-| Sem resposta da API há `{$PULSE.NODATA}` | Alta |
+| Sem resposta da API há `{$H2NODE.NODATA}` | Alta |
 
 Os alertas de cliente se resolvem sozinhos quando o próximo backup chega bem.
 
@@ -86,23 +86,23 @@ Os alertas de cliente se resolvem sozinhos quando o próximo backup chega bem.
 
 | Macro | Padrão | |
 |---|---|---|
-| `{$PULSE.URL}` | `https://backup.example.com` | endereço do painel, sem barra no fim |
-| `{$PULSE.TOKEN}` | — | token do painel (tipo **texto secreto**) |
-| `{$PULSE.INTERVAL}` | `2m` | intervalo da consulta |
-| `{$PULSE.NODATA}` | `15m` | sem resposta por este tempo = alerta |
-| `{$PULSE.WORKER.MAX.AGE}` | `300` | segundos sem sinal do worker (o sinal vem a cada 30 s) |
-| `{$PULSE.WORKER.BUSY.MAX}` | `12h` | tempo máximo na mesma tarefa |
-| `{$PULSE.DISK.PUSED.WARN}` / `.HIGH` | `85` / `95` | uso do disco dos backups (%) |
-| `{$PULSE.WARNING.ALERT}` | `1` | `0` = não alerta backups com avisos |
-| `{$PULSE.CLIENT.ALERT:"<slug>"}` | `1` | `0` silencia um cliente (macro de contexto) |
+| `{$H2NODE.URL}` | `https://backup.example.com` | endereço do painel, sem barra no fim |
+| `{$H2NODE.TOKEN}` | — | token do painel (tipo **texto secreto**) |
+| `{$H2NODE.INTERVAL}` | `2m` | intervalo da consulta |
+| `{$H2NODE.NODATA}` | `15m` | sem resposta por este tempo = alerta |
+| `{$H2NODE.WORKER.MAX.AGE}` | `300` | segundos sem sinal do worker (o sinal vem a cada 30 s) |
+| `{$H2NODE.WORKER.BUSY.MAX}` | `12h` | tempo máximo na mesma tarefa |
+| `{$H2NODE.DISK.PUSED.WARN}` / `.HIGH` | `85` / `95` | uso do disco dos backups (%) |
+| `{$H2NODE.WARNING.ALERT}` | `1` | `0` = não alerta backups com avisos |
+| `{$H2NODE.CLIENT.ALERT:"<slug>"}` | `1` | `0` silencia um cliente (macro de contexto) |
 
 ## Passo a passo
 
 1. Painel → **Configuração → Zabbix** → **Gerar token** (copie; não aparece de novo). Em
    *Redes liberadas*, informe o IP do servidor ou proxy Zabbix.
-2. Zabbix → **Coleta de dados → Templates → Importar** → `pulse_backup_zabbix7.yaml`.
-3. **Coleta de dados → Hosts → Criar host**: `Pulse Backup`, sem interface, template
-   **Pulse Backup by HTTP**; em *Macros*, `{$PULSE.URL}` e `{$PULSE.TOKEN}`.
+2. Zabbix → **Coleta de dados → Templates → Importar** → `h2node_backup_zabbix7.yaml`.
+3. **Coleta de dados → Hosts → Criar host**: `H2NODE Backup`, sem interface, template
+   **H2NODE Backup by HTTP**; em *Macros*, `{$H2NODE.URL}` e `{$H2NODE.TOKEN}`.
 4. Em até 2 min os clientes aparecem em **Monitoramento → Dados recentes**, e a página do painel
    mostra "consultou há …". Teste manual:
 

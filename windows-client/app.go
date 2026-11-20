@@ -14,10 +14,10 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"pulse-backup/windows-client/internal/config"
-	"pulse-backup/windows-client/internal/engine"
-	"pulse-backup/windows-client/internal/ipc"
-	"pulse-backup/windows-client/internal/service"
+	"h2node-backup/windows-client/internal/config"
+	"h2node-backup/windows-client/internal/engine"
+	"h2node-backup/windows-client/internal/ipc"
+	"h2node-backup/windows-client/internal/service"
 )
 
 // UIState: o estado do serviço + o que só a interface sabe.

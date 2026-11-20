@@ -5,42 +5,42 @@ zabbix_export:
     name: Templates/Applications
   templates:
   - uuid: bd32186ee3d24cfa8cccf4c5f1592963
-    template: Pulse Backup by HTTP
-    name: Pulse Backup by HTTP
-    description: 'Monitora o Pulse Backup pela API (pull): saúde de cada servidor/equipamento (falha, atraso, verificação), worker e disco. Requer um token gerado em Configuração → Zabbix no painel.'
+    template: H2NODE Backup by HTTP
+    name: H2NODE Backup by HTTP
+    description: 'Monitora o H2NODE Backup pela API (pull): saúde de cada servidor/equipamento (falha, atraso, verificação), worker e disco. Requer um token gerado em Configuração → Zabbix no painel.'
     vendor:
-      name: Pulse Backup
-      version: 0.9.24
+      name: H2NODE Backup
+      version: 0.9.26
     groups:
     - name: Templates/Applications
     items:
     - uuid: 140e543f1efe43468970567bf6de096a
-      name: 'Pulse Backup: obter status'
+      name: 'H2NODE Backup: obter status'
       type: HTTP_AGENT
-      key: pulse.backup.get
-      delay: '{$PULSE.INTERVAL}'
+      key: h2node.backup.get
+      delay: '{$H2NODE.INTERVAL}'
       history: 1h
       value_type: TEXT
       trends: '0'
       description: JSON de GET /api/monitoring/status (token gerado em Configuração → Zabbix no painel). Os demais itens e a descoberta de clientes saem daqui.
       timeout: 15s
-      url: '{$PULSE.URL}/api/monitoring/status'
+      url: '{$H2NODE.URL}/api/monitoring/status'
       headers:
       - name: Authorization
-        value: Bearer {$PULSE.TOKEN}
+        value: Bearer {$H2NODE.TOKEN}
       tags:
       - tag: component
         value: raw
       triggers:
       - uuid: a62166106310437d99b2ac0b0bf23a48
-        expression: nodata(/Pulse Backup by HTTP/pulse.backup.get,{$PULSE.NODATA})=1
-        name: 'Pulse Backup: sem resposta da API há {$PULSE.NODATA}'
+        expression: nodata(/H2NODE Backup by HTTP/h2node.backup.get,{$H2NODE.NODATA})=1
+        name: 'H2NODE Backup: sem resposta da API há {$H2NODE.NODATA}'
         priority: HIGH
-        description: 'O Zabbix não consegue ler o status: painel fora do ar, token trocado/revogado, IP do Zabbix fora das redes liberadas ou URL errada. Veja o erro do item "Pulse Backup: obter status".'
+        description: 'O Zabbix não consegue ler o status: painel fora do ar, token trocado/revogado, IP do Zabbix fora das redes liberadas ou URL errada. Veja o erro do item "H2NODE Backup: obter status".'
     - uuid: d5f3b042441d4ae78423570febbb56d7
-      name: 'Pulse Backup: versão'
+      name: 'H2NODE Backup: versão'
       type: DEPENDENT
-      key: pulse.backup.version
+      key: h2node.backup.version
       delay: '0'
       history: 7d
       value_type: CHAR
@@ -53,14 +53,14 @@ zabbix_export:
         parameters:
         - 1d
       master_item:
-        key: pulse.backup.get
+        key: h2node.backup.get
       tags:
       - tag: component
         value: application
     - uuid: e74587f5bddb4ae2a3b3f78b3474ceb5
-      name: 'Pulse Backup: worker — último sinal'
+      name: 'H2NODE Backup: worker — último sinal'
       type: DEPENDENT
-      key: pulse.backup.worker.age
+      key: h2node.backup.worker.age
       delay: '0'
       history: 31d
       value_type: FLOAT
@@ -71,24 +71,24 @@ zabbix_export:
         parameters:
         - $.worker.last_seen_age
       master_item:
-        key: pulse.backup.get
+        key: h2node.backup.get
       tags:
       - tag: component
         value: worker
       triggers:
       - uuid: 90bdeced72f94ff6b717b9ded18a2e04
-        expression: last(/Pulse Backup by HTTP/pulse.backup.worker.age)>{$PULSE.WORKER.MAX.AGE} or last(/Pulse Backup by HTTP/pulse.backup.worker.age)<0
-        name: 'Pulse Backup: worker parado (sem sinal há mais de {$PULSE.WORKER.MAX.AGE}s)'
+        expression: last(/H2NODE Backup by HTTP/h2node.backup.worker.age)>{$H2NODE.WORKER.MAX.AGE} or last(/H2NODE Backup by HTTP/h2node.backup.worker.age)<0
+        name: 'H2NODE Backup: worker parado (sem sinal há mais de {$H2NODE.WORKER.MAX.AGE}s)'
         priority: HIGH
         opdata: 'Último sinal: {ITEM.LASTVALUE1}'
         description: 'O processo do worker não manda sinal (a thread de sinal grava a cada 30 s, mesmo no meio de tarefas longas): parado, morto ou sem banco. Nada novo entra. Veja: docker compose logs worker.'
         dependencies:
-        - name: 'Pulse Backup: sem resposta da API há {$PULSE.NODATA}'
-          expression: nodata(/Pulse Backup by HTTP/pulse.backup.get,{$PULSE.NODATA})=1
+        - name: 'H2NODE Backup: sem resposta da API há {$H2NODE.NODATA}'
+          expression: nodata(/H2NODE Backup by HTTP/h2node.backup.get,{$H2NODE.NODATA})=1
     - uuid: 21ac805c9db8444495c12a24091c8be5
-      name: 'Pulse Backup: worker — tarefa atual'
+      name: 'H2NODE Backup: worker — tarefa atual'
       type: DEPENDENT
-      key: pulse.backup.worker.busy_with
+      key: h2node.backup.worker.busy_with
       delay: '0'
       history: 7d
       value_type: CHAR
@@ -102,14 +102,14 @@ zabbix_export:
         parameters:
         - 1h
       master_item:
-        key: pulse.backup.get
+        key: h2node.backup.get
       tags:
       - tag: component
         value: worker
     - uuid: 24f08630e4d84393895783905be7ece7
-      name: 'Pulse Backup: worker — tempo na tarefa atual'
+      name: 'H2NODE Backup: worker — tempo na tarefa atual'
       type: DEPENDENT
-      key: pulse.backup.worker.busy_age
+      key: h2node.backup.worker.busy_age
       delay: '0'
       history: 31d
       value_type: FLOAT
@@ -120,48 +120,48 @@ zabbix_export:
         parameters:
         - $.worker.busy_age
       master_item:
-        key: pulse.backup.get
+        key: h2node.backup.get
       tags:
       - tag: component
         value: worker
       triggers:
       - uuid: 564cbbf79435413e8501d72b51b23592
-        expression: last(/Pulse Backup by HTTP/pulse.backup.worker.busy_age)>{$PULSE.WORKER.BUSY.MAX} and length(last(/Pulse Backup by HTTP/pulse.backup.worker.busy_with))>=0
-        name: 'Pulse Backup: worker na mesma tarefa há mais de {$PULSE.WORKER.BUSY.MAX}'
+        expression: last(/H2NODE Backup by HTTP/h2node.backup.worker.busy_age)>{$H2NODE.WORKER.BUSY.MAX} and length(last(/H2NODE Backup by HTTP/h2node.backup.worker.busy_with))>=0
+        name: 'H2NODE Backup: worker na mesma tarefa há mais de {$H2NODE.WORKER.BUSY.MAX}'
         priority: WARNING
         opdata: '{ITEM.LASTVALUE2} há {ITEM.LASTVALUE1}'
         description: O worker está vivo (manda sinal), mas preso na mesma tarefa. Verificar um backup de centenas de GB leva horas; muito além disso, veja docker compose logs worker.
         dependencies:
-        - name: 'Pulse Backup: sem resposta da API há {$PULSE.NODATA}'
-          expression: nodata(/Pulse Backup by HTTP/pulse.backup.get,{$PULSE.NODATA})=1
+        - name: 'H2NODE Backup: sem resposta da API há {$H2NODE.NODATA}'
+          expression: nodata(/H2NODE Backup by HTTP/h2node.backup.get,{$H2NODE.NODATA})=1
     - uuid: 0c9e6ef9f8e34d7f89f083e93a225d44
-      name: 'Pulse Backup: verificação profunda'
+      name: 'H2NODE Backup: verificação profunda'
       type: DEPENDENT
-      key: pulse.backup.worker.deep_verify
+      key: h2node.backup.worker.deep_verify
       delay: '0'
       history: 31d
       value_type: UNSIGNED
       valuemap:
-        name: Pulse Backup ativo
+        name: H2NODE Backup ativo
       preprocessing:
       - type: JSONPATH
         parameters:
         - $.worker.deep_verify
       master_item:
-        key: pulse.backup.get
+        key: h2node.backup.get
       tags:
       - tag: component
         value: worker
       triggers:
       - uuid: 243909e2286740bb9e50e0546790aca2
-        expression: last(/Pulse Backup by HTTP/pulse.backup.worker.deep_verify)=0
-        name: 'Pulse Backup: verificação profunda desativada'
+        expression: last(/H2NODE Backup by HTTP/h2node.backup.worker.deep_verify)=0
+        name: 'H2NODE Backup: verificação profunda desativada'
         priority: WARNING
         description: 'O worker está sem a chave privada GPG (secrets/private): os backups são conferidos só por hash, sem decifrar e testar o conteúdo.'
     - uuid: fd658f153f2a492b8ccbccca03d2ace6
-      name: 'Pulse Backup: disco — usado (%)'
+      name: 'H2NODE Backup: disco — usado (%)'
       type: DEPENDENT
-      key: pulse.backup.disk.pused
+      key: h2node.backup.disk.pused
       delay: '0'
       history: 31d
       value_type: FLOAT
@@ -171,28 +171,28 @@ zabbix_export:
         parameters:
         - $.disk.pused
       master_item:
-        key: pulse.backup.get
+        key: h2node.backup.get
       tags:
       - tag: component
         value: storage
       triggers:
       - uuid: 70bbfd5b0a994fcdbf00f213a593f80d
-        expression: min(/Pulse Backup by HTTP/pulse.backup.disk.pused,10m)>{$PULSE.DISK.PUSED.HIGH}
-        name: 'Pulse Backup: disco dos backups acima de {$PULSE.DISK.PUSED.HIGH}%'
+        expression: min(/H2NODE Backup by HTTP/h2node.backup.disk.pused,10m)>{$H2NODE.DISK.PUSED.HIGH}
+        name: 'H2NODE Backup: disco dos backups acima de {$H2NODE.DISK.PUSED.HIGH}%'
         priority: HIGH
         opdata: 'Usado: {ITEM.LASTVALUE1}'
       - uuid: fb538b8c49d245df958a20e795a88387
-        expression: min(/Pulse Backup by HTTP/pulse.backup.disk.pused,10m)>{$PULSE.DISK.PUSED.WARN}
-        name: 'Pulse Backup: disco dos backups acima de {$PULSE.DISK.PUSED.WARN}%'
+        expression: min(/H2NODE Backup by HTTP/h2node.backup.disk.pused,10m)>{$H2NODE.DISK.PUSED.WARN}
+        name: 'H2NODE Backup: disco dos backups acima de {$H2NODE.DISK.PUSED.WARN}%'
         priority: WARNING
         opdata: 'Usado: {ITEM.LASTVALUE1}'
         dependencies:
-        - name: 'Pulse Backup: disco dos backups acima de {$PULSE.DISK.PUSED.HIGH}%'
-          expression: min(/Pulse Backup by HTTP/pulse.backup.disk.pused,10m)>{$PULSE.DISK.PUSED.HIGH}
+        - name: 'H2NODE Backup: disco dos backups acima de {$H2NODE.DISK.PUSED.HIGH}%'
+          expression: min(/H2NODE Backup by HTTP/h2node.backup.disk.pused,10m)>{$H2NODE.DISK.PUSED.HIGH}
     - uuid: 53104280c4bc4a58a4fbb67eb8729451
-      name: 'Pulse Backup: disco — livre'
+      name: 'H2NODE Backup: disco — livre'
       type: DEPENDENT
-      key: pulse.backup.disk.free
+      key: h2node.backup.disk.free
       delay: '0'
       history: 31d
       value_type: UNSIGNED
@@ -202,14 +202,14 @@ zabbix_export:
         parameters:
         - $.disk.free
       master_item:
-        key: pulse.backup.get
+        key: h2node.backup.get
       tags:
       - tag: component
         value: storage
     - uuid: 66c62ff60c60482782d4ac9095c4e73d
-      name: 'Pulse Backup: disco — total'
+      name: 'H2NODE Backup: disco — total'
       type: DEPENDENT
-      key: pulse.backup.disk.total
+      key: h2node.backup.disk.total
       delay: '0'
       history: 7d
       value_type: UNSIGNED
@@ -222,14 +222,14 @@ zabbix_export:
         parameters:
         - 1d
       master_item:
-        key: pulse.backup.get
+        key: h2node.backup.get
       tags:
       - tag: component
         value: storage
     - uuid: 153af59fdcb9498191c9db286fd26e40
-      name: 'Pulse Backup: clientes ok'
+      name: 'H2NODE Backup: clientes ok'
       type: DEPENDENT
-      key: pulse.backup.summary[ok]
+      key: h2node.backup.summary[ok]
       delay: '0'
       history: 31d
       value_type: UNSIGNED
@@ -238,14 +238,14 @@ zabbix_export:
         parameters:
         - $.summary.ok
       master_item:
-        key: pulse.backup.get
+        key: h2node.backup.get
       tags:
       - tag: component
         value: summary
     - uuid: f61293d44bb44f3f8e820f3a09dac71f
-      name: 'Pulse Backup: clientes com avisos'
+      name: 'H2NODE Backup: clientes com avisos'
       type: DEPENDENT
-      key: pulse.backup.summary[warning]
+      key: h2node.backup.summary[warning]
       delay: '0'
       history: 31d
       value_type: UNSIGNED
@@ -254,14 +254,14 @@ zabbix_export:
         parameters:
         - $.summary.warning
       master_item:
-        key: pulse.backup.get
+        key: h2node.backup.get
       tags:
       - tag: component
         value: summary
     - uuid: 18e27ee4b6424c9c9323424d4fd1c562
-      name: 'Pulse Backup: clientes com falha'
+      name: 'H2NODE Backup: clientes com falha'
       type: DEPENDENT
-      key: pulse.backup.summary[failed]
+      key: h2node.backup.summary[failed]
       delay: '0'
       history: 31d
       value_type: UNSIGNED
@@ -270,14 +270,14 @@ zabbix_export:
         parameters:
         - $.summary.failed
       master_item:
-        key: pulse.backup.get
+        key: h2node.backup.get
       tags:
       - tag: component
         value: summary
     - uuid: f4e4918f14b746e197daae114ce2bcb8
-      name: 'Pulse Backup: clientes atrasados'
+      name: 'H2NODE Backup: clientes atrasados'
       type: DEPENDENT
-      key: pulse.backup.summary[overdue]
+      key: h2node.backup.summary[overdue]
       delay: '0'
       history: 31d
       value_type: UNSIGNED
@@ -286,14 +286,14 @@ zabbix_export:
         parameters:
         - $.summary.overdue
       master_item:
-        key: pulse.backup.get
+        key: h2node.backup.get
       tags:
       - tag: component
         value: summary
     - uuid: 831d6e39944a470ebd4d5046650da6e1
-      name: 'Pulse Backup: clientes sem nenhum backup'
+      name: 'H2NODE Backup: clientes sem nenhum backup'
       type: DEPENDENT
-      key: pulse.backup.summary[never]
+      key: h2node.backup.summary[never]
       delay: '0'
       history: 31d
       value_type: UNSIGNED
@@ -302,7 +302,7 @@ zabbix_export:
         parameters:
         - $.summary.never
       master_item:
-        key: pulse.backup.get
+        key: h2node.backup.get
       tags:
       - tag: component
         value: summary
@@ -310,26 +310,26 @@ zabbix_export:
     - uuid: e4ab27eb2c044e529972f7da2405f0a8
       name: Clientes de backup
       type: DEPENDENT
-      key: pulse.backup.clients.discovery
+      key: h2node.backup.clients.discovery
       delay: '0'
       description: Servidores e equipamentos ATIVOS do painel. Cliente desativado ou excluído some daqui.
       item_prototypes:
       - uuid: 574076bbdd154789908b8069cd4b80f8
         name: '{#NAME}: saúde do backup'
         type: DEPENDENT
-        key: pulse.backup.client.health[{#SLUG}]
+        key: h2node.backup.client.health[{#SLUG}]
         delay: '0'
         history: 90d
         value_type: UNSIGNED
         description: 0 ok · 1 com avisos · 2 falhou · 3 atrasado · 4 nunca recebeu (mesma saúde do painel).
         valuemap:
-          name: Pulse Backup saúde
+          name: H2NODE Backup saúde
         preprocessing:
         - type: JSONPATH
           parameters:
           - $.clients[?(@.slug=='{#SLUG}')].health_code.first()
         master_item:
-          key: pulse.backup.get
+          key: h2node.backup.get
         tags: &id001
         - tag: client
           value: '{#SLUG}'
@@ -337,32 +337,32 @@ zabbix_export:
           value: '{#KIND}'
         trigger_prototypes:
         - uuid: fe9de02490de4c99bf41d5ebf602dcbe
-          expression: last(/Pulse Backup by HTTP/pulse.backup.client.health[{#SLUG}])=2 and length(last(/Pulse Backup by HTTP/pulse.backup.client.error[{#SLUG}]))>=0 and {$PULSE.CLIENT.ALERT:"{#SLUG}"}=1
+          expression: last(/H2NODE Backup by HTTP/h2node.backup.client.health[{#SLUG}])=2 and length(last(/H2NODE Backup by HTTP/h2node.backup.client.error[{#SLUG}]))>=0 and {$H2NODE.CLIENT.ALERT:"{#SLUG}"}=1
           name: '{#NAME}: último backup falhou'
           priority: HIGH
           opdata: '{ITEM.LASTVALUE2}'
           description: A última execução de {#NAME} ({#SLUG}) falhou ou chegou corrompida. Veja Backups no painel.
         - uuid: aef38decff154cd1b7b903da054a5541
-          expression: last(/Pulse Backup by HTTP/pulse.backup.client.health[{#SLUG}])=3 and last(/Pulse Backup by HTTP/pulse.backup.client.age[{#SLUG}])>=0 and {$PULSE.CLIENT.ALERT:"{#SLUG}"}=1
+          expression: last(/H2NODE Backup by HTTP/h2node.backup.client.health[{#SLUG}])=3 and last(/H2NODE Backup by HTTP/h2node.backup.client.age[{#SLUG}])>=0 and {$H2NODE.CLIENT.ALERT:"{#SLUG}"}=1
           name: '{#NAME}: backup atrasado'
           priority: HIGH
           opdata: Último backup há {ITEM.LASTVALUE2}
           description: Nenhum backup de {#NAME} dentro do intervalo esperado + tolerância (OVERDUE_GRACE_MINUTES).
         - uuid: 728be52916c4405890545e7f810583ec
-          expression: last(/Pulse Backup by HTTP/pulse.backup.client.health[{#SLUG}])=4 and {$PULSE.CLIENT.ALERT:"{#SLUG}"}=1
+          expression: last(/H2NODE Backup by HTTP/h2node.backup.client.health[{#SLUG}])=4 and {$H2NODE.CLIENT.ALERT:"{#SLUG}"}=1
           name: '{#NAME}: nenhum backup recebido ainda'
           priority: WARNING
           description: Cliente ativo e cadastrado que ainda não enviou nenhum backup.
         - uuid: 6b3a2713ffe3415684b833dd46682e24
-          expression: last(/Pulse Backup by HTTP/pulse.backup.client.health[{#SLUG}])=1 and length(last(/Pulse Backup by HTTP/pulse.backup.client.error[{#SLUG}]))>=0 and {$PULSE.WARNING.ALERT}=1 and {$PULSE.CLIENT.ALERT:"{#SLUG}"}=1
+          expression: last(/H2NODE Backup by HTTP/h2node.backup.client.health[{#SLUG}])=1 and length(last(/H2NODE Backup by HTTP/h2node.backup.client.error[{#SLUG}]))>=0 and {$H2NODE.WARNING.ALERT}=1 and {$H2NODE.CLIENT.ALERT:"{#SLUG}"}=1
           name: '{#NAME}: último backup com avisos'
           priority: WARNING
           opdata: '{ITEM.LASTVALUE2}'
-          description: 'Concluído com avisos (ex.: arquivo mudou durante o tar). Para não alertar avisos, use {$PULSE.WARNING.ALERT}=0.'
+          description: 'Concluído com avisos (ex.: arquivo mudou durante o tar). Para não alertar avisos, use {$H2NODE.WARNING.ALERT}=0.'
       - uuid: cd63afe12ab5470b991b447ade6185fa
         name: '{#NAME}: último backup há'
         type: DEPENDENT
-        key: pulse.backup.client.age[{#SLUG}]
+        key: h2node.backup.client.age[{#SLUG}]
         delay: '0'
         history: 31d
         value_type: FLOAT
@@ -373,34 +373,34 @@ zabbix_export:
           parameters:
           - $.clients[?(@.slug=='{#SLUG}')].last_backup_age.first()
         master_item:
-          key: pulse.backup.get
+          key: h2node.backup.get
         tags: *id001
       - uuid: 873f293796804d12b6981fe02500de00
         name: '{#NAME}: verificação do último backup'
         type: DEPENDENT
-        key: pulse.backup.client.verify[{#SLUG}]
+        key: h2node.backup.client.verify[{#SLUG}]
         delay: '0'
         history: 31d
         value_type: UNSIGNED
         valuemap:
-          name: Pulse Backup verificação
+          name: H2NODE Backup verificação
         preprocessing:
         - type: JSONPATH
           parameters:
           - $.clients[?(@.slug=='{#SLUG}')].verify_code.first()
         master_item:
-          key: pulse.backup.get
+          key: h2node.backup.get
         tags: *id001
         trigger_prototypes:
         - uuid: 06e72788764441ba993a124e4830f7e0
-          expression: last(/Pulse Backup by HTTP/pulse.backup.client.verify[{#SLUG}])=2 and {$PULSE.CLIENT.ALERT:"{#SLUG}"}=1
+          expression: last(/H2NODE Backup by HTTP/h2node.backup.client.verify[{#SLUG}])=2 and {$H2NODE.CLIENT.ALERT:"{#SLUG}"}=1
           name: '{#NAME}: verificação do último backup falhou'
           priority: HIGH
           description: O worker não conseguiu confirmar o conteúdo do último backup de {#NAME} (hash, decifragem ou teste do dump).
       - uuid: f9a543e7ffa84ba6b47bdac73d961e54
         name: '{#NAME}: tamanho do último backup'
         type: DEPENDENT
-        key: pulse.backup.client.size[{#SLUG}]
+        key: h2node.backup.client.size[{#SLUG}]
         delay: '0'
         history: 31d
         value_type: UNSIGNED
@@ -410,12 +410,12 @@ zabbix_export:
           parameters:
           - $.clients[?(@.slug=='{#SLUG}')].last_size.first()
         master_item:
-          key: pulse.backup.get
+          key: h2node.backup.get
         tags: *id001
       - uuid: 5e49b2abc1e94746aef26cc972f7e689
         name: '{#NAME}: erro do último backup'
         type: DEPENDENT
-        key: pulse.backup.client.error[{#SLUG}]
+        key: h2node.backup.client.error[{#SLUG}]
         delay: '0'
         history: 31d
         value_type: TEXT
@@ -428,10 +428,10 @@ zabbix_export:
           parameters:
           - 1d
         master_item:
-          key: pulse.backup.get
+          key: h2node.backup.get
         tags: *id001
       master_item:
-        key: pulse.backup.get
+        key: h2node.backup.get
       lld_macro_paths:
       - lld_macro: '{#SLUG}'
         path: $.slug
@@ -449,42 +449,42 @@ zabbix_export:
     - tag: class
       value: software
     - tag: target
-      value: pulse-backup
+      value: h2node-backup
     macros:
-    - macro: '{$PULSE.URL}'
+    - macro: '{$H2NODE.URL}'
       value: https://backup.example.com
       description: Endereço do painel, sem barra no fim.
-    - macro: '{$PULSE.TOKEN}'
+    - macro: '{$H2NODE.TOKEN}'
       value: ''
       description: Token gerado em Configuração → Zabbix no painel.
       type: SECRET_TEXT
-    - macro: '{$PULSE.INTERVAL}'
+    - macro: '{$H2NODE.INTERVAL}'
       value: 2m
       description: Intervalo da consulta ao painel.
-    - macro: '{$PULSE.NODATA}'
+    - macro: '{$H2NODE.NODATA}'
       value: 15m
       description: Sem resposta da API por este tempo = alerta.
-    - macro: '{$PULSE.WORKER.MAX.AGE}'
+    - macro: '{$H2NODE.WORKER.MAX.AGE}'
       value: '300'
       description: Segundos sem sinal do worker para alertar (o sinal vem a cada 30 s).
-    - macro: '{$PULSE.WORKER.BUSY.MAX}'
+    - macro: '{$H2NODE.WORKER.BUSY.MAX}'
       value: 12h
       description: 'Tempo máximo na mesma tarefa (ex.: verificar um backup grande).'
-    - macro: '{$PULSE.DISK.PUSED.WARN}'
+    - macro: '{$H2NODE.DISK.PUSED.WARN}'
       value: '85'
       description: Uso do disco dos backups (%) para aviso.
-    - macro: '{$PULSE.DISK.PUSED.HIGH}'
+    - macro: '{$H2NODE.DISK.PUSED.HIGH}'
       value: '95'
       description: Uso do disco dos backups (%) para alerta alto.
-    - macro: '{$PULSE.WARNING.ALERT}'
+    - macro: '{$H2NODE.WARNING.ALERT}'
       value: '1'
       description: 1 = alerta backups concluídos com avisos; 0 = não.
-    - macro: '{$PULSE.CLIENT.ALERT}'
+    - macro: '{$H2NODE.CLIENT.ALERT}'
       value: '1'
-      description: 'Por cliente: {$PULSE.CLIENT.ALERT:"slug"}=0 silencia os alertas dele.'
+      description: 'Por cliente: {$H2NODE.CLIENT.ALERT:"slug"}=0 silencia os alertas dele.'
     valuemaps:
     - uuid: 4fed1289f5c74ac0a4338047475cb0fc
-      name: Pulse Backup saúde
+      name: H2NODE Backup saúde
       mappings:
       - value: '0'
         newvalue: ok
@@ -497,7 +497,7 @@ zabbix_export:
       - value: '4'
         newvalue: nunca recebeu
     - uuid: 58f166cb1a2245a4bc1e38272c49a78e
-      name: Pulse Backup verificação
+      name: H2NODE Backup verificação
       mappings:
       - value: '0'
         newvalue: ok
@@ -508,7 +508,7 @@ zabbix_export:
       - value: '3'
         newvalue: sem verificação
     - uuid: ea65214c5b0343fdbc69520efcf5132e
-      name: Pulse Backup ativo
+      name: H2NODE Backup ativo
       mappings:
       - value: '0'
         newvalue: desativada

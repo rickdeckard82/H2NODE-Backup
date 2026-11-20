@@ -16,7 +16,7 @@ export default function JuniperHelpPage() {
     <div className="space-y-4">
       <PageHeader
         title="Juniper (Junos): backup e restauração"
-        subtitle="O Junos envia um .conf.gz por FTP a cada commit; o Pulse Backup valida, cifra e guarda cada versão."
+        subtitle="O Junos envia um .conf.gz por FTP a cada commit; o H2NODE Backup valida, cifra e guarda cada versão."
       />
 
       <Card className="space-y-5 p-5">

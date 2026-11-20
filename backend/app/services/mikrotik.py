@@ -1,6 +1,6 @@
 """Coleta da configuração de MikroTik (RouterOS) por SSH — roda no serviço `puller`.
 
-Diferente dos outros equipamentos (que ENVIAM por FTP/TFTP), aqui o Pulse Backup
+Diferente dos outros equipamentos (que ENVIAM por FTP/TFTP), aqui o H2NODE Backup
 busca: conecta com o usuário de uma credencial (Configuração → MikroTik), roda
 `/export show-sensitive` (RouterOS 7; no 6 cai para `/export`, que já inclui tudo),
 valida, CIFRA em memória com a chave pública e grava em store/<equipamento>/.
@@ -194,7 +194,7 @@ def _record_failure(db: Session, c: Client, message: str, now: datetime) -> None
         status=BackupStatus.failed, agent_status="failed", started_at=now, finished_at=now,
         received_at=now, storage_path=None, agent_version=AGENT_VERSION,
         error_message=f"coleta SSH de {c.mgmt_ip}: {message}"[:2000],
-        manifest={"format": "pulse-backup/net-1", "protocol": "ssh", "source_ip": c.mgmt_ip,
+        manifest={"format": "h2node-backup/net-1", "protocol": "ssh", "source_ip": c.mgmt_ip,
                   "status": "failed", "errors": [message]},
         verify_status=VerifyStatus.skipped,
     ))

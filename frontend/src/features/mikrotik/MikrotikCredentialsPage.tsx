@@ -18,7 +18,7 @@ interface FormState {
   description: string;
 }
 
-const empty: FormState = { name: "", username: "pulse-backup", password: "", port: 22, description: "" };
+const empty: FormState = { name: "", username: "h2node-backup", password: "", port: 22, description: "" };
 
 /** Comandos para criar o usuário no RouterOS (com a senha só logo depois de salvá-la). */
 function CommandsModal({
@@ -38,7 +38,7 @@ function CommandsModal({
         <div className="space-y-4 text-sm">
           <p className="text-slate-500 dark:text-slate-400">
             Cole no terminal de <b>cada</b> MikroTik que vai usar esta credencial (Winbox → New Terminal ou SSH como
-            admin). O grupo <span className="font-mono">pulse-backup</span> só tem login SSH, leitura e acesso aos dados
+            admin). O grupo <span className="font-mono">h2node-backup</span> só tem login SSH, leitura e acesso aos dados
             sensíveis — o usuário não consegue alterar nada.
           </p>
           <CopyBlock label="Comandos" text={routerosUserCommands(cred.username, password, address)} />
@@ -46,7 +46,7 @@ function CommandsModal({
             {!password && <li>Troque &lt;SENHA&gt; pela senha desta credencial (o painel não a mostra depois de salva).</li>}
             {address.startsWith("<") && (
               <li>
-                Troque &lt;IP-DO-SERVIDOR&gt; pelo IP com que o servidor do Pulse Backup chega ao MikroTik — o usuário só
+                Troque &lt;IP-DO-SERVIDOR&gt; pelo IP com que o servidor do H2NODE Backup chega ao MikroTik — o usuário só
                 consegue entrar a partir dele.
               </li>
             )}
@@ -119,7 +119,7 @@ export default function MikrotikCredentialsPage() {
     <div>
       <PageHeader
         title="MikroTik — usuário de acesso"
-        subtitle="Usuário e senha com que o Pulse Backup entra por SSH nos MikroTik para exportar a configuração"
+        subtitle="Usuário e senha com que o H2NODE Backup entra por SSH nos MikroTik para exportar a configuração"
         actions={isAdmin && <Button onClick={() => setForm({ ...empty })}>Nova credencial</Button>}
       />
 

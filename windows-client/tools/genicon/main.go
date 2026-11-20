@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"pulse-backup/windows-client/internal/icon"
+	"h2node-backup/windows-client/internal/icon"
 )
 
 func main() {

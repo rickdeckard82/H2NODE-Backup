@@ -22,13 +22,13 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 
-	"pulse-backup/windows-client/internal/config"
-	"pulse-backup/windows-client/internal/engine"
-	"pulse-backup/windows-client/internal/ipc"
+	"h2node-backup/windows-client/internal/config"
+	"h2node-backup/windows-client/internal/engine"
+	"h2node-backup/windows-client/internal/ipc"
 )
 
-// servidor Pulse falso: /hello, /runs, pedaços e manifesto
-func fakePulse(t *testing.T) (*httptest.Server, *sync.Map) {
+// servidor H2NODE falso: /hello, /runs, pedaços e manifesto
+func fakeH2node(t *testing.T) (*httptest.Server, *sync.Map) {
 	e, err := openpgp.NewEntity("t", "", "t@x", &packet.Config{RSABits: 2048, Algorithm: packet.PubKeyAlgoRSA})
 	if err != nil {
 		t.Fatal(err)
@@ -121,7 +121,7 @@ func TestUserPipeStateAndNoConfigRoutes(t *testing.T) {
 }
 
 func TestConfigureAndBackupThroughPipes(t *testing.T) {
-	srv, files := fakePulse(t)
+	srv, files := fakeH2node(t)
 	defer srv.Close()
 	dir := t.TempDir()
 	core, err := New(dir, "test", "Windows")

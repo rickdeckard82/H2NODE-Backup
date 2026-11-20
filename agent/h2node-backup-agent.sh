@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# Pulse Backup — agente para servidores Linux
+# H2NODE Backup — agente para servidores Linux
 #
-# Faz backup das pastas e bancos configurados em /etc/pulse-backup/agent.conf,
+# Faz backup das pastas e bancos configurados em /etc/h2node-backup/agent.conf,
 # cifra cada parte com a chave pública GPG do servidor, envia por rsync/SSH e
 # apaga tudo localmente. Feito para rodar pelo crontab do root.
 #
-#   pulse-backup-agent init     cria /etc/pulse-backup, gera a chave SSH do agente
-#   pulse-backup-agent test     confere config, chave GPG, conexão e bancos
-#   pulse-backup-agent run      executa o backup (padrão, usado no crontab)
-#   pulse-backup-agent version
+#   h2node-backup-agent init     cria /etc/h2node-backup, gera a chave SSH do agente
+#   h2node-backup-agent test     confere config, chave GPG, conexão e bancos
+#   h2node-backup-agent run      executa o backup (padrão, usado no crontab)
+#   h2node-backup-agent version
 #
 # Segurança:
 #  - Nenhum dado em claro é gravado em disco: cada pasta/dump sai do tar/dump
@@ -32,16 +32,18 @@ umask 077
 # devolver variáveis). Funciona porque o script não tem controle de jobs.
 shopt -s lastpipe
 
-AGENT_VERSION="1.4.2"
-CONF_DIR="/etc/pulse-backup"
-CONF_FILE="${PULSE_BACKUP_CONF:-$CONF_DIR/agent.conf}"
-LOCK_FILE="/run/pulse-backup-agent.lock"
+AGENT_VERSION="1.5.0"
+CONF_DIR="/etc/h2node-backup"
+# PULSE_BACKUP_CONF: nome da variável antes do rebranding (Pulse Backup → H2NODE Backup).
+CONF_FILE="${H2NODE_BACKUP_CONF:-${PULSE_BACKUP_CONF:-$CONF_DIR/agent.conf}}"
+LEGACY_CONF_DIR="/etc/pulse-backup"
+LOCK_FILE="/run/h2node-backup-agent.lock"
 export LC_ALL=C
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/mssql-tools18/bin:/opt/mssql-tools/bin"
 
 # ---------------------------------------------------------------- utilidades --
 
-LOG_FILE="/var/log/pulse-backup.log"
+LOG_FILE="/var/log/h2node-backup.log"
 
 log() {
     local level="$1"; shift
@@ -50,12 +52,33 @@ log() {
     printf '%s\n' "$line" >> "$LOG_FILE" 2>/dev/null || true
     [ -t 2 ] && printf '%s\n' "$line" >&2
     if command -v logger >/dev/null 2>&1; then
-        logger -t pulse-backup -p "user.$( [ "$level" = ERROR ] && echo err || echo info )" -- "$*" 2>/dev/null || true
+        logger -t h2node-backup -p "user.$( [ "$level" = ERROR ] && echo err || echo info )" -- "$*" 2>/dev/null || true
     fi
     return 0
 }
 
 die() { log ERROR "$*"; echo "ERRO: $*" >&2; exit 1; }
+
+# Rebranding Pulse Backup → H2NODE Backup: servidor que ainda tem só a pasta antiga
+# passa a usar /etc/h2node-backup. A antiga vira um link para a nova, para não
+# quebrar nada que ainda cite o caminho antigo (agent.conf editado à mão, scripts).
+# Idempotente e silenciosa; sem root (ou sem a pasta antiga) não faz nada.
+migrate_legacy_conf() {
+    [ "$(id -u)" -eq 0 ] || return 0
+    [ -d "$LEGACY_CONF_DIR" ] && [ ! -L "$LEGACY_CONF_DIR" ] || return 0
+    [ -e "$CONF_DIR" ] && return 0
+    mv "$LEGACY_CONF_DIR" "$CONF_DIR" || return 0
+    ln -s "$CONF_DIR" "$LEGACY_CONF_DIR" 2>/dev/null || true
+    if [ -f "$CONF_DIR/agent.conf" ]; then
+        sed -i -e 's#/etc/pulse-backup/#/etc/h2node-backup/#g' \
+               -e 's#/var/log/pulse-backup\.log#/var/log/h2node-backup.log#g' \
+               -e 's#/var/tmp/pulse-backup\b#/var/tmp/h2node-backup#g' "$CONF_DIR/agent.conf" || true
+    fi
+    if [ -f /var/log/pulse-backup.log ] && [ ! -e "$LOG_FILE" ]; then
+        mv /var/log/pulse-backup.log "$LOG_FILE" 2>/dev/null || true
+    fi
+    log INFO "configuração migrada de $LEGACY_CONF_DIR para $CONF_DIR (rebranding H2NODE Backup)"
+}
 
 json_str() {
     # Escapa uma string para JSON (aspas, barra invertida e controles).
@@ -103,13 +126,13 @@ load_config() {
     CLIENT_ID=""; SERVER_HOST=""; SERVER_PORT="2222"; SERVER_USER="backup"
     SSH_KEY="$CONF_DIR/id_ed25519"; KNOWN_HOSTS="$CONF_DIR/known_hosts"
     GPG_PUBLIC_KEY="$CONF_DIR/backup-key.pub.asc"; GPG_FINGERPRINT=""
-    WORK_DIR="/var/tmp/pulse-backup"
+    WORK_DIR="/var/tmp/h2node-backup"
     BACKUP_PATHS=(); EXCLUDES=(); ONE_FILE_SYSTEM="no"; BACKUP_FILES=(); FILES_MIN_AGE_MINUTES="10"
     CPANEL_CHECK_ACCOUNTS="auto"
     MYSQL_ENABLED="no"; MYSQL_DATABASES=("all"); MYSQL_DEFAULTS_FILE=""; MYSQL_DUMP_OPTS=""
     POSTGRES_ENABLED="no"; POSTGRES_DATABASES=("all"); POSTGRES_OS_USER="postgres"; POSTGRES_GLOBALS="yes"
     MSSQL_ENABLED="no"; MSSQL_DATABASES=("all"); MSSQL_SERVER="localhost"; MSSQL_USER="sa"
-    MSSQL_PASSWORD_FILE="$CONF_DIR/mssql.pass"; MSSQL_BACKUP_DIR="/var/opt/mssql/data/pulse-backup"
+    MSSQL_PASSWORD_FILE="$CONF_DIR/mssql.pass"; MSSQL_BACKUP_DIR="/var/opt/mssql/data/h2node-backup"
     BWLIMIT=""; UPLOAD_RETRIES="3"
 
     # shellcheck source=/dev/null
@@ -130,7 +153,7 @@ GPG_HOME=""
 gpg_prepare() {
     command -v gpg >/dev/null 2>&1 || die "gpg não instalado (apt install gnupg / dnf install gnupg2)"
     [ -s "$GPG_PUBLIC_KEY" ] || die "chave pública GPG não encontrada: $GPG_PUBLIC_KEY"
-    GPG_HOME="$(mktemp -d /tmp/pulse-backup-gnupg.XXXXXX)" || die "mktemp falhou"
+    GPG_HOME="$(mktemp -d /tmp/h2node-backup-gnupg.XXXXXX)" || die "mktemp falhou"
     chmod 700 "$GPG_HOME"
     gpg --homedir "$GPG_HOME" --batch --quiet --import "$GPG_PUBLIC_KEY" 2>/dev/null \
         || die "falha ao importar $GPG_PUBLIC_KEY"
@@ -660,7 +683,7 @@ backup_mssql() {
         local prefix file t0 bak
         next_prefix; prefix="$PREFIX"
         file="$prefix-mssql-$(safe_name "$db").bak.gz.gpg"
-        bak="$MSSQL_BACKUP_DIR/pulse-$(safe_name "$db").bak"; t0=$SECONDS
+        bak="$MSSQL_BACKUP_DIR/h2node-$(safe_name "$db").bak"; t0=$SECONDS
         rm -f "$bak"
         if ! mssql_query "BACKUP DATABASE [$db] TO DISK = N'$bak' WITH COPY_ONLY, CHECKSUM, INIT, FORMAT" >"$err" 2>&1 \
            || ! mssql_query "RESTORE VERIFYONLY FROM DISK = N'$bak' WITH CHECKSUM" >>"$err" 2>&1; then
@@ -710,7 +733,7 @@ write_manifest() {
     host="$(hostname -f 2>/dev/null || hostname)"
     [ -r /etc/os-release ] && os_name="$(. /etc/os-release && printf '%s' "${PRETTY_NAME:-$NAME}")"
     {
-        printf '{"format":"pulse-backup/1"'
+        printf '{"format":"h2node-backup/1"'
         printf ',"client_id":%s' "$(json_str "$CLIENT_ID")"
         printf ',"run_name":%s' "$(json_str "$RUN_NAME")"
         printf ',"agent_version":%s' "$(json_str "$AGENT_VERSION")"
@@ -813,7 +836,7 @@ cmd_init() {
     require_root
     mkdir -p "$CONF_DIR" && chmod 700 "$CONF_DIR"
     if [ ! -f "$CONF_DIR/id_ed25519" ]; then
-        ssh-keygen -q -t ed25519 -N '' -C "pulse-backup@$(hostname)" -f "$CONF_DIR/id_ed25519" \
+        ssh-keygen -q -t ed25519 -N '' -C "h2node-backup@$(hostname)" -f "$CONF_DIR/id_ed25519" \
             || die "ssh-keygen falhou"
     fi
     touch "$CONF_DIR/known_hosts" && chmod 600 "$CONF_DIR/known_hosts"
@@ -847,7 +870,7 @@ cmd_test() {
     done
     gpg_prepare && echo "• Chave GPG: $GPG_RECIPIENT"
     trap cleanup EXIT
-    RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/pulse-backup-test.XXXXXX")"
+    RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/h2node-backup-test.XXXXXX")"
     if echo "teste" | gpg_encrypt_cmd --output "$RUN_DIR/t.gpg" && [ -s "$RUN_DIR/t.gpg" ]; then
         echo "• Cifra: ok"
     else
@@ -931,7 +954,7 @@ cmd_test() {
     fi
     # rrsync -wo não permite listar; um envio vazio testa autenticação + host key.
     mkdir -p "$RUN_DIR/empty"
-    if rsync -r -e "$(ssh_cmd)" "$RUN_DIR/empty/" "$SERVER_USER@$SERVER_HOST:.pulse-test/" 2>"$RUN_DIR/err"; then
+    if rsync -r -e "$(ssh_cmd)" "$RUN_DIR/empty/" "$SERVER_USER@$SERVER_HOST:.h2node-test/" 2>"$RUN_DIR/err"; then
         echo "• Conexão SSH/rsync com o servidor: ok"
     else
         echo "✗ Conexão SSH/rsync falhou: $(cat "$RUN_DIR/err")"; ok=0
@@ -940,10 +963,12 @@ cmd_test() {
     exit 1
 }
 
+migrate_legacy_conf
+
 case "${1:-run}" in
     run) cmd_run ;;
     init) cmd_init ;;
     test) cmd_test ;;
-    version|--version|-v) echo "pulse-backup-agent $AGENT_VERSION" ;;
+    version|--version|-v) echo "h2node-backup-agent $AGENT_VERSION" ;;
     *) echo "uso: $0 {init|test|run|version}" >&2; exit 2 ;;
 esac

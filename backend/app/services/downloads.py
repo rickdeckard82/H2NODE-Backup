@@ -27,7 +27,7 @@ from app.core.config import settings
 from app.core.logging import logger
 from app.services import gpg, storage
 
-AGENT_FILES = (("pulse-backup-agent.sh", 0o755), ("install.sh", 0o755), ("agent.conf.example", 0o644))
+AGENT_FILES = (("h2node-backup-agent.sh", 0o755), ("install.sh", 0o755), ("agent.conf.example", 0o644))
 KEY_NAME = "backup-key.pub.asc"
 # o que pode ser enviado: instaladores e pacotes (nada de .html/.js servidos pelo domínio do painel)
 UPLOAD_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(exe|msi|zip|tar\.gz|tgz)$")
@@ -75,7 +75,7 @@ def built_names() -> set[str]:
 
 def agent_version() -> str | None:
     try:
-        text = (agent_dir() / "pulse-backup-agent.sh").read_text(encoding="utf-8", errors="replace")
+        text = (agent_dir() / "h2node-backup-agent.sh").read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
     m = re.search(r'^AGENT_VERSION="([^"]+)"', text, re.MULTILINE)
@@ -86,7 +86,7 @@ _bundle_cache: dict[tuple, bytes] = {}
 
 
 def agent_bundle() -> tuple[str, bytes, datetime] | None:
-    """(nome, conteúdo, data) do pulse-backup-agent-<versão>.tar.gz, ou None sem agent/."""
+    """(nome, conteúdo, data) do h2node-backup-agent-<versão>.tar.gz, ou None sem agent/."""
     base = agent_dir()
     files = [(base / n, mode) for n, mode in AGENT_FILES]
     try:
@@ -98,7 +98,7 @@ def agent_bundle() -> tuple[str, bytes, datetime] | None:
     data = _bundle_cache.get(key)
     if data is None:
         raw = io.BytesIO()
-        top = f"pulse-backup-agent-{version}"
+        top = f"h2node-backup-agent-{version}"
         with tarfile.open(fileobj=raw, mode="w", format=tarfile.PAX_FORMAT) as tf:
             for (p, mode), st in zip(files, stats, strict=True):
                 info = tarfile.TarInfo(f"{top}/{p.name}")
@@ -110,7 +110,7 @@ def agent_bundle() -> tuple[str, bytes, datetime] | None:
         _bundle_cache.clear()
         _bundle_cache[key] = data
     when = datetime.fromtimestamp(max(s.st_mtime for s in stats), UTC).replace(tzinfo=None)
-    return f"pulse-backup-agent-{version}.tar.gz", data, when
+    return f"h2node-backup-agent-{version}.tar.gz", data, when
 
 
 _sha_cache: dict[tuple, str] = {}
@@ -156,6 +156,15 @@ def _latest_windows(items: list[Item]) -> list[Item]:
     return [i for i in items if i.platform != "windows" or i is best]
 
 
+def file_item(p: Path, source: str) -> Item:
+    """Item de um instalador/pacote no disco (OSError se ilegível)."""
+    title, platform = _uploaded_title(p.name)
+    m = _VERSION_RE.search(p.name)
+    st = p.stat()
+    return Item(p.name, title, platform, source, st.st_size, sha256_file(p),
+                datetime.fromtimestamp(st.st_mtime, UTC).replace(tzinfo=None), m.group(1) if m else None)
+
+
 def list_items() -> tuple[list[Item], list[str]]:
     """Itens disponíveis e os problemas encontrados (um arquivo ilegível não esconde os outros)."""
     items: list[Item] = []
@@ -182,17 +191,10 @@ def list_items() -> tuple[list[Item], list[str]]:
     seen = {p.name for p in built}
     files = [(p, "build") for p in built] + [(p, "uploaded") for p in uploaded if p.name not in seen]
     for p, source in files:
-        title, platform = _uploaded_title(p.name)
-        m = _VERSION_RE.search(p.name)
         try:
-            st = p.stat()
-            sha = sha256_file(p)
+            items.append(file_item(p, source))
         except OSError as e:
             _problem(problems, p.name, e)
-            continue
-        items.append(Item(p.name, title, platform, source, st.st_size, sha,
-                          datetime.fromtimestamp(st.st_mtime, UTC).replace(tzinfo=None),
-                          m.group(1) if m else None))
     items = _latest_windows(items)
     try:
         pub = gpg.public_key_info()
@@ -218,8 +220,9 @@ def open_item(name: str) -> tuple[bytes | Path, str] | None:
         for d in (build_dir(), uploads_dir()):
             p = storage.safe_child(d, name)
             if p.is_file() and not p.is_symlink():
-                exe = name.lower().endswith(".exe")
-                return p, "application/vnd.microsoft.portable-executable" if exe else "application/octet-stream"
+                if name.lower().endswith(".exe"):
+                    return p, "application/vnd.microsoft.portable-executable"
+                return p, "application/octet-stream"
     return None
 
 

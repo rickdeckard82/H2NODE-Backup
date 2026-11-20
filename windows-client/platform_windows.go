@@ -34,7 +34,7 @@ func runElevated(args ...string) error {
 
 // startTrayAsUser abre o ícone da bandeja como o usuário logado, SEM elevação, mesmo
 // chamado de um processo elevado: quem abre o atalho Bandeja.lnk (criado pelo instalador,
-// "PulseBackup.exe --tray") é o Explorer, que roda como o usuário.
+// "H2nodeBackup.exe --tray") é o Explorer, que roda como o usuário.
 func startTrayAsUser() {
 	exe, err := os.Executable()
 	if err != nil {

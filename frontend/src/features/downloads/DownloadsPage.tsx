@@ -59,7 +59,7 @@ function commands(it: DownloadItem, url: string): string {
     ].join("\n");
   }
   if (it.platform === "key") {
-    return `sudo curl -fsSL "${url}" -o /etc/pulse-backup/${it.name}`;
+    return `sudo curl -fsSL "${url}" -o /etc/h2node-backup/${it.name}`;
   }
   return `curl -fsSL "${url}" -o ${it.name}`;
 }
@@ -171,7 +171,7 @@ export default function DownloadsPage() {
           <span className="font-mono">client-builder</span>) ao atualizar com{" "}
           <span className="font-mono">docker compose build &amp;&amp; docker compose up -d</span>. Compilado fora,{" "}
           {can("admin") ? "envie aqui com" : "um administrador envia em"} <b>Enviar arquivo</b> o{" "}
-          <span className="font-mono">PulseBackup-Setup-&lt;versão&gt;.exe</span>.
+          <span className="font-mono">H2nodeBackup-Setup-&lt;versão&gt;.exe</span>.
         </Card>
       )}
 

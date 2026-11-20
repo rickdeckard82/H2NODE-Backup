@@ -1,6 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Pulse Backup">
-  <rect width="48" height="48" rx="12" fill="#1a4fd8"/>
-  <ellipse cx="24" cy="14" rx="11" ry="4" fill="none" stroke="#ffffff" stroke-width="2.6"/>
-  <path d="M13 14v18c0 2.2 4.9 4 11 4s11-1.8 11-4V14" fill="none" stroke="#ffffff" stroke-width="2.6"/>
-  <path d="M16 25h3.5l2.5 5 4-11 2.5 6H32" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="H2NODE Backup">
+  <style>
+    .flow { stroke-dasharray: 14 86; animation: flow 2.4s linear infinite; }
+    .halo { transform-box: fill-box; transform-origin: center; animation: halo 2.4s ease-out infinite; }
+    .node { transform-box: fill-box; transform-origin: center; animation: beat 2.4s ease-in-out infinite; }
+    @keyframes flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+    @keyframes halo { 0% { transform: scale(1); opacity: .7; } 70%, 100% { transform: scale(2.1); opacity: 0; } }
+    @keyframes beat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.18); } }
+    @media (prefers-reduced-motion: reduce) { .flow, .halo { display: none; } .node { animation: none; } }
+  </style>
+  <rect width="48" height="48" rx="12" fill="#0b1022"/>
+  <g stroke="#a5b4fc" stroke-width="3" stroke-linecap="round">
+    <line x1="15" y1="12" x2="15" y2="36"/>
+    <line x1="15" y1="36" x2="35" y2="24"/>
+    <line x1="35" y1="24" x2="15" y2="12"/>
+  </g>
+  <!-- pulso de dados percorrendo as ligações entre os nós -->
+  <path class="flow" d="M35 24 L15 12 L15 36 Z" pathLength="100" fill="none" stroke="#22d3ee" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle class="halo" cx="35" cy="24" r="5" fill="none" stroke="#22d3ee" stroke-width="1.5"/>
+  <circle cx="15" cy="12" r="5" fill="#a78bfa"/>
+  <circle cx="15" cy="36" r="5" fill="#a78bfa"/>
+  <circle class="node" cx="35" cy="24" r="5" fill="#22d3ee"/>
 </svg>

@@ -1,6 +1,6 @@
-# Pulse Backup
+# H2NODE Backup
 
-![Painel do Pulse Backup — visão geral dos backups](docs/images/painel.png)
+![Painel do H2NODE Backup — visão geral dos backups](docs/images/painel.png)
 
 Sistema para **fazer, receber, validar e acompanhar backups de servidores Linux
 (inclusive cPanel/WHM) e de configurações de switches, roteadores e OLTs** (FTP/TFTP),
@@ -22,12 +22,16 @@ Pulse RADIUS e do Projeto.io.
 | **proxy** | Caddy: HTTPS público com certificado **Let's Encrypt automático** para `PUBLIC_DOMAIN`. |
 | **db** | PostgreSQL 16 (só na rede interna). |
 
+> **Antes chamado Pulse Backup.** Quem já usa o Pulse Backup: veja
+> [docs/migracao-h2node.md](docs/migracao-h2node.md) — nada para de funcionar na
+> atualização, e cada parte (servidor, Zabbix, agentes, Windows) migra no seu tempo.
+
 ## Arquitetura
 
 ```
  servidor cliente (root/cron)                         servidor de backup (docker compose)
  ┌──────────────────────────┐                  ┌──────────────────────────────────────────┐
- │ pulse-backup-agent run   │  rsync/SSH :2222 │ sshd ──▶ /data/incoming/<cliente>/<exec>/ │
+ │ h2node-backup-agent run   │  rsync/SSH :2222 │ sshd ──▶ /data/incoming/<cliente>/<exec>/ │
  │  tar | gzip | gpg ──┐    │ ───────────────▶ │            │ (pasta montada do host)     │
  │  dump | gzip | gpg ─┤    │  só .gpg +       │ worker ◀───┘ confere, decifra, testa      │
  │  manifest.json ─────┘    │  manifest.json   │   │    └──▶ /data/store/<cliente>/<exec>/ │
@@ -71,7 +75,7 @@ Teste local em HTTP: `make dev` → http://localhost:8080 (login `admin` + senha
    ```bash
    cd agent && ./install.sh --cron "30 2 * * *"
    ```
-   O instalador coloca o agente em `/usr/local/sbin/pulse-backup-agent` (com atalho em
+   O instalador coloca o agente em `/usr/local/sbin/h2node-backup-agent` (com atalho em
    `/usr/bin`, porque o `PATH` do root/sudo nem sempre inclui `/usr/local/sbin`), agenda no
    crontab do root e imprime a **chave pública SSH** do agente. Só a pasta `agent/`
    precisa ir para o cliente — não é preciso clonar o repositório.
@@ -80,7 +84,7 @@ Teste local em HTTP: `make dev` → http://localhost:8080 (login `admin` + senha
    o `agent.conf`, a linha do `known_hosts` e o download da chave pública GPG.
    Ajuste `BACKUP_PATHS` e ligue `MYSQL_ENABLED` / `POSTGRES_ENABLED` / `MSSQL_ENABLED`
    conforme o servidor.
-4. `pulse-backup-agent test` e depois `pulse-backup-agent run`.
+4. `h2node-backup-agent test` e depois `h2node-backup-agent run`.
 
 Bancos suportados:
 
@@ -102,13 +106,13 @@ MYSQL_DUMP_OPTS=""              # ex.: "--no-tablespaces" no MySQL 8 sem o privi
 ```
 
 Se `mysql -e 'SELECT 1'` funciona como root sem pedir senha (padrão do MariaDB no Debian/Ubuntu),
-deixe `MYSQL_DEFAULTS_FILE` vazio. Senão, crie `/etc/pulse-backup/mysql.cnf` (root:root, modo 600)
-e aponte `MYSQL_DEFAULTS_FILE="/etc/pulse-backup/mysql.cnf"` — o agente o passa como
+deixe `MYSQL_DEFAULTS_FILE` vazio. Senão, crie `/etc/h2node-backup/mysql.cnf` (root:root, modo 600)
+e aponte `MYSQL_DEFAULTS_FILE="/etc/h2node-backup/mysql.cnf"` — o agente o passa como
 `--defaults-extra-file` ao `mysql` e ao `mysqldump`/`mariadb-dump`:
 
 ```ini
 [client]
-user=pulsebackup
+user=h2nodebackup
 password="SuaSenhaForteAqui"    # entre aspas se tiver # ; ou espaço
 host=localhost
 # socket=/var/run/mysqld/mysqld.sock
@@ -117,13 +121,13 @@ host=localhost
 Prefira um usuário só de leitura a usar o root (o dump usa `--single-transaction --routines --triggers --events`):
 
 ```sql
-CREATE USER 'pulsebackup'@'localhost' IDENTIFIED BY 'SuaSenhaForteAqui';
-GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, LOCK TABLES, PROCESS, RELOAD ON *.* TO 'pulsebackup'@'localhost';
--- MySQL 8.0.20+: GRANT SHOW_ROUTINE ON *.* TO 'pulsebackup'@'localhost';
+CREATE USER 'h2nodebackup'@'localhost' IDENTIFIED BY 'SuaSenhaForteAqui';
+GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, LOCK TABLES, PROCESS, RELOAD ON *.* TO 'h2nodebackup'@'localhost';
+-- MySQL 8.0.20+: GRANT SHOW_ROUTINE ON *.* TO 'h2nodebackup'@'localhost';
 ```
 
-`pulse-backup-agent test` deve mostrar `MySQL/MariaDB: conexão ok (N bancos)`. Se mostrar
-`sem conexão`, veja o erro com `mysql --defaults-extra-file=/etc/pulse-backup/mysql.cnf -e 'SHOW DATABASES'`.
+`h2node-backup-agent test` deve mostrar `MySQL/MariaDB: conexão ok (N bancos)`. Se mostrar
+`sem conexão`, veja o erro com `mysql --defaults-extra-file=/etc/h2node-backup/mysql.cnf -e 'SHOW DATABASES'`.
 Cada banco vira um arquivo `NN-mysql-<banco>.sql.gz.gpg`.
 
 ## cPanel/WHM e arquivos grandes
@@ -134,7 +138,7 @@ vão por FTP: o agente (1.1+) cifra cada arquivo **como está** e o envia **um d
 do cliente só precisa caber o maior arquivo. No `agent.conf`:
 
 ```bash
-WORK_DIR="/backup/pulse-work"                      # partição grande, fora de /backup/cpanel
+WORK_DIR="/backup/h2node-work"                      # partição grande, fora de /backup/cpanel
 BACKUP_FILES=( "/backup/cpanel/@today/accounts/*.tar.gz" )   # só a pasta da data de hoje
 BACKUP_PATHS=( "/etc" "/backup/cpanel/@today/system" )       # a pasta system, pequena, vai inteira
 ```
@@ -164,7 +168,7 @@ assinado e só para aquele arquivo, com os comandos para baixar e instalar diret
 ## Computadores Windows
 
 Em **Servidores**, cadastre o computador (sem chave SSH) e clique em **Windows → Gerar
-token**. Baixe o `PulseBackup-Setup-<versão>.exe` em **Downloads** e instale como
+token**. Baixe o `H2nodeBackup-Setup-<versão>.exe` em **Downloads** e instale como
 administrador (Windows 10/11 ou Windows Server de 64 bits; no Server o instalador oferece
 instalar o WebView2 junto). Na janela de configuração, cole o endereço do painel e o token, confira a impressão digital da chave GPG e escolha pastas,
 arquivos e horário. O aplicativo fica na bandeja, abre com o Windows, cifra cada item no

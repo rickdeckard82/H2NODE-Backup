@@ -18,7 +18,7 @@ export default function A10HelpPage() {
     <div className="space-y-4">
       <PageHeader
         title="A10 Thunder (ACOS): backup e restauração"
-        subtitle="O ACOS envia o backup de sistema (startup-config, aFleX e certificados) por FTP; o Pulse Backup valida o tar.gz, cifra e guarda cada versão."
+        subtitle="O ACOS envia o backup de sistema (startup-config, aFleX e certificados) por FTP; o H2NODE Backup valida o tar.gz, cifra e guarda cada versão."
       />
 
       <Card className="space-y-5 p-5">
@@ -53,7 +53,7 @@ export default function A10HelpPage() {
         <Step n={4} title="Pela interface web (GUI)">
           <p>
             Em <b>System → Maintenance → Backup → System</b>: <b>Local or Remote</b> = Remote, <b>Encrypt</b> = Disable
-            (o Pulse Backup já cifra ao receber), <b>Use Management Port</b> conforme o item acima, e preencha:
+            (o H2NODE Backup já cifra ao receber), <b>Use Management Port</b> conforme o item acima, e preencha:
           </p>
           <ul className="list-disc space-y-1 pl-5">
             <li><b>Protocol</b>: FTP</li>

@@ -1,7 +1,7 @@
 {
-  "name": "pulse-backup-windows-ui",
+  "name": "h2node-backup-windows-ui",
   "private": true,
-  "version": "0.2.4",
+  "version": "0.3.0",
   "license": "MIT",
   "type": "module",
   "scripts": {

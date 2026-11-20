@@ -1,4 +1,4 @@
-# Pulse Backup — receptor rsync-sobre-SSH. Só o usuário "backup", só chave
+# H2NODE Backup — receptor rsync-sobre-SSH. Só o usuário "backup", só chave
 # pública, e cada chave presa a `rrsync -wo -no-del /data/incoming/<cliente>`
 # (definido no authorized_keys gerado pelo painel).
 Port 2222

@@ -17,7 +17,7 @@ export default function MikrotikHelpPage() {
     <div className="space-y-4">
       <PageHeader
         title="MikroTik (RouterOS): backup e restauração"
-        subtitle="O Pulse Backup entra por SSH em cada MikroTik, roda /export, valida, cifra e guarda cada versão."
+        subtitle="O H2NODE Backup entra por SSH em cada MikroTik, roda /export, valida, cifra e guarda cada versão."
       />
 
       <Card className="space-y-5 p-5">
@@ -40,13 +40,13 @@ export default function MikrotikHelpPage() {
         <Step n={1} title="Crie o usuário de acesso no painel">
           <p>
             Em <Link className={link} to="/mikrotik/credentials">MikroTik → Usuário de acesso</Link>, crie uma credencial
-            (ex.: usuário <Code>pulse-backup</Code>, porta 22). A senha tem de 8 a 64 caracteres, <b>sem espaço, aspas, \, $ ou ?</b>.
+            (ex.: usuário <Code>h2node-backup</Code>, porta 22). A senha tem de 8 a 64 caracteres, <b>sem espaço, aspas, \, $ ou ?</b>.
             Ela fica cifrada no servidor e não volta para a tela. Ao salvar, o painel mostra os comandos do passo 2 já com a senha.
           </p>
         </Step>
 
         <Step n={2} title="Crie o mesmo usuário em cada MikroTik">
-          <CopyBlock label="Comandos" text={routerosUserCommands("pulse-backup", null, address)} />
+          <CopyBlock label="Comandos" text={routerosUserCommands("h2node-backup", null, address)} />
           <p>
             O grupo só tem <Code>ssh</Code>, <Code>read</Code> e <Code>sensitive</Code>: o usuário entra, lê e exporta, mas não
             altera nada. O <Code>sensitive</Code> faz a exportação trazer senhas de PPPoE/Wi-Fi, chaves IPsec etc.; sem ele o
@@ -65,7 +65,7 @@ export default function MikrotikHelpPage() {
           </p>
           <CopyBlock
             label="Firewall"
-            text={`/ip firewall filter add chain=input protocol=tcp dst-port=22 src-address=${address} action=accept comment="Pulse Backup"`}
+            text={`/ip firewall filter add chain=input protocol=tcp dst-port=22 src-address=${address} action=accept comment="H2NODE Backup"`}
           />
           <p>
             A regra entra no fim da lista: arraste-a para cima do drop no Winbox (ou <Code>/ip firewall filter move</Code>). Troque

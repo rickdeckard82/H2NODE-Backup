@@ -12,6 +12,7 @@ Retomada: GET .../files/<nome> devolve o tamanho já recebido; o PUT seguinte
 manda `offset` igual a esse tamanho (se não bater: 409 com o tamanho atual).
 """
 
+import contextlib
 import hashlib
 import os
 import re
@@ -95,7 +96,8 @@ def _open_run(ac: AgentClient, run: str) -> Path:
 
 def _file_path(run_dir: Path, name: str) -> Path:
     if not _FILE_RE.match(name):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "nome de arquivo inválido (precisa ser *.gpg)")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            "nome de arquivo inválido (precisa ser *.gpg)")
     p = storage.safe_child(run_dir, name)
     if p.is_symlink() or (p.exists() and not p.is_file()):
         raise HTTPException(status.HTTP_409_CONFLICT, "nome de arquivo em uso")
@@ -104,10 +106,8 @@ def _file_path(run_dir: Path, name: str) -> Path:
 
 def _touch(run_dir: Path) -> None:
     # o worker manda para a quarentena execução parada há INCOMING_STALE_HOURS (mtime da pasta)
-    try:
+    with contextlib.suppress(OSError):
         os.utime(run_dir)
-    except OSError:
-        pass
 
 
 @router.get("/hello")
@@ -117,14 +117,15 @@ def hello(request: Request, ac: AgentClient = Depends(agent_client)) -> dict:
     cifrar) e os limites do envio."""
     pub = gpg.public_key_info()
     if pub is None:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "chave pública GPG não configurada no servidor")
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE,
+                            "chave pública GPG não configurada no servidor")
     return {
         "client_id": ac.slug,
         "client_name": ac.name,
         "public_key": pub.armored,
         "public_key_fingerprint": pub.fingerprint,
         "chunk_max": CHUNK_MAX,
-        "manifest_format": "pulse-backup/1",
+        "manifest_format": "h2node-backup/1",
         "server_time": datetime.now(UTC).isoformat(),
     }
 
@@ -137,7 +138,8 @@ def create_run(request: Request, ac: AgentClient = Depends(agent_client)) -> dic
                  if d.is_dir() and not d.name.startswith(".") and not (d / MANIFEST_NAME).exists()]
     if len(open_runs) >= OPEN_RUNS_MAX:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS,
-                            f"{len(open_runs)} execuções abertas sem manifesto — termine ou aguarde a limpeza")
+                            f"{len(open_runs)} execuções abertas sem manifesto — "
+                            "termine ou aguarde a limpeza")
     run = f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(3)}"
     storage.safe_child(base, run).mkdir(mode=0o700)
     logger.info("agent_run_created", client=ac.slug, run=run)
@@ -199,9 +201,11 @@ async def put_manifest(run: str, request: Request, ac: AgentClient = Depends(age
     try:
         m = Manifest.model_validate_json(body)
     except ValidationError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"manifesto inválido: {str(exc)[:500]}") from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            f"manifesto inválido: {str(exc)[:500]}") from exc
     if m.client_id != ac.slug or m.run_name != run:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "client_id/run_name do manifesto não conferem")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            "client_id/run_name do manifesto não conferem")
     tmp = run_dir / ".manifest.tmp"
     tmp.write_bytes(body)
     os.replace(tmp, run_dir / MANIFEST_NAME)  # atômico: o worker só vê o manifesto inteiro

@@ -11,7 +11,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 MANIFEST_NAME = "manifest.json"
 MANIFEST_MAX_BYTES = 1024 * 1024
-FORMAT = "pulse-backup/1"
+FORMAT = "h2node-backup/1"
+# Agentes e clientes Windows anteriores ao rebranding (Pulse Backup) mandam
+# "pulse-backup/1". O conteúdo é idêntico: continue aceitando até todos atualizarem.
+LEGACY_FORMATS = ("pulse-backup/1",)
 
 _SHA256 = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
@@ -42,7 +45,7 @@ class ManifestComponent(BaseModel):
 class Manifest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    format: Literal["pulse-backup/1"]
+    format: Literal["h2node-backup/1", "pulse-backup/1"]
     client_id: str = Field(max_length=48)
     run_name: str = Field(max_length=80, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
     agent_version: str | None = Field(default=None, max_length=32)

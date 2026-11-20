@@ -3,11 +3,11 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import client_ip, enforce_csrf, require_admin, require_auditor, require_operator
+from app.api.routes.agent_upload import new_token
 from app.core.config import settings
 from app.core.db import get_db
 from app.core.security import utcnow
 from app.models import Backup, Client, DeviceCredential, FtpAccount, SystemUser
-from app.api.routes.agent_upload import new_token
 from app.schemas.client import (
     AgentConfigOut,
     ClientCreate,
@@ -306,7 +306,8 @@ def delete_client(
     if stored and not purge_backups:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            f"o cliente ainda tem {len(stored)} backup(s) guardado(s) — desative-o ou exclua os backups antes",
+            f"o cliente ainda tem {len(stored)} backup(s) guardado(s) — "
+            "desative-o ou exclua os backups antes",
         )
     if purge_backups:
         try:
@@ -410,23 +411,23 @@ def accept_host_key(
 
 
 def render_agent_config(c: Client, fingerprint: str | None) -> str:
-    return f"""# /etc/pulse-backup/agent.conf — gerado pelo Pulse Backup para "{c.name}"
+    return f"""# /etc/h2node-backup/agent.conf — gerado pelo H2NODE Backup para "{c.name}"
 # Permissões obrigatórias: dono root, modo 600 (o agente se recusa a rodar se não for).
 
 CLIENT_ID="{c.slug}"
 SERVER_HOST="{settings.ssh_public_host}"
 SERVER_PORT="{settings.ssh_public_port}"
 SERVER_USER="{settings.ssh_user}"
-SSH_KEY="/etc/pulse-backup/id_ed25519"
-KNOWN_HOSTS="/etc/pulse-backup/known_hosts"
+SSH_KEY="/etc/h2node-backup/id_ed25519"
+KNOWN_HOSTS="/etc/h2node-backup/known_hosts"
 
 # Chave pública GPG do servidor (baixe em Configuração → Chaves e servidor).
-GPG_PUBLIC_KEY="/etc/pulse-backup/backup-key.pub.asc"
+GPG_PUBLIC_KEY="/etc/h2node-backup/backup-key.pub.asc"
 # O agente confere a chave antes de cifrar — evita cifrar para a chave errada.
 GPG_FINGERPRINT="{fingerprint or 'PREENCHA-COM-A-IMPRESSAO-DIGITAL'}"
 
 # Pasta temporária local (só arquivos JÁ cifrados ficam aqui; apagados ao final).
-WORK_DIR="/var/tmp/pulse-backup"
+WORK_DIR="/var/tmp/h2node-backup"
 
 # ---- Pastas ----
 BACKUP_PATHS=(
@@ -461,7 +462,7 @@ BACKUP_FILES=(
 # ---- MySQL / MariaDB ----  (autenticação: unix_socket do root ou MYSQL_DEFAULTS_FILE)
 MYSQL_ENABLED="no"
 MYSQL_DATABASES=( "all" )
-MYSQL_DEFAULTS_FILE=""          # ex.: /etc/pulse-backup/mysql.cnf ([client] user/password), modo 600
+MYSQL_DEFAULTS_FILE=""          # ex.: /etc/h2node-backup/mysql.cnf ([client] user/password), modo 600
 MYSQL_DUMP_OPTS=""
 
 # ---- PostgreSQL ----  (roda pg_dump como o usuário do SO abaixo, via peer)
@@ -475,13 +476,13 @@ MSSQL_ENABLED="no"
 MSSQL_DATABASES=( "all" )
 MSSQL_SERVER="localhost"
 MSSQL_USER="sa"
-MSSQL_PASSWORD_FILE="/etc/pulse-backup/mssql.pass"   # modo 600
-MSSQL_BACKUP_DIR="/var/opt/mssql/data/pulse-backup" # gravável pelo usuário mssql
+MSSQL_PASSWORD_FILE="/etc/h2node-backup/mssql.pass"   # modo 600
+MSSQL_BACKUP_DIR="/var/opt/mssql/data/h2node-backup" # gravável pelo usuário mssql
 
 # ---- Envio ----
 BWLIMIT=""                      # KB/s (vazio = sem limite)
 UPLOAD_RETRIES="3"
-LOG_FILE="/var/log/pulse-backup.log"
+LOG_FILE="/var/log/h2node-backup.log"
 """
 
 

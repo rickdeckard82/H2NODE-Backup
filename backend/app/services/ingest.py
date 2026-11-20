@@ -223,8 +223,9 @@ def scan(db: Session) -> int:
             continue
         for run_dir in sorted(client_dir.iterdir()):
             if run_dir.name.startswith("."):
-                # ".pulse-test" é criado pelo `pulse-backup-agent test`
-                if run_dir.name == ".pulse-test":
+                # ".h2node-test" é criado pelo `h2node-backup-agent test`
+                # (".pulse-test" pelos agentes anteriores ao rebranding)
+                if run_dir.name in (".h2node-test", ".pulse-test"):
                     storage.remove_tree(run_dir)
                 continue
             try:

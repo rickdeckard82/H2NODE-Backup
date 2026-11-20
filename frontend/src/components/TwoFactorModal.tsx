@@ -50,7 +50,7 @@ function RecoveryCodes({ codes }: { codes: string[] }) {
             const blob = new Blob([codes.join("\n") + "\n"], { type: "text/plain" });
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
-            a.download = "pulse-backup-codigos-recuperacao.txt";
+            a.download = "h2node-backup-codigos-recuperacao.txt";
             a.click();
             URL.revokeObjectURL(a.href);
           }}

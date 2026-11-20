@@ -14,7 +14,7 @@ _ph = PasswordHasher()
 
 # Hash real e descartável para igualar o tempo de verificação quando a conta não
 # existe (mitiga enumeração de usuários por timing). Calculado uma vez.
-DUMMY_PASSWORD_HASH = _ph.hash("pulse-backup-timing-equalizer")
+DUMMY_PASSWORD_HASH = _ph.hash("h2node-backup-timing-equalizer")
 
 
 def hash_password(password: str) -> str:

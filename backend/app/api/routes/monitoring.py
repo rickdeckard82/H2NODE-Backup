@@ -1,7 +1,7 @@
 """Integração com Zabbix (ou outro monitoramento): o monitor CONSULTA o estado (pull).
 
 - GET /monitoring/status — JSON com a saúde de cada cliente ativo, do worker e do disco, para o
-  template "Pulse Backup by HTTP" (zabbix/). Autenticação: `Authorization: Bearer <token>`;
+  template "H2NODE Backup by HTTP" (zabbix/). Autenticação: `Authorization: Bearer <token>`;
   só leitura; sem token configurado responde 404.
 - /monitoring/settings e /monitoring/token — configuração no painel (administrador).
 
@@ -45,7 +45,7 @@ def _hash(token: str) -> str:
 
 def _version() -> str:
     try:
-        return metadata.version("pulse-backup-backend")
+        return metadata.version("h2node-backup-backend")
     except metadata.PackageNotFoundError:
         return ""
 

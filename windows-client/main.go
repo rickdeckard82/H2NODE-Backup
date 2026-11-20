@@ -1,12 +1,12 @@
-// Pulse Backup — cliente Windows.
+// H2NODE Backup — cliente Windows.
 //
 // Um único executável com três papéis:
 //
-//	PulseBackup.exe service run|install|uninstall|start|stop
+//	H2nodeBackup.exe service run|install|uninstall|start|stop
 //	    o serviço do Windows (LocalSystem) que agenda e faz os backups, com VSS;
-//	PulseBackup.exe [--tray]
+//	H2nodeBackup.exe [--tray]
 //	    a interface + ícone na bandeja de cada usuário (mostra, pede "backup agora");
-//	PulseBackup.exe --admin
+//	H2nodeBackup.exe --admin
 //	    a janela de configuração elevada (UAC): pastas, servidor, agendamento.
 package main
 
@@ -22,14 +22,14 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 
-	"pulse-backup/windows-client/internal/service"
+	"h2node-backup/windows-client/internal/service"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 // Version vai no manifesto (aparece no painel como versão do agente).
-var Version = "0.2.4"
+var Version = "0.3.0"
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "service" {
@@ -42,12 +42,12 @@ func main() {
 	hidden := *trayMode || *background
 
 	app := NewApp(hidden, *adminMode)
-	id := "pulse-backup-windows-client-7f3c2a9e"
+	id := "h2node-backup-windows-client-7f3c2a9e"
 	if *adminMode {
 		id += "-admin" // a janela elevada convive com a da bandeja
 	}
 	err := wails.Run(&options.App{
-		Title:             "Pulse Backup",
+		Title:             "H2NODE Backup",
 		Width:             1000,
 		Height:            700,
 		MinWidth:          820,
@@ -73,7 +73,7 @@ func main() {
 // serviceCmd: usado pelo instalador (como administrador) e pelo Gerenciador de Serviços.
 func serviceCmd(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "uso: PulseBackup.exe service run|install|uninstall|start|stop")
+		fmt.Fprintln(os.Stderr, "uso: H2nodeBackup.exe service run|install|uninstall|start|stop")
 		return 2
 	}
 	var err error

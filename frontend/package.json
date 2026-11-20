@@ -1,7 +1,7 @@
 {
-  "name": "pulse-backup-frontend",
+  "name": "h2node-backup-frontend",
   "private": true,
-  "version": "0.9.25",
+  "version": "0.9.26",
   "license": "MIT",
   "type": "module",
   "scripts": {

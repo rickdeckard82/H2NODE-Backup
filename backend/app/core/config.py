@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # Banco
     database_url: str = Field(
-        default="postgresql+psycopg://pulse:pulse@db:5432/pulse_backup",
+        default="postgresql+psycopg://h2node:h2node@db:5432/h2node_backup",
         alias="DATABASE_URL",
     )
 

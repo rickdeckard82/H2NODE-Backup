@@ -18,7 +18,7 @@ export default function HuaweiHelpPage() {
     <div className="space-y-4">
       <PageHeader
         title="Huawei (VRP): backup e restauração"
-        subtitle="O VRP envia a configuração salva por FTP (backup-to-server); o Pulse Backup valida, cifra e guarda cada versão."
+        subtitle="O VRP envia a configuração salva por FTP (backup-to-server); o H2NODE Backup valida, cifra e guarda cada versão."
       />
 
       <Card className="space-y-5 p-5">

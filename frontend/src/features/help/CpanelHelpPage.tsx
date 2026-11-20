@@ -16,7 +16,7 @@ export default function CpanelHelpPage() {
         <ul className="list-disc space-y-1 pl-5">
           <li>
             O próprio cPanel continua gerando os backups por conta em <Code>/backup/cpanel/AAAA-MM-DD/accounts/*.tar.gz</Code> (e a
-            pasta <Code>system</Code>). O agente do Pulse Backup roda <b>depois</b> dele, no crontab do root, e envia <b>só a pasta
+            pasta <Code>system</Code>). O agente do H2NODE Backup roda <b>depois</b> dele, no crontab do root, e envia <b>só a pasta
             da data de hoje</b> (<Code>@today</Code>). Se a pasta de hoje não existir (o backup do cPanel falhou ou atrasou), o
             agente acusa falha em vez de reenviar a de ontem.
           </li>
@@ -57,7 +57,7 @@ export default function CpanelHelpPage() {
             : copie a pasta <Code>agent/</Code> e rode o instalador. Use a <b>versão 1.3.0 ou mais nova</b> do agente (entende{" "}
             <Code>BACKUP_FILES</Code> e confere as contas do dia).
           </p>
-          <CopyBlock label="Comandos" text={`scp -r agent/ root@<ip-do-cpanel>:/root/pulse-agent\n# no cPanel, como root:\ncd /root/pulse-agent && ./install.sh --cron "0 22 * * *"`} />
+          <CopyBlock label="Comandos" text={`scp -r agent/ root@<ip-do-cpanel>:/root/h2node-agent\n# no cPanel, como root:\ncd /root/h2node-agent && ./install.sh --cron "0 22 * * *"`} />
           <p>
             Escolha o horário <b>depois</b> que o backup do cPanel termina, com folga. O backup do WHM começa às 02:00 (padrão) e a
             duração muda muito de um dia para outro: num servidor grande ele pode terminar de madrugada num dia e no meio da
@@ -70,7 +70,7 @@ export default function CpanelHelpPage() {
             lugar de <Code>@today</Code> (agente 1.4.0 ou mais novo). O cron acompanha os dias do WHM com um dia a mais. Por
             exemplo, WHM na segunda, quarta e sexta, e agente na terça, quinta e sábado:
           </p>
-          <CopyBlock label="Comando" text={`cd /root/pulse-agent && ./install.sh --cron "0 22 * * 2,4,6"`} />
+          <CopyBlock label="Comando" text={`cd /root/h2node-agent && ./install.sh --cron "0 22 * * 2,4,6"`} />
           <p>
             Ajuste o <b>intervalo esperado</b> do servidor no painel ao maior espaço entre dois envios (no exemplo, 72 h, de
             sábado para terça). Assim ele não fica &quot;atrasado&quot; nos dias sem backup.
@@ -93,11 +93,11 @@ export default function CpanelHelpPage() {
           </p>
         </Step>
 
-        <Step n={3} title="Edite /etc/pulse-backup/agent.conf">
+        <Step n={3} title="Edite /etc/h2node-backup/agent.conf">
           <CopyBlock
             label="agent.conf (trechos)"
             text={`# Pasta de trabalho: precisa caber o MAIOR arquivo cifrado (+1 GB) — use uma partição grande
-WORK_DIR="/backup/pulse-work"
+WORK_DIR="/backup/h2node-work"
 
 # Cada conta do cPanel, só da pasta de HOJE (ex.: /backup/cpanel/2026-10-16/accounts/*.tar.gz)
 BACKUP_FILES=(
@@ -133,10 +133,10 @@ BWLIMIT=""`}
         </Step>
 
         <Step n={4} title="Teste e rode o primeiro backup">
-          <CopyBlock label="No cPanel" text={`sudo pulse-backup-agent test   # lista quantos arquivos achou e confere o espaço em WORK_DIR\nsudo pulse-backup-agent run`} />
+          <CopyBlock label="No cPanel" text={`sudo h2node-backup-agent test   # lista quantos arquivos achou e confere o espaço em WORK_DIR\nsudo h2node-backup-agent run`} />
           <p>
             O <Code>test</Code> avisa se o <Code>WORK_DIR</Code> não comporta o maior arquivo e lista as contas sem backup na
-            pasta de hoje. Acompanhe o envio em <Code>/var/log/pulse-backup.log</Code>.
+            pasta de hoje. Acompanhe o envio em <Code>/var/log/h2node-backup.log</Code>.
           </p>
         </Step>
 
@@ -149,13 +149,13 @@ BWLIMIT=""`}
             label="No cPanel"
             text={`ls /backup/cpanel/AAAA-MM-DD/accounts | wc -l
 ls -l --time-style=+%F_%T /backup/cpanel/AAAA-MM-DD/accounts | sort -k6 | tail -1
-grep 'AAAA-MM-DD' /var/log/pulse-backup.log | grep -E 'início|enviado|FALHOU'
+grep 'AAAA-MM-DD' /var/log/h2node-backup.log | grep -E 'início|enviado|FALHOU'
 ls -t /usr/local/cpanel/logs/cpbackup/ | head -3`}
           />
           <p>
             Agente antes do fim do WHM: mova o cron para mais tarde. Contas faltando na própria pasta do WHM: veja o log do
             backup do cPanel (espaço em disco é a causa mais comum). Para reenviar um dia, troque <Code>@today</Code> pela data
-            (ex.: <Code>2026-10-17</Code>) no <Code>agent.conf</Code>, rode <Code>pulse-backup-agent run</Code> e volte ao{" "}
+            (ex.: <Code>2026-10-17</Code>) no <Code>agent.conf</Code>, rode <Code>h2node-backup-agent run</Code> e volte ao{" "}
             <Code>@today</Code>.
           </p>
         </Step>

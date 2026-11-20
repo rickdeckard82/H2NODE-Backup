@@ -1,4 +1,4 @@
-# Compila o instalador do cliente Windows (PulseBackup-Setup-<versão>.exe) num Linux,
+# Compila o instalador do cliente Windows (H2nodeBackup-Setup-<versão>.exe) num Linux,
 # sem Windows: Go cruzado (sem cgo) + Wails + NSIS. Usado pelo serviço client-builder do
 # docker-compose: a cada `docker compose build` o Docker só recompila se algo em
 # windows-client/ mudou, e na subida o instalador vai para o volume que o backend
@@ -26,8 +26,8 @@ RUN cd frontend && npm run build \
  && cd .. && wails build -s -m -skipbindings -clean -trimpath -platform windows/amd64 \
  && VERSION=$(sed -n 's/^var Version = "\([0-9.]*\)"/\1/p' main.go) \
  && test -n "$VERSION" \
- && makensis -V2 -DVERSION="$VERSION" -DWEBVIEW2_BOOTSTRAPPER=/opt/MicrosoftEdgeWebview2Setup.exe installer/pulse-backup.nsi \
- && mkdir /dist && cp build/bin/PulseBackup-Setup-*.exe /dist/ \
+ && makensis -V2 -DVERSION="$VERSION" -DWEBVIEW2_BOOTSTRAPPER=/opt/MicrosoftEdgeWebview2Setup.exe installer/h2node-backup.nsi \
+ && mkdir /dist && cp build/bin/H2nodeBackup-Setup-*.exe /dist/ \
  && cd /dist && sha256sum *.exe
 
 FROM busybox:1.37

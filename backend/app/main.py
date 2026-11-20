@@ -36,12 +36,12 @@ configure_logging()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    logger.info("pulse_backup_api_started", frontend_origin=settings.frontend_origin)
+    logger.info("h2node_backup_api_started", frontend_origin=settings.frontend_origin)
     yield
 
 
 app = FastAPI(
-    title="Pulse Backup API",
+    title="H2NODE Backup API",
     version="0.1.0",
     docs_url=f"{settings.api_prefix}/docs" if settings.enable_docs else None,
     openapi_url=f"{settings.api_prefix}/openapi.json" if settings.enable_docs else None,

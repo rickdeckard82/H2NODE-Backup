@@ -115,7 +115,7 @@ export default function HistoryPage({ state }: { state: UIState }) {
         </table>
       </Card>
       <p className="text-xs text-slate-400 dark:text-slate-500">
-        O painel do Pulse Backup mostra também a verificação feita no servidor (o arquivo é decifrado lá e conferido).
+        O painel do H2NODE Backup mostra também a verificação feita no servidor (o arquivo é decifrado lá e conferido).
       </p>
     </div>
   );

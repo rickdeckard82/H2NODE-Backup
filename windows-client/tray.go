@@ -8,7 +8,7 @@ import (
 
 	"fyne.io/systray"
 
-	"pulse-backup/windows-client/internal/icon"
+	"h2node-backup/windows-client/internal/icon"
 )
 
 // tray: ícone na bandeja. Roda numa thread própria do sistema (systray cria a janela
@@ -32,12 +32,12 @@ func startTray(a *App) *tray {
 		goruntime.LockOSThread()
 		systray.Run(func() {
 			systray.SetIcon(icon.ICO(32, ""))
-			systray.SetTitle("Pulse Backup")
-			systray.SetTooltip("Pulse Backup")
-			t.statusMI = systray.AddMenuItem("Pulse Backup", "")
+			systray.SetTitle("H2NODE Backup")
+			systray.SetTooltip("H2NODE Backup")
+			t.statusMI = systray.AddMenuItem("H2NODE Backup", "")
 			t.statusMI.Disable()
 			systray.AddSeparator()
-			t.open = systray.AddMenuItem("Abrir", "Abrir a janela do Pulse Backup")
+			t.open = systray.AddMenuItem("Abrir", "Abrir a janela do H2NODE Backup")
 			t.runNow = systray.AddMenuItem("Fazer backup agora", "")
 			t.cancel = systray.AddMenuItem("Cancelar backup", "")
 			t.cancel.Disable()
@@ -88,27 +88,27 @@ func (t *tray) update(st UIState) {
 	if !t.ready {
 		return
 	}
-	state, tip := "", "Pulse Backup"
+	state, tip := "", "H2NODE Backup"
 	switch {
 	case !st.ServiceOK:
 		state = "failed"
-		tip = "Pulse Backup — o serviço não está rodando"
+		tip = "H2NODE Backup — o serviço não está rodando"
 	case st.Running:
 		state = "running"
-		tip = "Pulse Backup — backup em andamento"
+		tip = "H2NODE Backup — backup em andamento"
 		if p := st.Progress; p != nil && p.Count > 0 {
-			tip = fmt.Sprintf("Pulse Backup — backup em andamento (%d de %d)", max(p.Index, 1), p.Count)
+			tip = fmt.Sprintf("H2NODE Backup — backup em andamento (%d de %d)", max(p.Index, 1), p.Count)
 		}
 	case len(st.History) > 0 && st.History[0].Status == "failed":
 		state = "failed"
-		tip = "Pulse Backup — o último backup falhou"
+		tip = "H2NODE Backup — o último backup falhou"
 	case st.LastSuccess != "":
 		if ts, err := time.Parse(time.RFC3339, st.LastSuccess); err == nil {
-			tip = "Pulse Backup — último backup: " + ts.Local().Format("02/01 15:04")
+			tip = "H2NODE Backup — último backup: " + ts.Local().Format("02/01 15:04")
 		}
 	}
 	if st.ServiceOK && !st.Connected {
-		tip = "Pulse Backup — não conectado ao servidor"
+		tip = "H2NODE Backup — não conectado ao servidor"
 	}
 	if state != t.state {
 		systray.SetIcon(icon.ICO(32, state))

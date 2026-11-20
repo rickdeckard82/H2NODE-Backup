@@ -1,4 +1,4 @@
-# Pulse Backup — proxy HTTPS. Certificado Let's Encrypt automático para
+# H2NODE Backup — proxy HTTPS. Certificado Let's Encrypt automático para
 # PUBLIC_DOMAIN (emitido e renovado pelo Caddy; guardado no volume caddy_data).
 {
 	email {$ACME_EMAIL}

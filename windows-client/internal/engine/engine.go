@@ -1,6 +1,6 @@
 // Package engine faz um backup: para cada item escolhido gera um .gpg (pasta =
 // tar.gz cifrado; arquivo = cifrado como está), envia, apaga a cópia local e, no fim,
-// fecha a execução com o manifest.json no formato do agente Linux (pulse-backup/1).
+// fecha a execução com o manifest.json no formato do agente Linux (h2node-backup/1).
 //
 // Nada em claro vai para o disco: tar → gzip → OpenPGP é um pipeline em memória e só
 // o resultado cifrado é gravado na pasta de trabalho, um item por vez (a pasta só
@@ -26,7 +26,7 @@ import (
 
 	"github.com/klauspost/pgzip"
 
-	"pulse-backup/windows-client/internal/api"
+	"h2node-backup/windows-client/internal/api"
 )
 
 // Item é uma pasta ou um arquivo escolhido para backup.
@@ -84,7 +84,7 @@ type Component struct {
 	DurationS   int64  `json:"duration_s"`
 }
 
-// Manifest segue o Manifest (pulse-backup/1) do servidor.
+// Manifest segue o Manifest (h2node-backup/1) do servidor.
 type Manifest struct {
 	Format                string      `json:"format"`
 	ClientID              string      `json:"client_id"`
@@ -233,7 +233,7 @@ func Run(ctx context.Context, cl *api.Client, o Options, report func(Progress), 
 	// fecha a execução mesmo depois de falha/cancelamento: o painel mostra o que houve
 	report(Progress{Phase: "closing", Count: len(o.Items)})
 	m := Manifest{
-		Format: "pulse-backup/1", ClientID: o.ClientID, RunName: run, AgentVersion: o.Version,
+		Format: "h2node-backup/1", ClientID: o.ClientID, RunName: run, AgentVersion: o.Version,
 		Hostname: o.Hostname, OS: o.OSInfo, StartedAt: res.StartedAt, FinishedAt: time.Now().UTC(),
 		Status: status, EncryptionFingerprint: o.Recipient.Fingerprint, Errors: res.Errors,
 	}

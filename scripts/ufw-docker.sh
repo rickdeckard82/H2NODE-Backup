@@ -24,15 +24,19 @@ set -euo pipefail
 
 # AFTER_RULES só existe para teste; em produção use o padrão do ufw.
 RULES="${AFTER_RULES:-/etc/ufw/after.rules}"
-BEGIN="# BEGIN PULSE-BACKUP UFW AND DOCKER"
-END="# END PULSE-BACKUP UFW AND DOCKER"
+BEGIN="# BEGIN H2NODE-BACKUP UFW AND DOCKER"
+END="# END H2NODE-BACKUP UFW AND DOCKER"
 
 if [ -z "${AFTER_RULES:-}" ]; then
     command -v ufw >/dev/null || { echo "ufw não instalado" >&2; exit 1; }
 fi
 [ -f "$RULES" ] || { echo "arquivo não encontrado: $RULES" >&2; exit 1; }
 
-applied() { grep -qF "$BEGIN" "$RULES"; }
+# marcadores gravados antes do rebranding (Pulse Backup): o bloco é o mesmo
+LEGACY_BEGIN="# BEGIN PULSE-BACKUP UFW AND DOCKER"
+LEGACY_END="# END PULSE-BACKUP UFW AND DOCKER"
+
+applied() { grep -qF "$BEGIN" "$RULES" || grep -qF "$LEGACY_BEGIN" "$RULES"; }
 
 block() {
     cat <<EOF
@@ -78,17 +82,18 @@ case "${1:-}" in
         if applied; then
             echo "bloco já aplicado em $RULES"; exit 0
         fi
-        cp -p "$RULES" "$RULES.pulse-backup.bak"
+        cp -p "$RULES" "$RULES.h2node-backup.bak"
         { echo; block; } >>"$RULES"
-        echo "bloco inserido em $RULES (cópia em $RULES.pulse-backup.bak)"
+        echo "bloco inserido em $RULES (cópia em $RULES.h2node-backup.bak)"
         reload
         echo "reinicie o Docker para recriar a DOCKER-USER se ela sumiu: systemctl restart docker"
         ;;
     remove)
         applied || { echo "bloco não está aplicado"; exit 0; }
-        cp -p "$RULES" "$RULES.pulse-backup.bak"
+        cp -p "$RULES" "$RULES.h2node-backup.bak"
         sed -i "/^$BEGIN\$/,/^$END\$/d" "$RULES"
-        echo "bloco removido de $RULES (cópia em $RULES.pulse-backup.bak)"
+        sed -i "/^$LEGACY_BEGIN\$/,/^$LEGACY_END\$/d" "$RULES"
+        echo "bloco removido de $RULES (cópia em $RULES.h2node-backup.bak)"
         reload
         ;;
     status)

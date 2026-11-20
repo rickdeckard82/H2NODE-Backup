@@ -15,7 +15,7 @@ export default function DatacomHelpPage() {
     <div className="space-y-4">
       <PageHeader
         title="Datacom (DmOS): backup e restauração"
-        subtitle="O DmOS envia a configuração por TFTP quando o script roda; o Pulse Backup valida, cifra e guarda cada versão."
+        subtitle="O DmOS envia a configuração por TFTP quando o script roda; o H2NODE Backup valida, cifra e guarda cada versão."
       />
 
       <Card className="space-y-5 p-5">
@@ -110,7 +110,7 @@ assistant-task config-backup run-now`}
 
         <Step n={2} title="Leve o arquivo ao equipamento">
           <p>
-            O receptor TFTP do Pulse Backup só aceita <b>gravação</b>: o equipamento não consegue buscar o arquivo nele. Coloque o
+            O receptor TFTP do H2NODE Backup só aceita <b>gravação</b>: o equipamento não consegue buscar o arquivo nele. Coloque o
             arquivo decifrado num servidor TFTP temporário da sua rede (por exemplo, no seu computador) e importe:
           </p>
           <CopyBlock label="No DmOS" text="copy file tftp://<IP-do-seu-TFTP>/config.txt config-restore.txt" />

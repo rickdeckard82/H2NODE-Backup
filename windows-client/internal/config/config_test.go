@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"pulse-backup/windows-client/internal/engine"
+	"h2node-backup/windows-client/internal/engine"
 )
 
 func TestScheduleNextDaily(t *testing.T) {

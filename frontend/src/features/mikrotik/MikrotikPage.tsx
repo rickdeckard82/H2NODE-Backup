@@ -252,7 +252,7 @@ export default function MikrotikPage() {
     <div>
       <PageHeader
         title="MikroTik"
-        subtitle="O Pulse Backup entra por SSH em cada MikroTik, exporta a configuração (/export), cifra e guarda"
+        subtitle="O H2NODE Backup entra por SSH em cada MikroTik, exporta a configuração (/export), cifra e guarda"
         actions={
           <>
             <RefreshButton keys={["clients"]} />

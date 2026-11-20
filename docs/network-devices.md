@@ -1,6 +1,6 @@
 # Backup de switches e roteadores (FTP / TFTP)
 
-Os equipamentos **enviam** a configuração para o servidor; o Pulse Backup recebe,
+Os equipamentos **enviam** a configuração para o servidor; o H2NODE Backup recebe,
 valida, **cifra com a chave GPG** e guarda como uma versão do equipamento (com
 retenção, verificação e alertas iguais aos dos servidores Linux).
 
@@ -201,8 +201,8 @@ Página **FTP Firmwares**: o administrador envia imagens de firmware e os equipa
 2. Em cada MikroTik, crie o usuário (o painel mostra os comandos com a senha logo após salvar):
 
    ```
-   /user group add name=pulse-backup policy=ssh,read,sensitive comment="Pulse Backup: somente leitura"
-   /user add name=pulse-backup group=pulse-backup password="<SENHA>" address=<IP-DO-SERVIDOR>/32 comment="Pulse Backup"
+   /user group add name=h2node-backup policy=ssh,read,sensitive comment="H2NODE Backup: somente leitura"
+   /user add name=h2node-backup group=h2node-backup password="<SENHA>" address=<IP-DO-SERVIDOR>/32 comment="H2NODE Backup"
    ```
 
    Libere o SSH para o servidor em `/ip service` (campo `address`) e no firewall `input`.

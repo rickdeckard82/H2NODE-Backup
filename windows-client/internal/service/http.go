@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"pulse-backup/windows-client/internal/config"
-	"pulse-backup/windows-client/internal/engine"
+	"h2node-backup/windows-client/internal/config"
+	"h2node-backup/windows-client/internal/engine"
 )
 
 // Rotas do pipe de usuários: ver o estado, fazer backup agora, cancelar, ler o log.

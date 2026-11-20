@@ -1,19 +1,19 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "Pulse Backup",
-  "outputfilename": "PulseBackup",
+  "name": "H2NODE Backup",
+  "outputfilename": "H2nodeBackup",
   "frontend:install": "npm ci",
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
   "author": {
-    "name": "Pulse Backup"
+    "name": "H2NODE Backup"
   },
   "info": {
-    "companyName": "Pulse Backup",
-    "productName": "Pulse Backup",
-    "productVersion": "0.2.4",
+    "companyName": "H2NODE Backup",
+    "productName": "H2NODE Backup",
+    "productVersion": "0.3.0",
     "copyright": "",
-    "comments": "Cliente Windows do Pulse Backup: backup cifrado de pastas e arquivos"
+    "comments": "Cliente Windows do H2NODE Backup: backup cifrado de pastas e arquivos"
   }
 }

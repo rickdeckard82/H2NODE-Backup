@@ -1,4 +1,4 @@
-# /etc/pulse-backup/agent.conf — exemplo. O painel gera este arquivo já preenchido
+# /etc/h2node-backup/agent.conf — exemplo. O painel gera este arquivo já preenchido
 # em Clientes → (cliente) → Configuração do agente.
 # Permissões obrigatórias: dono root, modo 600 (o agente se recusa a rodar se não for).
 
@@ -6,16 +6,16 @@ CLIENT_ID="COLOQUE-O-ID-DO-CLIENTE"
 SERVER_HOST="backup.suaempresa.com.br"
 SERVER_PORT="2222"
 SERVER_USER="backup"
-SSH_KEY="/etc/pulse-backup/id_ed25519"
-KNOWN_HOSTS="/etc/pulse-backup/known_hosts"
+SSH_KEY="/etc/h2node-backup/id_ed25519"
+KNOWN_HOSTS="/etc/h2node-backup/known_hosts"
 
 # Chave pública GPG do servidor (baixe em Configuração → Chaves e servidor).
-GPG_PUBLIC_KEY="/etc/pulse-backup/backup-key.pub.asc"
+GPG_PUBLIC_KEY="/etc/h2node-backup/backup-key.pub.asc"
 # O agente confere a chave antes de cifrar — evita cifrar para a chave errada.
 GPG_FINGERPRINT="PREENCHA-COM-A-IMPRESSAO-DIGITAL"
 
 # Pasta temporária local (só arquivos JÁ cifrados ficam aqui; apagados ao final).
-WORK_DIR="/var/tmp/pulse-backup"
+WORK_DIR="/var/tmp/h2node-backup"
 
 # ---- Pastas ----
 BACKUP_PATHS=(
@@ -50,7 +50,7 @@ BACKUP_FILES=(
 # ---- MySQL / MariaDB ----  (autenticação: unix_socket do root ou MYSQL_DEFAULTS_FILE)
 MYSQL_ENABLED="no"
 MYSQL_DATABASES=( "all" )
-MYSQL_DEFAULTS_FILE=""          # ex.: /etc/pulse-backup/mysql.cnf ([client] user/password), modo 600
+MYSQL_DEFAULTS_FILE=""          # ex.: /etc/h2node-backup/mysql.cnf ([client] user/password), modo 600
 MYSQL_DUMP_OPTS=""
 
 # ---- PostgreSQL ----  (roda pg_dump como o usuário do SO abaixo, via peer)
@@ -64,10 +64,10 @@ MSSQL_ENABLED="no"
 MSSQL_DATABASES=( "all" )
 MSSQL_SERVER="localhost"
 MSSQL_USER="sa"
-MSSQL_PASSWORD_FILE="/etc/pulse-backup/mssql.pass"   # modo 600
-MSSQL_BACKUP_DIR="/var/opt/mssql/data/pulse-backup" # gravável pelo usuário mssql
+MSSQL_PASSWORD_FILE="/etc/h2node-backup/mssql.pass"   # modo 600
+MSSQL_BACKUP_DIR="/var/opt/mssql/data/h2node-backup" # gravável pelo usuário mssql
 
 # ---- Envio ----
 BWLIMIT=""                      # KB/s (vazio = sem limite)
 UPLOAD_RETRIES="3"
-LOG_FILE="/var/log/pulse-backup.log"
+LOG_FILE="/var/log/h2node-backup.log"

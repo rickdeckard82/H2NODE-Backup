@@ -17,7 +17,7 @@ export default function FtpFilesHelpPage() {
     <div className="space-y-4">
       <PageHeader
         title="Arquivos e bancos por FTP"
-        subtitle="Um servidor ou serviço envia dumps .sql, configurações e arquivos .zip por FTP; o Pulse Backup testa, cifra e guarda cada versão."
+        subtitle="Um servidor ou serviço envia dumps .sql, configurações e arquivos .zip por FTP; o H2NODE Backup testa, cifra e guarda cada versão."
       />
 
       <Card className="space-y-3 p-5 text-sm">

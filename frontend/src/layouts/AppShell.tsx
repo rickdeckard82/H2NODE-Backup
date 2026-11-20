@@ -156,7 +156,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           }`}
         >
           <Logo className={`h-11 w-11 shrink-0 lg:transition-[height,width] lg:duration-150 ${railCollapsed ? "lg:h-7 lg:w-7" : ""}`} />
-          <span className={`whitespace-nowrap text-lg font-bold tracking-tight ${railCollapsed ? "lg:hidden" : ""}`}>Pulse Backup</span>
+          <span className={`whitespace-nowrap text-lg font-bold tracking-tight ${railCollapsed ? "lg:hidden" : ""}`}>H2NODE Backup</span>
           <button
             type="button"
             aria-label="Fechar menu"

@@ -25,7 +25,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 
-	"pulse-backup/windows-client/internal/api"
+	"h2node-backup/windows-client/internal/api"
 )
 
 // fakeServer imita /api/agent/v1: execuções, pedaços com offset e manifesto.
@@ -87,7 +87,7 @@ func (f *fakeServer) handler(t *testing.T) http.Handler {
 
 func testKey(t *testing.T) (*openpgp.Entity, string) {
 	t.Helper()
-	e, err := openpgp.NewEntity("Pulse Backup teste", "", "t@example.com", &packet.Config{RSABits: 2048, Algorithm: packet.PubKeyAlgoRSA})
+	e, err := openpgp.NewEntity("H2NODE Backup teste", "", "t@example.com", &packet.Config{RSABits: 2048, Algorithm: packet.PubKeyAlgoRSA})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestRunEndToEnd(t *testing.T) {
 	if err := json.Unmarshal(fs.manifest[res.RunName], &m); err != nil {
 		t.Fatal(err)
 	}
-	if m.Format != "pulse-backup/1" || m.ClientID != "pc-financeiro" || m.Status != "partial" || len(m.Components) != 3 {
+	if m.Format != "h2node-backup/1" || m.ClientID != "pc-financeiro" || m.Status != "partial" || len(m.Components) != 3 {
 		t.Fatalf("manifesto inesperado: %+v", m)
 	}
 	if m.EncryptionFingerprint != rcpt.Fingerprint {

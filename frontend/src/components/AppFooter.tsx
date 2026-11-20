@@ -8,7 +8,7 @@ export function AppFooter({ className = "" }: { className?: string }) {
   return (
     <div className={`text-xs leading-relaxed text-slate-400 dark:text-slate-500 ${className}`}>
       <div>
-        © {new Date().getFullYear()} Pulse Backup{" "}
+        © {new Date().getFullYear()} H2NODE Backup{" "}
         <button
           type="button"
           onClick={() => setShowChangelog(true)}

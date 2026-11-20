@@ -8,7 +8,7 @@ import segno
 from app.core.security import hash_password, utcnow, verify_password
 from app.models import MfaRecoveryCode, SystemUser
 
-_ISSUER = "Pulse Backup"
+_ISSUER = "H2NODE Backup"
 
 # Códigos de recuperação: uso único, mostrados só na ativação. Alfabeto sem
 # caracteres ambíguos (0/O, 1/I/L). 10 grupos de 5 => ~51 bits de entropia.

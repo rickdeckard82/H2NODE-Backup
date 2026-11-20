@@ -129,8 +129,8 @@ class AllowlistAuthorizer(DummyAuthorizer):
 
     def get_msg_login(self, username):  # noqa: ANN001
         if self.allowlist.is_firmware_user(username):
-            return "Pulse Backup: firmwares (somente leitura)."
-        return "Pulse Backup: somente envio de configuracao."
+            return "H2NODE Backup: firmwares (somente leitura)."
+        return "H2NODE Backup: somente envio de configuracao."
 
     def get_msg_quit(self, username):  # noqa: ANN001
         return "Ate logo."
@@ -294,7 +294,7 @@ def build_server(host: str = "0.0.0.0", port: int | None = None,
     handler.passive_ports = list(range(settings.passive_port_range[0], settings.passive_port_range[1] + 1))
     if settings.ftp_masquerade_address:
         handler.masquerade_address = settings.ftp_masquerade_address
-    handler.banner = "Pulse Backup FTP"
+    handler.banner = "H2NODE Backup FTP"
     server = FTPServer((host, settings.ftp_port if port is None else port), handler)
     server.allowlist = handler.authorizer.allowlist
     server.max_cons = 64

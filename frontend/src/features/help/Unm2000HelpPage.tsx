@@ -16,7 +16,7 @@ export default function Unm2000HelpPage() {
     <div className="space-y-4">
       <PageHeader
         title="UNM2000 (Fiberhome): backup das OLTs"
-        subtitle="A UNM2000 manda as OLTs enviarem a configuração por FTP; o Pulse Backup valida, cifra e guarda cada versão."
+        subtitle="A UNM2000 manda as OLTs enviarem a configuração por FTP; o H2NODE Backup valida, cifra e guarda cada versão."
       />
 
       <Card className="space-y-3 p-5 text-sm">

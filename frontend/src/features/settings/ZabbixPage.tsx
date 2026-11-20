@@ -15,17 +15,17 @@ interface MonitoringSettings {
   status_url: string;
 }
 
-const TEMPLATE_URL = "/zabbix/pulse_backup_zabbix7.yaml";
+const TEMPLATE_URL = "/zabbix/h2node_backup_zabbix7.yaml";
 
 const ALERTS: [string, string, string][] = [
   ["Último backup falhou", "Alta", "execução com falha ou corrompida (mostra o erro)"],
   ["Backup atrasado", "Alta", "nada dentro do intervalo esperado + tolerância"],
   ["Verificação do último backup falhou", "Alta", "hash, decifragem ou teste do dump não conferiu"],
   ["Nenhum backup recebido ainda", "Atenção", "cliente ativo que nunca enviou"],
-  ["Último backup com avisos", "Atenção", "desligável com {$PULSE.WARNING.ALERT}=0"],
-  ["Worker parado", "Alta", "sem sinal do worker há mais de {$PULSE.WORKER.MAX.AGE} s (o sinal vem a cada 30 s)"],
-  ["Worker na mesma tarefa há muito tempo", "Atenção", "vivo, mas preso numa tarefa há mais de {$PULSE.WORKER.BUSY.MAX}"],
-  ["Disco dos backups acima de 85% / 95%", "Atenção / Alta", "{$PULSE.DISK.PUSED.WARN} e {$PULSE.DISK.PUSED.HIGH}"],
+  ["Último backup com avisos", "Atenção", "desligável com {$H2NODE.WARNING.ALERT}=0"],
+  ["Worker parado", "Alta", "sem sinal do worker há mais de {$H2NODE.WORKER.MAX.AGE} s (o sinal vem a cada 30 s)"],
+  ["Worker na mesma tarefa há muito tempo", "Atenção", "vivo, mas preso numa tarefa há mais de {$H2NODE.WORKER.BUSY.MAX}"],
+  ["Disco dos backups acima de 85% / 95%", "Atenção / Alta", "{$H2NODE.DISK.PUSED.WARN} e {$H2NODE.DISK.PUSED.HIGH}"],
   ["Verificação profunda desativada", "Atenção", "worker sem a chave privada GPG"],
   ["Sem resposta da API", "Alta", "painel fora do ar, token trocado ou IP do Zabbix bloqueado"],
 ];
@@ -90,7 +90,7 @@ export default function ZabbixPage() {
     <div>
       <PageHeader
         title="Zabbix"
-        subtitle="O Zabbix consulta o Pulse Backup e alerta quando um backup falha, atrasa ou não passa na verificação"
+        subtitle="O Zabbix consulta o H2NODE Backup e alerta quando um backup falha, atrasa ou não passa na verificação"
       />
 
       {q.isLoading && <Spinner className="h-5 w-5 text-brand-600" />}
@@ -202,21 +202,21 @@ export default function ZabbixPage() {
               <p className="text-slate-500 dark:text-slate-400">
                 Baixe{" "}
                 <a className="text-brand-600 hover:underline dark:text-brand-400" href={TEMPLATE_URL} download>
-                  pulse_backup_zabbix7.yaml
+                  h2node_backup_zabbix7.yaml
                 </a>{" "}
                 e importe em <b>Coleta de dados → Templates → Importar</b>.
               </p>
             </Step>
             <Step n={2} title="Crie o host">
               <p className="text-slate-500 dark:text-slate-400">
-                Em <b>Coleta de dados → Hosts → Criar host</b>: nome <span className="font-mono">Pulse Backup</span>, sem interface,
-                template <b>Pulse Backup by HTTP</b>.
+                Em <b>Coleta de dados → Hosts → Criar host</b>: nome <span className="font-mono">H2NODE Backup</span>, sem interface,
+                template <b>H2NODE Backup by HTTP</b>.
               </p>
             </Step>
             <Step n={3} title="Preencha as macros do host">
-              <CopyBlock label="Macros" text={`{$PULSE.URL}   = ${origin}\n{$PULSE.TOKEN} = <token gerado aqui> (tipo: texto secreto)`} />
+              <CopyBlock label="Macros" text={`{$H2NODE.URL}   = ${origin}\n{$H2NODE.TOKEN} = <token gerado aqui> (tipo: texto secreto)`} />
               <p className="text-xs text-slate-400 dark:text-slate-500">
-                Para silenciar um cliente: <span className="font-mono">{'{$PULSE.CLIENT.ALERT:"slug-do-cliente"}'} = 0</span>.
+                Para silenciar um cliente: <span className="font-mono">{'{$H2NODE.CLIENT.ALERT:"slug-do-cliente"}'} = 0</span>.
               </p>
             </Step>
             <Step n={4} title="Confira">
@@ -263,7 +263,7 @@ export default function ZabbixPage() {
             </p>
             <CopyBlock label="Token" text={token} />
             <p className="text-slate-500 dark:text-slate-400">
-              No Zabbix, cole na macro <span className="font-mono">{"{$PULSE.TOKEN}"}</span> do host, com o tipo{" "}
+              No Zabbix, cole na macro <span className="font-mono">{"{$H2NODE.TOKEN}"}</span> do host, com o tipo{" "}
               <b>Texto secreto</b>.
             </p>
             <div className="flex justify-end">

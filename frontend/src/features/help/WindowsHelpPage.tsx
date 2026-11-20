@@ -23,7 +23,7 @@ export default function WindowsHelpPage() {
         <h2 className="text-base font-bold">Como funciona</h2>
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            O instalador cria o <b>serviço “Pulse Backup”</b> (conta do sistema, início automático). É ele que agenda e faz os
+            O instalador cria o <b>serviço “H2NODE Backup”</b> (conta do sistema, início automático). É ele que agenda e faz os
             backups, <b>mesmo sem ninguém logado</b>, e lê as pastas de qualquer usuário do computador.
           </li>
           <li>
@@ -68,12 +68,12 @@ export default function WindowsHelpPage() {
 
         <Step n={2} title="Instale">
           <p>
-            Baixe o <Code>PulseBackup-Setup-&lt;versão&gt;.exe</Code> em{" "}
+            Baixe o <Code>H2nodeBackup-Setup-&lt;versão&gt;.exe</Code> em{" "}
             <Link className={link} to="/downloads">
               Downloads
             </Link>{" "}
             (ou gere lá um link de 1 h e baixe direto no computador) e rode como administrador. Ele instala em{" "}
-            <Code>C:\Program Files\PulseBackup</Code>, registra e inicia o serviço, coloca o ícone na bandeja no login de
+            <Code>C:\Program Files\H2nodeBackup</Code>, registra e inicia o serviço, coloca o ícone na bandeja no login de
             todos os usuários e cria os atalhos no menu Iniciar. Requer Windows 10/11 ou Windows Server de 64 bits. No Windows
             Server (que não traz o WebView2, usado pela janela), o instalador oferece instalá-lo junto, baixando da Microsoft.
             Para atualizar, rode o instalador novo por cima: a configuração é mantida.
@@ -136,11 +136,11 @@ export default function WindowsHelpPage() {
             perdido roda 2 minutos depois que o serviço inicia.
           </li>
           <li>
-            A <b>pasta de trabalho</b> (padrão <Code>C:\ProgramData\PulseBackup\work</Code>) precisa de espaço para o maior
+            A <b>pasta de trabalho</b> (padrão <Code>C:\ProgramData\H2nodeBackup\work</Code>) precisa de espaço para o maior
             item compactado; troque na aba Pastas e arquivos.
           </li>
           <li>
-            Log: aba Histórico → <b>Ver log do serviço</b> (arquivo em <Code>C:\ProgramData\PulseBackup\logs</Code>, só para
+            Log: aba Histórico → <b>Ver log do serviço</b> (arquivo em <Code>C:\ProgramData\H2nodeBackup\logs</Code>, só para
             administradores). <i>serviço parado</i>: botão <b>Iniciar serviço</b> na janela ou <Code>services.msc</Code>.
           </li>
           <li>

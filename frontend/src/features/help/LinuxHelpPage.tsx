@@ -48,15 +48,15 @@ export default function LinuxHelpPage() {
           </p>
           <CopyBlock
             label="Comandos"
-            text={`scp -r agent/ root@<ip-do-cliente>:/root/pulse-agent
+            text={`scp -r agent/ root@<ip-do-cliente>:/root/h2node-agent
 # no cliente, como root:
-cd /root/pulse-agent && ./install.sh --cron "30 2 * * *"`}
+cd /root/h2node-agent && ./install.sh --cron "30 2 * * *"`}
           />
           <p>
-            O instalador copia o agente para <Code>/usr/local/sbin/pulse-backup-agent</Code> (com atalho em{" "}
-            <Code>/usr/bin</Code>), cria <Code>/etc/pulse-backup/</Code>, agenda no crontab do root (aqui, todo dia às 02:30) e gera a
+            O instalador copia o agente para <Code>/usr/local/sbin/h2node-backup-agent</Code> (com atalho em{" "}
+            <Code>/usr/bin</Code>), cria <Code>/etc/h2node-backup/</Code>, agenda no crontab do root (aqui, todo dia às 02:30) e gera a
             chave SSH do agente.
-            No fim ele imprime a <b>chave pública SSH</b> (também em <Code>/etc/pulse-backup/id_ed25519.pub</Code>).
+            No fim ele imprime a <b>chave pública SSH</b> (também em <Code>/etc/h2node-backup/id_ed25519.pub</Code>).
           </p>
         </Step>
 
@@ -81,7 +81,7 @@ cd /root/pulse-agent && ./install.sh --cron "30 2 * * *"`}
         <Step n={4} title="Grave a configuração no cliente">
           <p>
             Na linha do servidor, o botão <b>Agente</b> mostra, prontos para copiar, o <Code>agent.conf</Code>, a linha do{" "}
-            <Code>known_hosts</Code> e o download da chave pública GPG. Grave em <Code>/etc/pulse-backup/</Code>:
+            <Code>known_hosts</Code> e o download da chave pública GPG. Grave em <Code>/etc/h2node-backup/</Code>:
           </p>
           <ul className="list-disc space-y-1 pl-5">
             <li><Code>agent.conf</Code> (modo 600; o agente se recusa a rodar se não for root:600);</li>
@@ -101,11 +101,11 @@ cd /root/pulse-agent && ./install.sh --cron "30 2 * * *"`}
         </Step>
 
         <Step n={5} title="Teste e rode o primeiro backup">
-          <CopyBlock label="No cliente" text={`sudo pulse-backup-agent test   # confere config, chave, cifra, pastas e conexão\nsudo pulse-backup-agent run    # faz o backup agora`} />
+          <CopyBlock label="No cliente" text={`sudo h2node-backup-agent test   # confere config, chave, cifra, pastas e conexão\nsudo h2node-backup-agent run    # faz o backup agora`} />
           <Note>
             Se aparecer <Code>command not found</Code>, o <Code>PATH</Code> do root/sudo não inclui{" "}
-            <Code>/usr/local/sbin</Code>: use o caminho completo <Code>/usr/local/sbin/pulse-backup-agent</Code> ou crie o atalho{" "}
-            <Code>ln -s /usr/local/sbin/pulse-backup-agent /usr/bin/pulse-backup-agent</Code> (o instalador novo já faz isso).
+            <Code>/usr/local/sbin</Code>: use o caminho completo <Code>/usr/local/sbin/h2node-backup-agent</Code> ou crie o atalho{" "}
+            <Code>ln -s /usr/local/sbin/h2node-backup-agent /usr/bin/h2node-backup-agent</Code> (o instalador novo já faz isso).
           </Note>
           <p>
             Para mudar o horário depois, edite o crontab do root (<Code>crontab -e</Code>): reexecutar o instalador não altera a linha
@@ -113,7 +113,7 @@ cd /root/pulse-agent && ./install.sh --cron "30 2 * * *"`}
           </p>
           <p>
             A execução aparece em Backups com <b>sucesso</b> e <b>verificado</b>. O log do agente fica em{" "}
-            <Code>/var/log/pulse-backup.log</Code>.
+            <Code>/var/log/h2node-backup.log</Code>.
           </p>
         </Step>
       </Card>
@@ -136,32 +136,32 @@ MYSQL_DUMP_OPTS=""              # ex.: "--no-tablespaces" no MySQL 8 sem o privi
           do MariaDB no Debian/Ubuntu), deixe <Code>MYSQL_DEFAULTS_FILE</Code> vazio.
         </p>
         <p>
-          <b>Com usuário e senha:</b> crie <Code>/etc/pulse-backup/mysql.cnf</Code> e aponte{" "}
-          <Code>MYSQL_DEFAULTS_FILE=&quot;/etc/pulse-backup/mysql.cnf&quot;</Code>. O agente o passa como{" "}
+          <b>Com usuário e senha:</b> crie <Code>/etc/h2node-backup/mysql.cnf</Code> e aponte{" "}
+          <Code>MYSQL_DEFAULTS_FILE=&quot;/etc/h2node-backup/mysql.cnf&quot;</Code>. O agente o passa como{" "}
           <Code>--defaults-extra-file</Code> ao <Code>mysql</Code> e ao dump.
         </p>
         <CopyBlock
-          label="/etc/pulse-backup/mysql.cnf"
+          label="/etc/h2node-backup/mysql.cnf"
           text={`[client]
-user=pulsebackup
+user=h2nodebackup
 password="SuaSenhaForteAqui"
 host=localhost
 # socket=/var/run/mysqld/mysqld.sock   # só se o socket não estiver no lugar padrão`}
         />
-        <CopyBlock label="Permissões" text="chown root:root /etc/pulse-backup/mysql.cnf && chmod 600 /etc/pulse-backup/mysql.cnf" />
+        <CopyBlock label="Permissões" text="chown root:root /etc/h2node-backup/mysql.cnf && chmod 600 /etc/h2node-backup/mysql.cnf" />
         <Note>
           Coloque a senha entre aspas se ela tiver <Code>#</Code>, <Code>;</Code> ou espaço.
         </Note>
         <p>Prefira um usuário só de leitura a usar o root:</p>
         <CopyBlock
           label="No MySQL/MariaDB"
-          text={`CREATE USER 'pulsebackup'@'localhost' IDENTIFIED BY 'SuaSenhaForteAqui';
-GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, LOCK TABLES, PROCESS, RELOAD ON *.* TO 'pulsebackup'@'localhost';
+          text={`CREATE USER 'h2nodebackup'@'localhost' IDENTIFIED BY 'SuaSenhaForteAqui';
+GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, LOCK TABLES, PROCESS, RELOAD ON *.* TO 'h2nodebackup'@'localhost';
 -- MySQL 8.0.20+: para copiar procedures/functions
--- GRANT SHOW_ROUTINE ON *.* TO 'pulsebackup'@'localhost';`}
+-- GRANT SHOW_ROUTINE ON *.* TO 'h2nodebackup'@'localhost';`}
         />
         <p>
-          O <Code>pulse-backup-agent test</Code> deve mostrar <Code>MySQL/MariaDB: conexão ok (N bancos)</Code>.
+          O <Code>h2node-backup-agent test</Code> deve mostrar <Code>MySQL/MariaDB: conexão ok (N bancos)</Code>.
         </p>
       </Card>
 
@@ -190,7 +190,7 @@ GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, LOCK TABLES, PROCESS, RELOAD ON *.* TO 
           </li>
           <li>
             <b>MySQL/MariaDB: sem conexão</b> — veja o erro real com{" "}
-            <Code>mysql --defaults-extra-file=/etc/pulse-backup/mysql.cnf -e &apos;SHOW DATABASES&apos;</Code> (ou só{" "}
+            <Code>mysql --defaults-extra-file=/etc/h2node-backup/mysql.cnf -e &apos;SHOW DATABASES&apos;</Code> (ou só{" "}
             <Code>mysql -e &apos;SHOW DATABASES&apos;</Code> se usa unix_socket). <i>Access denied</i> = usuário/senha do{" "}
             <Code>mysql.cnf</Code>; <i>Can&apos;t connect … socket</i> = descomente <Code>socket=</Code> com o caminho certo.
           </li>

@@ -2,7 +2,8 @@
 
 Cada cliente ativo com chave vira UMA linha:
 
-    restrict,command="/usr/bin/rrsync -wo -no-del /data/incoming/<slug>" ssh-ed25519 AAAA… pulse-backup:<slug>
+    restrict,command="/usr/bin/rrsync -wo -no-del /data/incoming/<slug>" ssh-ed25519 AAAA…\
+        h2node-backup:<slug>
 
 - `restrict`: sem pty, sem port/agent/X11 forwarding.
 - `rrsync -wo -no-del`: o agente só consegue ESCREVER dentro da própria pasta
@@ -91,13 +92,13 @@ def _incoming_dir(slug: str) -> str:
 
 def render_authorized_keys(clients: list[Client]) -> str:
     lines = [
-        "# Gerado pelo Pulse Backup — NÃO edite à mão (é reescrito a cada alteração de cliente).",
+        "# Gerado pelo H2NODE Backup — NÃO edite à mão (é reescrito a cada alteração de cliente).",
     ]
     for c in sorted(clients, key=lambda x: x.slug):
         if not c.is_active or not c.ssh_public_key:
             continue
         cmd = f"/usr/bin/rrsync -wo -no-del {_incoming_dir(c.slug)}"
-        lines.append(f'restrict,command="{cmd}" {c.ssh_public_key} pulse-backup:{c.slug}')
+        lines.append(f'restrict,command="{cmd}" {c.ssh_public_key} h2node-backup:{c.slug}')
     return "\n".join(lines) + "\n"
 
 

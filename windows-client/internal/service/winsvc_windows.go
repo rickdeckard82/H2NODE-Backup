@@ -15,24 +15,24 @@ import (
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 
-	"pulse-backup/windows-client/internal/ipc"
+	"h2node-backup/windows-client/internal/ipc"
 )
 
 const (
-	Name        = "PulseBackup"
-	DisplayName = "Pulse Backup"
-	Description = "Backup cifrado de pastas e arquivos para o servidor Pulse Backup (com cópias de sombra VSS)."
+	Name        = "H2nodeBackup"
+	DisplayName = "H2NODE Backup"
+	Description = "Backup cifrado de pastas e arquivos para o servidor H2NODE Backup (com cópias de sombra VSS)."
 	// SDDL da pasta de dados: só SYSTEM e Administradores (config, token protegido, histórico, log).
 	dataSDDL = "D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)"
 )
 
-// DataDir: %ProgramData%\PulseBackup.
+// DataDir: %ProgramData%\H2nodeBackup.
 func DataDir() string {
 	base := os.Getenv("ProgramData")
 	if base == "" {
 		base = `C:\ProgramData`
 	}
-	return filepath.Join(base, "PulseBackup")
+	return filepath.Join(base, "H2nodeBackup")
 }
 
 // protectDir cria a pasta e troca a ACL (sem herança): só SYSTEM e Administradores.
@@ -64,7 +64,7 @@ func RunService(version, osInfo string) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	fmt.Println("Pulse Backup rodando em primeiro plano (Ctrl+C para parar). Log em", filepath.Join(DataDir(), "logs"))
+	fmt.Println("H2NODE Backup rodando em primeiro plano (Ctrl+C para parar). Log em", filepath.Join(DataDir(), "logs"))
 	return runCore(ctx, version, osInfo, nil)
 }
 
@@ -102,8 +102,23 @@ func (h *handler) Execute(_ []string, req <-chan svc.ChangeRequest, st chan<- sv
 	}
 }
 
+// migrateLegacyDataDir: a pasta de dados se chamava %ProgramData%\PulseBackup antes do
+// rebranding (H2NODE Backup). O instalador já a renomeia; isto cobre quem registrou o
+// serviço à mão. Só age se a pasta nova ainda não existe — nunca mistura as duas.
+func migrateLegacyDataDir(dir string) {
+	if _, err := os.Stat(dir); err == nil {
+		return
+	}
+	old := filepath.Join(filepath.Dir(dir), "PulseBackup")
+	if fi, err := os.Stat(old); err != nil || !fi.IsDir() {
+		return
+	}
+	_ = os.Rename(old, dir)
+}
+
 func runCore(ctx context.Context, version, osInfo string, ready func()) error {
 	dir := DataDir()
+	migrateLegacyDataDir(dir)
 	if err := protectDir(dir); err != nil {
 		return fmt.Errorf("pasta de dados %s: %w", dir, err)
 	}

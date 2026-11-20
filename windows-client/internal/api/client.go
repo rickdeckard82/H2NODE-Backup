@@ -1,4 +1,4 @@
-// Package api fala com o Pulse Backup pelo envio HTTPS (/api/agent/v1).
+// Package api fala com o H2NODE Backup pelo envio HTTPS (/api/agent/v1).
 //
 // Modelo do servidor: só cria execuções, acrescenta bytes a arquivos .gpg e fecha a
 // execução com o manifest.json. Nada é lido de volta além do tamanho já recebido de

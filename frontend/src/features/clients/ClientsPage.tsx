@@ -135,12 +135,12 @@ function AgentConfigModal({ client, onClose }: { client: Client | null; onClose:
               ) : (
                 <>
                   <b className="text-amber-600 dark:text-amber-400">Sem chave ainda.</b> Edite o cliente e cole o
-                  conteúdo de <code className="font-mono">/etc/pulse-backup/id_ed25519.pub</code>.
+                  conteúdo de <code className="font-mono">/etc/h2node-backup/id_ed25519.pub</code>.
                 </>
               )}
             </p>
           </Step>
-          <Step n={3} title="Grave a configuração em /etc/pulse-backup/agent.conf (modo 600)">
+          <Step n={3} title="Grave a configuração em /etc/h2node-backup/agent.conf (modo 600)">
             <p className="text-slate-500 dark:text-slate-400">
               Ajuste <code className="font-mono">BACKUP_PATHS</code> e ligue os bancos que existirem no servidor.
             </p>
@@ -149,7 +149,7 @@ function AgentConfigModal({ client, onClose }: { client: Client | null; onClose:
               Baixar agent.conf
             </Button>
           </Step>
-          <Step n={4} title="Fixe a chave do servidor em /etc/pulse-backup/known_hosts">
+          <Step n={4} title="Fixe a chave do servidor em /etc/h2node-backup/known_hosts">
             {cfg.known_hosts ? (
               <CopyBlock label="Linha do known_hosts" text={cfg.known_hosts} />
             ) : (
@@ -158,7 +158,7 @@ function AgentConfigModal({ client, onClose }: { client: Client | null; onClose:
               </p>
             )}
           </Step>
-          <Step n={5} title="Salve a chave pública GPG em /etc/pulse-backup/backup-key.pub.asc">
+          <Step n={5} title="Salve a chave pública GPG em /etc/h2node-backup/backup-key.pub.asc">
             {cfg.public_key_available ? (
               <Button variant="ghost" onClick={downloadKey}>
                 Baixar backup-key.pub.asc
@@ -170,7 +170,7 @@ function AgentConfigModal({ client, onClose }: { client: Client | null; onClose:
             )}
           </Step>
           <Step n={6} title="Teste e rode o primeiro backup">
-            <CopyBlock label="Comandos" text={"sudo pulse-backup-agent test\nsudo pulse-backup-agent run"} />
+            <CopyBlock label="Comandos" text={"sudo h2node-backup-agent test\nsudo h2node-backup-agent run"} />
           </Step>
         </div>
       )}
@@ -403,7 +403,7 @@ export default function ClientsPage() {
             </Field>
             <Field
               label="Chave pública SSH do agente"
-              hint="Conteúdo de /etc/pulse-backup/id_ed25519.pub (gerado pelo install.sh). Vazio = cliente não consegue enviar."
+              hint="Conteúdo de /etc/h2node-backup/id_ed25519.pub (gerado pelo install.sh). Vazio = cliente não consegue enviar."
             >
               <textarea
                 className="input min-h-[80px] font-mono text-xs"

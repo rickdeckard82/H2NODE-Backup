@@ -202,7 +202,7 @@ def _store(
     problems = [p.check_message if len(parts) == 1 else f"{p.original}: {p.check_message}"
                 for p in parts if p.status != "ok"]
     manifest = {
-        "format": "pulse-backup/net-1",
+        "format": "h2node-backup/net-1",
         "client_id": client.slug,
         "run_name": run_name,
         "protocol": protocol,

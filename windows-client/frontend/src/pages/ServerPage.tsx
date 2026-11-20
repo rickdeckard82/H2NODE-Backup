@@ -94,7 +94,7 @@ export default function ServerPage({ state }: { state: UIState }) {
       <AdminBanner state={state} />
       <Card className="space-y-4 p-5">
         <div>
-          <div className="font-semibold">Conectar ao Pulse Backup</div>
+          <div className="font-semibold">Conectar ao H2NODE Backup</div>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             No painel, em <b>Servidores</b>, cadastre este computador e clique em <b>Windows</b> → <b>Gerar token</b>. Cole
             aqui o endereço e o token mostrados.

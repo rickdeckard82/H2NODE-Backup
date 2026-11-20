@@ -1,9 +1,11 @@
 """MikroTik: validação do /export, credenciais e cadastro pela API e coleta por SSH
 contra um servidor SSH de verdade (paramiko imitando o RouterOS) em 127.0.0.1."""
 
+import contextlib
 import json
 import socket
 import threading
+import time
 from datetime import timedelta
 from pathlib import Path
 
@@ -23,7 +25,7 @@ ROS7_EXPORT = (b"# 2026-10-18 03:00:01 by RouterOS 7.16.1\r\n# software id = ABC
 ROS6_EXPORT = (b"# oct/18/2026 03:00:01 by RouterOS 6.49.10\r\n# software id = ABCD-1234\r\n"
                b"/system identity\r\nset name=RB-OLD\r\n/ip address\r\n"
                b"add address=10.0.0.2/24 interface=ether1\r\n")
-USER, PASSWORD = "pulse-backup", "Senha-forte-1"
+USER, PASSWORD = "h2node-backup", "Senha-forte-1"
 
 
 # ------------------------------------------------------------------ netconfig --
@@ -74,6 +76,9 @@ class _RosServer(paramiko.ServerInterface):
             out = b"bad command name\r\n"
 
         def reply() -> None:
+            # o paramiko só confirma o exec depois que este método retorna; responder antes faz o
+            # cliente ver "Channel closed". shortcut: espera fixa, aumentar se voltar a oscilar em CI lenta
+            time.sleep(0.1)
             channel.sendall(out)
             channel.send_exit_status(0)
             channel.close()
@@ -113,6 +118,9 @@ class FakeRouterOS:
 
     def close(self) -> None:
         self._stop = True
+        # no Linux, close() sozinho não acorda o accept() da outra thread: a porta seguiria aceitando
+        with contextlib.suppress(OSError):
+            self.sock.shutdown(socket.SHUT_RDWR)
         self.sock.close()
 
 

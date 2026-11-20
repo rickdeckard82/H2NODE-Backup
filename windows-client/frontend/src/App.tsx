@@ -49,7 +49,7 @@ export default function App() {
         <img src={logoLight} alt="" className="h-9 w-9 dark:hidden" />
         <img src={logoDark} alt="" className="hidden h-9 w-9 dark:block" />
         <div>
-          <div className="text-lg font-bold leading-tight">Pulse Backup</div>
+          <div className="text-lg font-bold leading-tight">H2NODE Backup</div>
           <div className="text-xs text-slate-500 dark:text-slate-400">
             Cliente Windows{state.version ? ` · v${state.version}` : ""}
             {state.admin_window && " · configuração (administrador)"}
@@ -91,7 +91,7 @@ export default function App() {
             <Note tone="error">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span>
-                  O serviço do Pulse Backup não está rodando: nenhum backup é feito.
+                  O serviço do H2NODE Backup não está rodando: nenhum backup é feito.
                   {state.service_error && !state.service_error.includes("não está rodando") && ` (${state.service_error})`}
                 </span>
                 <Button onClick={() => backend.startService().catch((e) => toast("err", errText(e)))}>Iniciar serviço</Button>

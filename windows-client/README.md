@@ -1,4 +1,4 @@
-# Pulse Backup — cliente Windows
+# H2NODE Backup — cliente Windows
 
 Serviço do Windows + interface (Go + [Wails v2](https://wails.io)): agenda e faz o backup
 de pastas e arquivos lendo de uma **cópia de sombra (VSS)**, cifra no próprio computador
@@ -7,17 +7,17 @@ uso no painel em **Ajuda → Windows**.
 
 ## Arquitetura
 
-Um único `PulseBackup.exe` com três papéis:
+Um único `H2nodeBackup.exe` com três papéis:
 
 | Comando | Papel |
 |---|---|
-| `PulseBackup.exe service run` | **Serviço** “PulseBackup” (LocalSystem, início automático atrasado, reinicia sozinho se cair). Agenda, cria as cópias de sombra, faz e envia os backups. Configuração, histórico e log em `%ProgramData%\PulseBackup` (ACL: só SYSTEM e Administradores); token protegido com DPAPI da conta SYSTEM. |
-| `PulseBackup.exe --tray` | **Ícone na bandeja** de cada usuário (aberto no login pelo `HKLM\…\Run`): estado, “fazer backup agora”, cancelar, histórico e log. |
-| `PulseBackup.exe --admin` | **Janela de configuração** elevada (UAC): pastas, servidor/token, agendamento, VSS. |
+| `H2nodeBackup.exe service run` | **Serviço** “H2nodeBackup” (LocalSystem, início automático atrasado, reinicia sozinho se cair). Agenda, cria as cópias de sombra, faz e envia os backups. Configuração, histórico e log em `%ProgramData%\H2nodeBackup` (ACL: só SYSTEM e Administradores); token protegido com DPAPI da conta SYSTEM. |
+| `H2nodeBackup.exe --tray` | **Ícone na bandeja** de cada usuário (aberto no login pelo `HKLM\…\Run`): estado, “fazer backup agora”, cancelar, histórico e log. |
+| `H2nodeBackup.exe --admin` | **Janela de configuração** elevada (UAC): pastas, servidor/token, agendamento, VSS. |
 
-A interface fala com o serviço por named pipes locais (HTTP/JSON): `\\.\pipe\PulseBackup`
+A interface fala com o serviço por named pipes locais (HTTP/JSON): `\\.\pipe\H2nodeBackup`
 (usuários interativos: ler o estado, pedir backup, cancelar, ver o log) e
-`\\.\pipe\PulseBackupAdmin` (só Administradores elevados e SYSTEM: mudar a configuração).
+`\\.\pipe\H2nodeBackupAdmin` (só Administradores elevados e SYSTEM: mudar a configuração).
 Os dois negam acesso pela rede.
 
 Também: `service install|uninstall|start|stop` (usados pelo instalador, como administrador).
@@ -47,7 +47,7 @@ Versão (as três iguais): `Version` em `main.go`, `productVersion` em `wails.js
 
 ```bash
 make windows-installer        # na raiz: wails build + makensis
-# -> windows-client/build/bin/PulseBackup.exe e PulseBackup-Setup-<versão>.exe
+# -> windows-client/build/bin/H2nodeBackup.exe e H2nodeBackup-Setup-<versão>.exe
 ```
 
 O instalador embute o bootstrapper oficial do **WebView2** (`MicrosoftEdgeWebview2Setup.exe`,
@@ -75,10 +75,10 @@ Para revisar a interface no navegador sem o Go: `cd frontend && npm run dev`
 - `internal/service` — núcleo do serviço: agenda, backup com VSS, estado, rotas dos pipes, SCM (instalar/rodar).
 - `internal/vss` — cópias de sombra e tradução de caminhos.
 - `internal/ipc` — named pipes (SDDL) e cliente HTTP sobre eles.
-- `internal/engine` — o backup: pasta → tar → gzip → OpenPGP → pasta de trabalho → envio → apaga; manifesto `pulse-backup/1`.
+- `internal/engine` — o backup: pasta → tar → gzip → OpenPGP → pasta de trabalho → envio → apaga; manifesto `h2node-backup/1`.
 - `internal/api` — HTTPS com token, pedaços de até 32 MiB, retomada.
 - `internal/config` — `config.json`/`history.json`, DPAPI, agendamento.
-- `installer/pulse-backup.nsi` — instalador NSIS. `frontend/` — React + Tailwind no padrão do painel.
+- `installer/h2node-backup.nsi` — instalador NSIS. `frontend/` — React + Tailwind no padrão do painel.
 
 ## Segurança
 

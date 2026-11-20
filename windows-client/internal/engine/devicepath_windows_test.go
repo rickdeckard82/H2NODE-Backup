@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"pulse-backup/windows-client/internal/vss"
+	"h2node-backup/windows-client/internal/vss"
 )
 
 // A cópia de sombra é lida por \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopyN\…. O

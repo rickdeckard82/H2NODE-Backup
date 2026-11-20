@@ -1,0 +1,2 @@
+# scripts rodam em Linux (containers e servidores): CRLF quebra o shebang mesmo com checkout no Windows
+*.sh text eol=lf

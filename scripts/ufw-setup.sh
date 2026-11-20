@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regras do ufw para o Pulse Backup (rodar como root no servidor).
+# Regras do ufw para o H2NODE Backup (rodar como root no servidor).
 #
 #   ./scripts/ufw-setup.sh web                 libera 443 (e 80) para todos — painel HTTPS
 #   ./scripts/ufw-setup.sh client 203.0.113.10 libera o SSH de backup só para este IP
@@ -29,15 +29,15 @@ valid_ip() { [[ "$1" =~ ^[0-9a-fA-F:.]+(/[0-9]{1,3})?$ ]]; }
 
 case "${1:-}" in
     web)
-        ufw allow 443/tcp comment 'pulse-backup https'
+        ufw allow 443/tcp comment 'h2node-backup https'
         # 80: redirecionamento para HTTPS e desafio HTTP-01 do Let's Encrypt.
         # Opcional — sem ela o certificado sai pelo desafio TLS-ALPN na 443.
-        ufw allow 80/tcp comment 'pulse-backup http->https'
+        ufw allow 80/tcp comment 'h2node-backup http->https'
         ;;
     client)
         ip="${2:?informe o IP do cliente de backup}"
         valid_ip "$ip" || { echo "IP inválido: $ip" >&2; exit 1; }
-        ufw allow from "$ip" to any port "$PORT" proto tcp comment 'pulse-backup cliente'
+        ufw allow from "$ip" to any port "$PORT" proto tcp comment 'h2node-backup cliente'
         ;;
     remove)
         ip="${2:?informe o IP}"
@@ -49,19 +49,19 @@ case "${1:-}" in
         valid_ip "$ip" || { echo "IP inválido: $ip" >&2; exit 1; }
         case "$proto" in
             ftp)
-                ufw allow from "$ip" to any port "$FTP_PORT" proto tcp comment 'pulse-backup ftp'
+                ufw allow from "$ip" to any port "$FTP_PORT" proto tcp comment 'h2node-backup ftp'
                 # modo passivo: o equipamento abre a conexão de dados nesta faixa
-                ufw allow from "$ip" to any port "${PASV/-/:}" proto tcp comment 'pulse-backup ftp-pasv'
+                ufw allow from "$ip" to any port "${PASV/-/:}" proto tcp comment 'h2node-backup ftp-pasv'
                 ;;
             tftp)
                 # as respostas (portas efêmeras) passam pelo conntrack do ufw
-                ufw allow from "$ip" to any port "$TFTP_PORT" proto udp comment 'pulse-backup tftp'
+                ufw allow from "$ip" to any port "$TFTP_PORT" proto udp comment 'h2node-backup tftp'
                 ;;
             *) echo "protocolo deve ser ftp ou tftp" >&2; exit 1 ;;
         esac
         ;;
     status)
-        ufw status numbered | grep -E "pulse-backup" || echo "nenhuma regra do pulse-backup"
+        ufw status numbered | grep -E "h2node-backup|pulse-backup" || echo "nenhuma regra do h2node-backup"
         ;;
     *)
         sed -n '2,15p' "$0"; exit 2 ;;
