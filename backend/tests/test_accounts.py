@@ -18,16 +18,16 @@ def _run(db, client: Client, run: str, age_days: int, parts: list[tuple[str, str
 
 def test_accounts_only_real_copies_from_servers(auth_client, seeded):
     whm = Client(slug="whm", name="WHM/cPanel")
-    rpz = Client(slug="arquivos-erp", name="Arquivos ERP", kind="network", vendor="files", mgmt_ip="192.0.2.30",
-                 protocol="ftp")
-    seeded.add_all([whm, rpz])
+    erp = Client(slug="arquivos-erp", name="Arquivos ERP", kind="network", vendor="files",
+                 mgmt_ip="192.0.2.30", protocol="ftp")
+    seeded.add_all([whm, erp])
     seeded.flush()
     _run(seeded, whm, "r1", 3, [("abcs.tar.gz", "01-file-abcs.tar.gz.gpg", 1000, "ok"),
                                 ("cliente2.tar.gz", "02-file-cliente2.tar.gz.gpg", 50, "ok")])
     # execução de hoje: padrão sem arquivo (data errada) e conta que o WHM não copiou — sem arquivo
     _run(seeded, whm, "r2", 0, [("/backup/cpanel/@today/accounts/*.tar.gz", None, 0, "failed"),
                                 ("cliente2.tar.gz", None, 0, "failed")])
-    _run(seeded, rpz, "r1", 2, [("arquivos-erp-arquivos-20261020-190010", "01-file-x.gpg", 40, "ok")])
+    _run(seeded, erp, "r1", 2, [("arquivos-erp-arquivos-20261020-190010", "01-file-x.gpg", 40, "ok")])
     seeded.commit()
 
     items = auth_client.get("/api/backups/accounts").json()["items"]
