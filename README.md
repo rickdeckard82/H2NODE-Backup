@@ -7,7 +7,7 @@ Sistema para **fazer, receber, validar e acompanhar backups de servidores Linux
 com painel web protegido por login. Stack: **FastAPI + PostgreSQL** no backend,
 **React + Vite + Tailwind** no frontend, **rsync sobre SSH** no transporte e
 **GPG** na criptografia, tudo em **Docker**. Mesmos padrões visuais e de código do
-Pulse RADIUS e do Projeto.io.
+H2NODE Auth (antigo Pulse RADIUS) e do Projeto.io.
 
 | Parte | O que faz |
 |---|---|
