@@ -6,8 +6,27 @@ Sistema para **fazer, receber, validar e acompanhar backups de servidores Linux
 (inclusive cPanel/WHM) e de configurações de switches, roteadores e OLTs** (FTP/TFTP),
 com painel web protegido por login. Stack: **FastAPI + PostgreSQL** no backend,
 **React + Vite + Tailwind** no frontend, **rsync sobre SSH** no transporte e
-**GPG** na criptografia, tudo em **Docker**. Mesmos padrões visuais e de código do
-H2NODE Auth (antigo Pulse RADIUS) e do Projeto.io.
+**GPG** na criptografia, tudo em **Docker**.
+
+**Em uma frase:** cada origem (servidor, computador ou equipamento de rede) cifra o backup
+com a chave **pública** do servidor e só consegue *gravar* nele; o servidor confere se o
+backup restaura de verdade e avisa (painel e Zabbix) quando algo falha ou atrasa. A chave
+**privada**, a única que abre os backups, fica com você.
+
+## Documentação
+
+| Quero… | Leia |
+|---|---|
+| Instalar o servidor em produção | [docs/deploy.md](docs/deploy.md) |
+| Entender o modelo de segurança | [docs/security.md](docs/security.md) |
+| Restaurar um backup | [docs/restore.md](docs/restore.md) |
+| Fazer backup de switches, roteadores, OLTs e MikroTik | [docs/network-devices.md](docs/network-devices.md) |
+| Receber alertas no Zabbix | [docs/zabbix.md](docs/zabbix.md) |
+| Compilar ou entender o cliente Windows | [windows-client/README.md](windows-client/README.md) |
+| Atualizar uma instalação antiga (Pulse Backup) | [docs/migracao-h2node.md](docs/migracao-h2node.md) |
+
+Depois de instalado, o menu **Ajuda** do painel traz o passo a passo de cada tipo de
+origem, já preenchido com o endereço e a chave do seu servidor.
 
 | Parte | O que faz |
 |---|---|

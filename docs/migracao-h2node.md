@@ -27,8 +27,9 @@ O script:
 O `.env` original fica copiado em `.env.antes-h2node.<data>`. O `docker compose` pode
 avisar que os volumes foram criados por outro projeto: é esperado.
 
-> Quem monta o volume `pulse-backup_caddy_data` em outro serviço (ex.: um serviço do
-> example.com) não precisa mudar nada: com `VOLUME_PREFIX=pulse-backup` o nome continua o mesmo.
+> Se outro serviço do mesmo servidor monta o volume `pulse-backup_caddy_data` (por exemplo,
+> para reaproveitar os certificados), ele não precisa mudar nada: com
+> `VOLUME_PREFIX=pulse-backup` o nome continua o mesmo.
 
 As regras do ufw criadas com o comentário `pulse-backup` continuam valendo; o
 `scripts/ufw-docker.sh` reconhece o bloco antigo (`PULSE-BACKUP`) no `after.rules`.

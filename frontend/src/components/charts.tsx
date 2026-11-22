@@ -1,4 +1,4 @@
-/* Gráficos leves em SVG/flex puro — sem dependências (mesmo estilo do H2NODE Auth).
+/* Gráficos leves em SVG/flex puro — sem dependências.
  * Cores de status (ok/aviso/falha) sempre acompanhadas de legenda com rótulo e
  * valor — a cor nunca é a única pista. Texto sempre em tons neutros. */
 import { useState, type ReactNode } from "react";

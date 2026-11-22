@@ -87,7 +87,7 @@ body {
   }
 }
 
-/* Ondas decorativas (login, cabeçalho e rodapé) — mesmo padrão do H2NODE Auth. */
+/* Ondas decorativas (login, cabeçalho e rodapé). */
 @keyframes wave-drift {
   from {
     transform: translateX(0);
